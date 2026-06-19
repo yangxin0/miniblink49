@@ -452,7 +452,7 @@ double WKE_CALL_TYPE jsToDouble(jsExecState es, jsValue v)
         v8::Isolate* isolate = wkeValue->isolate;
         v8::HandleScope handleScope(isolate);
         v8::Local<v8::Value> value = v8::Local<v8::Value>::New(wkeValue->isolate, wkeValue->value);
-        return value->ToNumber()->Value();
+        return value->ToNumber(isolate->GetCurrentContext()).ToLocalChecked()->Value();
     } else if (WkeJsValue::wkeJsValueInt == wkeValue->type) {
         return (double)wkeValue->intVal;
     } else if (WkeJsValue::wkeJsValueDouble == wkeValue->type)
@@ -789,7 +789,7 @@ jsValue WKE_CALL_TYPE jsGlobalObject(jsExecState es)
     v8::MaybeLocal<v8::String> str = v8::String::NewFromUtf8(isolate, "window", v8::NewStringType::kNormal, -1);
     if (str.IsEmpty())
         return jsUndefined();
-    v8::Local<v8::Value> val = obj->Get(str.ToLocalChecked());
+    v8::Local<v8::Value> val = obj->Get(isolate->GetCurrentContext(), str.ToLocalChecked()).FromMaybe(v8::Local<v8::Value>());
     if (val.IsEmpty() || !val->IsObject())
         return jsUndefined();
     
@@ -1037,7 +1037,7 @@ jsValue WKE_CALL_TYPE jsGet(jsExecState es, jsValue object, const char* prop)
         return jsUndefined();
     v8::Local<v8::String> propV8Local = propV8.ToLocalChecked();
 
-    v8::Local<v8::Value> retValue = obj->Get(propV8Local);
+    v8::Local<v8::Value> retValue = obj->Get(isolate->GetCurrentContext(), propV8Local).FromMaybe(v8::Local<v8::Value>());
     if (!tryCatch.HasCaught() && !retValue.IsEmpty())
         return createJsValueByLocalValue(isolate, context, retValue);
     return jsUndefined();
@@ -1071,7 +1071,7 @@ void WKE_CALL_TYPE jsSet(jsExecState es, jsValue object, const char* prop, jsVal
         return;
     v8::Local<v8::String> propV8Local = propV8.ToLocalChecked();
 
-    obj->Set(propV8Local, valueLocal);
+    obj->Set(isolate->GetCurrentContext(), propV8Local, valueLocal);
 }
 
 jsValue WKE_CALL_TYPE jsGetGlobal(jsExecState es, const char* prop)
@@ -1426,7 +1426,7 @@ static void addFunction(v8::Local<v8::Context> context, const char* name, wkeJsN
     v8::Local<v8::String> nameV8Local = nameV8.ToLocalChecked();
     func->SetName(nameV8Local);
 
-    object->Set(nameV8Local, func);
+    object->Set(isolate->GetCurrentContext(), nameV8Local, func);
 }
 
 class NativeGetterSetterWrap {
@@ -1771,7 +1771,7 @@ static void namedPropertyGetterCallback(v8::Local<v8::Name> prop, const v8::Prop
     v8::Local<v8::String> propStr;
     if (!prop->IsString())
         return;
-    propStr = prop->ToString();
+    propStr = prop->ToString(info.GetIsolate()->GetCurrentContext()).ToLocalChecked();
 
     NativeGetterSetterWrap* wrap = static_cast<NativeGetterSetterWrap*>(v8::External::Cast(*info.Data())->Value());
 
@@ -1797,7 +1797,7 @@ static void namedPropertySetterCallback(v8::Local<v8::Name> prop, v8::Local<v8::
     v8::Local<v8::String> propStr;
     if (!prop->IsString())
         return;
-    propStr = prop->ToString();
+    propStr = prop->ToString(info.GetIsolate()->GetCurrentContext()).ToLocalChecked();
 
     NativeGetterSetterWrap* wrap = static_cast<NativeGetterSetterWrap*>(v8::External::Cast(*info.Data())->Value());
 

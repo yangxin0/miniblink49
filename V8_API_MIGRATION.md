@@ -1,5 +1,26 @@
 # V8 7.5 → 8.7 API migration (engine compatibility)
 
+## TL;DR (compatibility verdict)
+
+**The V8 8.7 API is compatible with the engine with a small, mechanical
+migration — and most of the codebase was already written against the modern
+context-based V8 API.** A whole-engine census (`gin/`, `wke/`, `content/`) found
+only a handful of leftover V8 7.5-isms; they have been migrated:
+- `gin/`: `converter.cc`, `dictionary.{cc,h}`, `try_catch.cc` (the rest of gin
+  already used context-form `Set/Get/Call/NewInstance/Script::Compile`).
+- `wke/wkeJsBind.cpp`: 7 sites (`ToNumber/ToString`, `Object::Get/Set`).
+After migration, the engine-wide count of deprecated no-arg
+`To*()/BooleanValue()` and 2-arg `Set`/1-arg `Get` v8 calls is **0**.
+
+Verification status: gin files are **compile-verified** (syntax-only) against the
+V8 8.7 headers. `wke/wkeJsBind.cpp` edits are mechanically correct per the 8.7
+API but **not yet compile-verified** (wke can't build until the base/engine port
+advances — see BUILD_CROSSPLATFORM.md). The `Object::Get` sites in wke use
+`.FromMaybe(Local())` (not `.ToLocalChecked()`) to preserve the original
+exception/empty-handling semantics.
+
+
+
 The engine (`gin/`, `wke/wkeJsBind.cpp`, …) was written against the V8 ~7.5 C++
 API. The cross-platform build links **V8 8.7.220.3**. Between those versions V8
 deprecated/removed several APIs (the "context-and-Maybe" migration). This file
