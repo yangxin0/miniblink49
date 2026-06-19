@@ -8,3 +8,9 @@ build/miniblink.VC.VC.opendb
 out/*
 bin/cookies.dat
 *.user
+
+# CMake (cross-platform build) out-of-source build dirs
+build-cmake/
+cmake-build-*/
+/build/CMakeFiles/
+CMakeCache.txt

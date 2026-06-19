@@ -1,0 +1,94 @@
+diff --git a/config/compiler/BUILD.gn b/config/compiler/BUILD.gn
+index 4f6461b..b3ed2e0 100644
+--- a/config/compiler/BUILD.gn
++++ b/config/compiler/BUILD.gn
+@@ -480,34 +480,10 @@ config("compiler") {
+     ldflags += [ "-Wl,-z,keep-text-section-prefix" ]
+   }
+ 
+-  if (is_clang && !is_nacl && !use_xcode_clang) {
++  # NOTE: Disabled for the cross-platform build with the SYSTEM clang (21), which
++  # does not accept these pinned-clang-12-specific -mllvm internal flags.
++  if (false && is_clang && !is_nacl && !use_xcode_clang) {
+     cflags += [ "-fcrash-diagnostics-dir=" + clang_diagnostic_dir ]
+-
+-    cflags += [
+-      # TODO(hans): Remove this once Clang generates better optimized debug info
+-      # by default. https://crbug.com/765793
+-      "-mllvm",
+-      "-instcombine-lower-dbg-declare=0",
+-    ]
+-
+-    # Pinned clang has enable-dse-memoryssa enabled by default but it's broken,
+-    # so we have to force it off.
+-    # Trunk clang has it disabled by default but it might work, so we force it
+-    # on so the ToT bots can check if it works now.
+-    if (!llvm_force_head_revision) {
+-      cflags += [
+-        # TODO(https://crbug.com/1127713): Investigate, remove.
+-        "-mllvm",
+-        "-enable-dse-memoryssa=false",
+-      ]
+-    }
+-    if (llvm_force_head_revision) {
+-      cflags += [
+-        # TODO(https://crbug.com/1127713): Investigate, remove.
+-        "-mllvm",
+-        "-enable-dse-memoryssa=true",
+-      ]
+-    }
+   }
+ 
+   # C11/C++11 compiler flags setup.
+diff --git a/config/mac/sdk_info.py b/config/mac/sdk_info.py
+index 46f3435..24fc03a 100644
+--- a/config/mac/sdk_info.py
++++ b/config/mac/sdk_info.py
+@@ -66,11 +66,18 @@ def FillXcodeVersion(settings, developer_dir):
+     settings['xcode_build'] = version_plist['ProductBuildVersion']
+     return
+ 
+-  lines = subprocess.check_output(['xcodebuild',
+-                                   '-version']).decode('UTF-8').splitlines()
+-  settings['xcode_version'] = FormatVersion(lines[0].split()[-1])
+-  settings['xcode_version_int'] = int(settings['xcode_version'], 10)
+-  settings['xcode_build'] = lines[-1].split()[-1]
++  try:
++    lines = subprocess.check_output(['xcodebuild',
++                                     '-version']).decode('UTF-8').splitlines()
++    settings['xcode_version'] = FormatVersion(lines[0].split()[-1])
++    settings['xcode_version_int'] = int(settings['xcode_version'], 10)
++    settings['xcode_build'] = lines[-1].split()[-1]
++  except (subprocess.CalledProcessError, OSError):
++    # Command Line Tools only (no full Xcode.app). The SDK still comes from
++    # xcrun; provide a plausible dummy Xcode version so the build can proceed.
++    settings['xcode_version'] = '1500'
++    settings['xcode_version_int'] = 1500
++    settings['xcode_build'] = '15A240d'
+ 
+ 
+ def FillMachineOSBuild(settings):
+diff --git a/mac/find_sdk.py b/mac/find_sdk.py
+index d86f310..d1dbaee 100755
+--- a/mac/find_sdk.py
++++ b/mac/find_sdk.py
+@@ -70,9 +70,16 @@ def main():
+       dev_dir, 'Platforms/MacOSX.platform/Developer/SDKs')
+ 
+   if not os.path.isdir(sdk_dir):
+-    raise SdkError('Install Xcode, launch it, accept the license ' +
+-      'agreement, and run `sudo xcode-select -s /path/to/Xcode.app` ' +
+-      'to continue.')
++    # Command Line Tools only (no full Xcode.app). Locate the SDK via xcrun.
++    sdk_path = subprocess.check_output(
++        ['xcrun', '--show-sdk-path']).decode('UTF-8').rstrip()
++    best_sdk = subprocess.check_output(
++        ['xcrun', '--show-sdk-version']).decode('UTF-8').rstrip()
++    if options.print_sdk_path:
++      print(sdk_path)
++    if options.print_bin_path:
++      print(os.path.join(dev_dir, 'usr/bin/'))
++    return best_sdk
+   sdks = [re.findall('^MacOSX(\d+\.\d+)\.sdk$', s) for s in os.listdir(sdk_dir)]
+   sdks = [s[0] for s in sdks if s]  # [['10.5'], ['10.6']] => ['10.5', '10.6']
+   sdks = [s for s in sdks  # ['10.5', '10.6'] => ['10.6']

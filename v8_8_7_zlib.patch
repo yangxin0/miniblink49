@@ -1,0 +1,16 @@
+diff --git a/zutil.h b/zutil.h
+index 4425bcf..d65dcb0 100644
+--- a/zutil.h
++++ b/zutil.h
+@@ -145,7 +145,10 @@ extern z_const char * const z_errmsg[10]; /* indexed by 2-zlib_error */
+ #  endif
+ #endif
+ 
+-#if defined(MACOS) || defined(TARGET_OS_MAC)
++/* The modern macOS SDK defines TARGET_OS_MAC=1; this block is for *classic*
++ * Mac OS only. Exclude modern Apple platforms (handled by __APPLE__ below),
++ * otherwise it wrongly does `#define fdopen NULL` and breaks the real fdopen. */
++#if (defined(MACOS) || defined(TARGET_OS_MAC)) && !defined(__APPLE__)
+ #  define OS_CODE  7
+ #  ifndef Z_SOLO
+ #    if defined(__MWERKS__) && __dest_os != __be_os && __dest_os != __win32_os

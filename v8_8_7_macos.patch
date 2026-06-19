@@ -1,0 +1,62 @@
+diff --git a/src/base/bit-field.h b/src/base/bit-field.h
+index ca5fb45..e8400d5 100644
+--- a/src/base/bit-field.h
++++ b/src/base/bit-field.h
+@@ -39,8 +39,10 @@ class BitField final {
+   static constexpr int kLastUsedBit = kShift + kSize - 1;
+   static constexpr U kNumValues = U{1} << kSize;
+ 
+-  // Value for the field with all bits set.
+-  static constexpr T kMax = static_cast<T>(kNumValues - 1);
++  // Value for the field with all bits set. Use the underlying integer type U
++  // rather than T: casting an out-of-enum-range integer to T is rejected by
++  // newer Clang in a constexpr context (matches upstream V8's later fix).
++  static constexpr U kMax = kNumValues - 1;
+ 
+   template <class T2, int size2>
+   using Next = BitField<T2, kShift + kSize, size2, U>;
+diff --git a/src/objects/allocation-site.h b/src/objects/allocation-site.h
+index 1da5925..5fb25c7 100644
+--- a/src/objects/allocation-site.h
++++ b/src/objects/allocation-site.h
+@@ -74,7 +74,7 @@ class AllocationSite : public Struct {
+   using MementoFoundCountBits = base::BitField<int, 0, 26>;
+   using PretenureDecisionBits = base::BitField<PretenureDecision, 26, 3>;
+   using DeoptDependentCodeBit = base::BitField<bool, 29, 1>;
+-  STATIC_ASSERT(PretenureDecisionBits::kMax >= kLastPretenureDecisionValue);
++  STATIC_ASSERT(PretenureDecisionBits::kMax >= static_cast<unsigned>(kLastPretenureDecisionValue));
+ 
+   // Increments the mementos found counter and returns true when the first
+   // memento was found for a given allocation site.
+diff --git a/src/objects/scope-info.h b/src/objects/scope-info.h
+index 23c3949..43b2c91 100644
+--- a/src/objects/scope-info.h
++++ b/src/objects/scope-info.h
+@@ -268,7 +268,7 @@ class ScopeInfo : public FixedArray {
+   static const int kFlagsOffset = OffsetOfElementAt(Fields::kFlags);
+ 
+   STATIC_ASSERT(LanguageModeSize == 1 << LanguageModeBit::kSize);
+-  STATIC_ASSERT(kLastFunctionKind <= FunctionKindBits::kMax);
++  STATIC_ASSERT(static_cast<int>(kLastFunctionKind) <= FunctionKindBits::kMax);
+ 
+  private:
+   // The layout of the variable part of a ScopeInfo is as follows:
+diff --git a/src/objects/shared-function-info.h b/src/objects/shared-function-info.h
+index e195f99..9aa0099 100644
+--- a/src/objects/shared-function-info.h
++++ b/src/objects/shared-function-info.h
+@@ -646,11 +646,11 @@ class SharedFunctionInfo : public HeapObject {
+   class BodyDescriptor;
+ 
+   // Bailout reasons must fit in the DisabledOptimizationReason bitfield.
+-  STATIC_ASSERT(BailoutReason::kLastErrorMessage <=
++  STATIC_ASSERT(static_cast<int>(BailoutReason::kLastErrorMessage) <=
+                 DisabledOptimizationReasonBits::kMax);
+ 
+-  STATIC_ASSERT(kLastFunctionKind <= FunctionKindBits::kMax);
+-  STATIC_ASSERT(FunctionSyntaxKind::kLastFunctionSyntaxKind <=
++  STATIC_ASSERT(static_cast<int>(kLastFunctionKind) <= FunctionKindBits::kMax);
++  STATIC_ASSERT(static_cast<int>(FunctionSyntaxKind::kLastFunctionSyntaxKind) <=
+                 FunctionSyntaxKindBits::kMax);
+ 
+   // Indicates that this function uses a super property (or an eval that may
