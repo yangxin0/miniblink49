@@ -73,11 +73,11 @@ public:
 
     inline void SetMethod(const char* name, v8::FunctionCallback callback)
     {
-        v8::Local<v8::Function> func = v8::FunctionTemplate::New(isolate_, callback)->GetFunction();
+        v8::Local<v8::Function> func = v8::FunctionTemplate::New(isolate_, callback)->GetFunction(isolate_->GetCurrentContext()).ToLocalChecked();
         // kInternalized strings are created in the old space.
         const v8::NewStringType type = v8::NewStringType::kInternalized;
         v8::Local<v8::String> name_string = v8::String::NewFromUtf8(isolate(), name, type).ToLocalChecked();
-        object_->Set(name_string, func);
+        object_->Set(isolate_->GetCurrentContext(), name_string, func);
         func->SetName(name_string);  // NODE_SET_METHOD() compatibility.
     }
 
@@ -92,12 +92,12 @@ public:
     void SetMethod(const char* name, const std::function<void(const v8::FunctionCallbackInfo<v8::Value>&)>&& callback)
     {
         v8::Local<v8::External> wrap = v8::External::New(isolate_, new std::function<void(const v8::FunctionCallbackInfo<v8::Value>&)>(callback));
-        v8::Local<v8::Function> func = v8::FunctionTemplate::New(isolate_, MethodCallbackWrap, wrap)->GetFunction();
+        v8::Local<v8::Function> func = v8::FunctionTemplate::New(isolate_, MethodCallbackWrap, wrap)->GetFunction(isolate_->GetCurrentContext()).ToLocalChecked();
 
         // kInternalized strings are created in the old space.
         const v8::NewStringType type = v8::NewStringType::kInternalized;
         v8::Local<v8::String> name_string = v8::String::NewFromUtf8(isolate(), name, type).ToLocalChecked();
-        object_->Set(name_string, func);
+        object_->Set(isolate_->GetCurrentContext(), name_string, func);
         func->SetName(name_string);  // NODE_SET_METHOD() compatibility.
     }
 

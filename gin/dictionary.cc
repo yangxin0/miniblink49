@@ -48,7 +48,7 @@ void Dictionary::GetBydefaultVal(const char* name, bool defaultVal, bool* outRes
         *outResult = defaultVal;
         return;
     }
-    *outResult = result->ToBoolean()->BooleanValue();
+    *outResult = result->ToBoolean(isolate_)->Value();
 }
 
 void Dictionary::GetBydefaultVal(const char* name, int defaultVal, int* outResult) const
@@ -94,7 +94,7 @@ void Dictionary::GetBydefaultVal(const char* name, std::string defaultVal, std::
         return;
     }
 
-    v8::String::Utf8Value str(v);
+    v8::String::Utf8Value str(isolate_, v);
     *outResult = *str;
 }
 

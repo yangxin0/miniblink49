@@ -48,7 +48,7 @@ std::string TryCatch::GetStackTrace() {
 
   int len = trace->GetFrameCount();
   for (int i = 0; i < len; ++i) {
-    v8::Local<v8::StackFrame> frame = trace->GetFrame(i);
+    v8::Local<v8::StackFrame> frame = trace->GetFrame(isolate_, i);
     ss << V8ToString(frame->GetScriptName()) << ":"
        << frame->GetLineNumber() << ":"
        << frame->GetColumn() << ": "

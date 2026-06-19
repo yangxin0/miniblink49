@@ -21,7 +21,7 @@
 #include <vector>
 
 // #include "base/base_export.h"
-// #include "build/build_config.h"
+#include "build/build_config.h"   // defines OS_WIN / OS_POSIX (needed for StringType)
 
 namespace base {
 

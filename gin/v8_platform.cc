@@ -6,7 +6,9 @@
 #if V8_MAJOR_VERSION >= 7
 #include "v8_7_5/src/libplatform/default_platform_wrap.h"
 #endif
+#if defined(_WIN32)
 #include <windows.h>
+#endif
 #include "third_party/WebKit/public/platform/Platform.h"
 #include "third_party/WebKit/public/platform/WebTraceLocation.h"
 #include "third_party/WebKit/public/platform/WebThread.h"
