@@ -24,6 +24,17 @@
 #  endif
 #endif
 
+// Comparison variants of DCHECK (miniblink's logging.h omitted these; base/
+// and gin/ use them widely). Minimal forms built on DCHECK.
+#ifndef DCHECK_EQ
+#define DCHECK_EQ(a, b) DCHECK((a) == (b))
+#define DCHECK_NE(a, b) DCHECK((a) != (b))
+#define DCHECK_LE(a, b) DCHECK((a) <= (b))
+#define DCHECK_LT(a, b) DCHECK((a) <  (b))
+#define DCHECK_GE(a, b) DCHECK((a) >= (b))
+#define DCHECK_GT(a, b) DCHECK((a) >  (b))
+#endif
+
 #if defined(NDEBUG) && !defined(DCHECK_ALWAYS_ON)
 #define DCHECK_IS_ON() 0
 #else

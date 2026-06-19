@@ -38,6 +38,12 @@ set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib")
 
 enable_testing()
 
+# ---- Engine base library (port in progress) ---------------------------------
+option(MINIBLINK_BUILD_BASE "Build the engine base/ library (macOS port WIP)" OFF)
+if(MINIBLINK_BUILD_BASE)
+    add_subdirectory(base)
+endif()
+
 # ---- Imported V8 monolith target -------------------------------------------
 set(_v8_lib "${MINIBLINK_V8_ROOT}/${MINIBLINK_V8_OUT}/obj/libv8_monolith.a")
 set(_v8_inc "${MINIBLINK_V8_ROOT}/include")

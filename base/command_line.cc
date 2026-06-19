@@ -25,9 +25,7 @@
 
 namespace base {
 
-typedef wchar_t char16;
-typedef std::wstring string16;
-typedef std::char_traits<wchar_t> string16_char_traits;
+// (string16/char16 come from base/strings/string16.h — do not redefine.)
 
 CommandLine* CommandLine::current_process_commandline_ = NULL;
 

@@ -8,11 +8,10 @@
 #define BASE_STRINGS_STRING_UTIL_H_
 
 #include <string>
+// Use the canonical, platform-conditional string16/char16 definition rather
+// than redefining it here (which broke on macOS, where wchar_t is 32-bit).
+#include "base/strings/string16.h"
 namespace base {
-
-	typedef wchar_t char16;
-	typedef std::wstring string16;
-	typedef std::char_traits<wchar_t> string16_char_traits;
 
 enum TrimPositions {
     TRIM_NONE = 0,
