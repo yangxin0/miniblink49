@@ -38,7 +38,7 @@ list(FILTER BLINK_CORE_SRC EXCLUDE REGEX "Test\\.cpp$|TestHelper\\.cpp$")
 list(FILTER BLINK_CORE_SRC EXCLUDE REGEX "HTMLMetaElement-in\\.cpp$")
 # nested-subdir stragglers: API skews / platform variants (HTMLParserScheduler
 # recovered by the workflow).
-list(FILTER BLINK_CORE_SRC EXCLUDE REGEX "CustomElementNone\\.cpp$|FileInputType\\.cpp$|CanvasRenderingContextFactory\\.cpp$")
+list(FILTER BLINK_CORE_SRC EXCLUDE REGEX "CustomElementNone\\.cpp$|CanvasRenderingContextFactory\\.cpp$")
 # layout: non-mac platform themes (we keep LayoutThemeMac). LayoutText/LayoutReplaced recovered.
 list(FILTER BLINK_CORE_SRC EXCLUDE REGEX "LayoutTheme(Android|Default|Linux|Win|FontProviderWin)\\.cpp$")
 # paint: non-mac theme painter (we keep the mac path).

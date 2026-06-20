@@ -54,7 +54,8 @@ file(GLOB_RECURSE BLINK_FONTS "${BSRC}/fonts/*.cpp")  # incl. fonts/shaping (har
 file(GLOB BLINK_SUBLAYERS
     "${BSRC}/scroll/*.cpp" "${BSRC}/network/*.cpp"
     "${BSRC}/mhtml/*.cpp" "${BSRC}/mediastream/*.cpp" "${BSRC}/blob/*.cpp"
-    "${BSRC}/plugins/*.cpp"
+    "${BSRC}/plugins/*.cpp" "${BSRC}/clipboard/*.cpp" "${BSRC}/scheduler/*.cpp"
+    "${BSRC}/image-decoders/*.cpp"   # base ImageDecoder/ImageFrame/ImagePlanes (codec subdirs deferred)
     "${BSRC}/weborigin/*.cpp"    # KURL recovered; KURL_new/KURL_w variants excluded below
     "${BSRC}/*.cpp")             # platform-root files (JSONValues/Widget/SharedBuffer/DateComponents/...)
 # platform-root: 48/50 compile. The 4 value types already in BLINK_CORE_SOURCES
@@ -70,6 +71,8 @@ list(FILTER BLINK_SUBLAYERS EXCLUDE REGEX "Test\\.cpp$")
 # weborigin: keep KURL.cpp (recovered); the alternate KURL_new (chromium url/) and
 # KURL_w (copyASCII skew) variants are not used on macOS.
 list(FILTER BLINK_SUBLAYERS EXCLUDE REGEX "KURL_new\\.cpp$|KURL_w\\.cpp$")
+# clipboard: keep the Posix variant; the Win one needs shlwapi.h.
+list(FILTER BLINK_SUBLAYERS EXCLUDE REGEX "ClipboardUtilitiesWin\\.cpp$")
 # UnifiedHeapController now compiles: migrated to the V8 8.7 EmbedderHeapTracer API
 # (TracePrologue(TraceFlags)/TraceEpilogue(TraceSummary*)/TracedReferenceBase).
 # Most of graphics/ is skia-2D and compiles clean (GraphicsContext, the
