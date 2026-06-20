@@ -132,7 +132,12 @@ target_compile_options(blink_platform PUBLIC -include "${WSRC}/config.h")
 # ABI-affecting flag, so it must be identical across platform and core; PUBLIC so
 # blink_core inherits it.
 target_compile_definitions(blink_platform PUBLIC
-    OFFICIAL_BUILD U_DISABLE_RENAMING=1 INSIDE_BLINK=1 ENABLE_OILPAN=1)
+    OFFICIAL_BUILD U_DISABLE_RENAMING=1 INSIDE_BLINK=1 ENABLE_OILPAN=1
+    # Match the V8 monolith ABI (pointer compression). PUBLIC so every blink
+    # archive that links blink_platform (core/generated/bindings/modules/web)
+    # inherits it — v8::Local/Persistent sizes depend on it, so all blink code
+    # and the monolith must agree or the final link is ABI-corrupt.
+    V8_COMPRESS_POINTERS V8_31BIT_SMIS_ON_64BIT_ARCH)
 set_target_properties(blink_platform PROPERTIES CXX_STANDARD 14)
 if(NOT MSVC)
     target_compile_options(blink_platform PRIVATE
