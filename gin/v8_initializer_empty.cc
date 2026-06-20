@@ -4,7 +4,17 @@
 
 #include "gin/v8_initializer.h"
 
+#include "base/rand_util.h"
+
 namespace gin {
+
+namespace {
+// Matches v8_initializer.cc's entropy source (the _empty variant omitted it).
+bool GenerateEntropy(unsigned char* buffer, size_t amount) {
+  base::RandBytes(buffer, amount);
+  return true;
+}
+}  // namespace
 
 // static
 void V8Initializer::Initialize(gin::IsolateHolder::ScriptMode mode) {

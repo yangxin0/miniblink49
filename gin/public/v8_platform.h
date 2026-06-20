@@ -80,10 +80,12 @@ public:
     int NumberOfWorkerThreads(void) override;
     std::shared_ptr<v8::TaskRunner> GetForegroundTaskRunner(v8::Isolate*) override;
 #else
+    // CallOn/DelayedOnForegroundThread + CallOnBackgroundThread were removed from
+    // v8::Platform in V8 7+ (replaced by task runners). Pre-7 only.
     void CallOnBackgroundThread(v8::Task* task, v8::Platform::ExpectedRuntime expected_runtime) override;
-#endif
     void CallOnForegroundThread(v8::Isolate* isolate, v8::Task* task) override;
     void CallDelayedOnForegroundThread(v8::Isolate* isolate, v8::Task* task, double delay_in_seconds) override;
+#endif
 
     double MonotonicallyIncreasingTime() override;
 
