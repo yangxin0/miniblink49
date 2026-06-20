@@ -81,6 +81,23 @@ if(MINIBLINK_BUILD_BLINK)
     include(third_party/WebKit/Source/core/blink_core.cmake)  # blink_core archive
     include(third_party/WebKit/Source/web/blink_web.cmake)    # blink_web embedding layer
     add_subdirectory(test/blink)  # smoke test: prove geometry links + computes
+
+    if(APPLE)
+        # macOS backend (part 3): NSEvent -> blink WebInputEvent. Blink-coupled
+        # (WebInputEvent uses IntRect under INSIDE_BLINK), so it inherits
+        # blink_platform's flags/includes.
+        add_library(miniblink_mac_input STATIC
+            "${CMAKE_SOURCE_DIR}/port/mac/web_input_event_mac.mm")
+        target_link_libraries(miniblink_mac_input PUBLIC blink_platform "-framework Cocoa")
+        target_include_directories(miniblink_mac_input PUBLIC "${CMAKE_SOURCE_DIR}")
+        set_target_properties(miniblink_mac_input PROPERTIES CXX_STANDARD 14)
+
+        add_executable(web_input_event_mac_smoketest
+            "${CMAKE_SOURCE_DIR}/test/mac/web_input_event_mac_smoketest.mm")
+        target_link_libraries(web_input_event_mac_smoketest PRIVATE miniblink_mac_input)
+        set_target_properties(web_input_event_mac_smoketest PROPERTIES CXX_STANDARD 14)
+        add_test(NAME web_input_event_mac_smoketest COMMAND web_input_event_mac_smoketest)
+    endif()
 endif()
 
 # ---- Imported V8 monolith target -------------------------------------------
