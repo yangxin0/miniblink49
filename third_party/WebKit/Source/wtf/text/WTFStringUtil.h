@@ -9,7 +9,7 @@
 // Win type shims (this util was written against the Win32 codepage API).
 #if !defined(_WIN32)
 typedef unsigned int UINT;
-typedef unsigned long DWORD;
+typedef unsigned int DWORD;   // Win32 DWORD is 32-bit; matches win_compat/windows.h
 typedef unsigned char UCHAR;
 typedef const char* LPCSTR;
 #ifndef CP_UTF8
