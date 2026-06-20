@@ -432,9 +432,13 @@ static void initializeV8Common(v8::Isolate* isolate)
     isolate->SetHostInitializeImportMetaObjectCallback(hostGetImportMetaProperties);
 #endif
 
+#if V8_MAJOR_VERSION < 8
     v8::Debug::SetLiveEditEnabled(isolate, false);
-
     isolate->SetAutorunMicrotasks(false);
+#else
+    // V8 8.7: live-edit toggle removed; autorun-microtasks -> explicit policy.
+    isolate->SetMicrotasksPolicy(v8::MicrotasksPolicy::kExplicit);
+#endif
 }
 
 namespace {
@@ -456,7 +460,7 @@ class ArrayBufferAllocator : public v8::ArrayBuffer::Allocator {
         void* data;
         WTF::ArrayBufferContents::allocateMemory(size, policy, data);
 
-        // ±¾º¯ÊýµÄ·µ»ØÖµ£¬±ØÐëÊÇArrayBufferContents::allocateMemoryµÄ·µ»ØÖµ¡£ÒòÎªÏÂÃæ¶ÑÕ»£º
+        // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ä·ï¿½ï¿½ï¿½Öµï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ArrayBufferContents::allocateMemoryï¿½Ä·ï¿½ï¿½ï¿½Öµï¿½ï¿½ï¿½ï¿½Îªï¿½ï¿½ï¿½ï¿½ï¿½Õ»ï¿½ï¿½
         //  node.dll!blink::`anonymous namespace'::ArrayBufferAllocator::allocate
         //  node.dll!blink::`anonymous namespace'::ArrayBufferAllocator::AllocateUninitialized
         //  node.dll!v8::internal::JSTypedArray::MaterializeArrayBuffer
@@ -467,8 +471,8 @@ class ArrayBufferAllocator : public v8::ArrayBuffer::Allocator {
         //  node.dll!blink::CryptoV8Internal::getRandomValuesMethod
         //  node.dll!blink::CryptoV8Internal::getRandomValuesMethodCallback
         //  node.dll!v8::internal::FunctionCallbackArguments::Call
-        // ¿ÉÒÔ¿´µ½WTF::ArrayBufferContents contents(v8Contents.Data(), v8Contents.ByteLength(), WTF::ArrayBufferContents::NotShared);
-        // ÕâÀï»á°Ñ±¾º¯Êý·ÖÅäµÄÄÚ´æ£¬Ö±½ÓÈ¡³öºó¸øArrayBufferContents
+        // ï¿½ï¿½ï¿½Ô¿ï¿½ï¿½ï¿½WTF::ArrayBufferContents contents(v8Contents.Data(), v8Contents.ByteLength(), WTF::ArrayBufferContents::NotShared);
+        // ï¿½ï¿½ï¿½ï¿½ï¿½Ñ±ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ú´æ£¬Ö±ï¿½ï¿½È¡ï¿½ï¿½ï¿½ï¿½ï¿½ArrayBufferContents
 
 //         WTF::ArrayBufferContents::allocateMemory(size + sizeof(gin::IsolateHolder::MemoryHead), policy, data);
 // 
@@ -528,10 +532,18 @@ void V8Initializer::initializeMainThreadIfNeeded()
 
     initializeV8Common(isolate);
 
+#if V8_MAJOR_VERSION < 8
     v8::V8::SetFatalErrorHandler(reportFatalErrorInMainThread);
     v8::V8::AddMessageListener(messageHandlerInMainThread);
     v8::V8::SetFailedAccessCheckCallbackFunction(failedAccessCheckCallbackInMainThread);
     v8::V8::SetAllowCodeGenerationFromStringsCallback(codeGenerationCheckCallbackInMainThread);
+#else
+    // V8 8.7: these moved from static v8::V8:: to per-isolate methods.
+    isolate->SetFatalErrorHandler(reportFatalErrorInMainThread);
+    isolate->AddMessageListener(messageHandlerInMainThread);
+    isolate->SetFailedAccessCheckCallbackFunction(failedAccessCheckCallbackInMainThread);
+    isolate->SetAllowCodeGenerationFromStringsCallback(codeGenerationCheckCallbackInMainThread);
+#endif
 
     if (RuntimeEnabledFeatures::v8IdleTasksEnabled())
         Platform::current()->currentThread()->scheduler()->postIdleTask(FROM_HERE, WTF::bind<double>(idleGCTaskInMainThread));
@@ -578,7 +590,11 @@ static void messageHandlerInWorker(v8::Local<v8::Message> message, v8::Local<v8:
 
         // If execution termination has been triggered as part of constructing
         // the error event from the v8::Message, quietly leave.
+#if V8_MAJOR_VERSION < 8
         if (!v8::V8::IsExecutionTerminating(isolate)) {
+#else
+        if (!isolate->IsExecutionTerminating()) {
+#endif
             V8ErrorHandler::storeExceptionOnErrorEventWrapper(isolate, event.get(), data, scriptState->context()->Global());
             context->reportException(event.release(), scriptId, callStack, corsStatus);
         }
@@ -597,8 +613,13 @@ void V8Initializer::initializeWorker(v8::Isolate* isolate)
 {
     initializeV8Common(isolate);
 
+#if V8_MAJOR_VERSION < 8
     v8::V8::AddMessageListener(messageHandlerInWorker);
     v8::V8::SetFatalErrorHandler(reportFatalErrorInWorker);
+#else
+    isolate->AddMessageListener(messageHandlerInWorker);
+    isolate->SetFatalErrorHandler(reportFatalErrorInWorker);
+#endif
 
     uint32_t here;
     isolate->SetStackLimit(reinterpret_cast<uintptr_t>(&here - kWorkerMaxStackSize / sizeof(uint32_t*)));
