@@ -195,7 +195,9 @@ void V8HTMLCollection::visitDOMWrapper(v8::Isolate* isolate, ScriptWrappable* sc
     // The ownerNode() method may return a reference or a pointer.
     if (Node* owner = WTF::getPtr(impl->ownerNode())) {
         Node* root = V8GCController::opaqueRootForGC(isolate, owner);
+        #if V8_MAJOR_VERSION < 8
         isolate->SetReferenceFromGroup(v8::UniqueId(reinterpret_cast<intptr_t>(root)), wrapper);
+        #endif
         return;
     }
 }

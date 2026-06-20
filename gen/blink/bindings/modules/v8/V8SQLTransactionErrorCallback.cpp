@@ -51,7 +51,11 @@ bool V8SQLTransactionErrorCallback::handleEvent(SQLError* error)
     }
     v8::Local<v8::Value> argv[] = { errorHandle };
 
+    #if V8_MAJOR_VERSION < 8
     v8::TryCatch exceptionCatcher;
+    #else
+    v8::TryCatch exceptionCatcher(m_scriptState->isolate());
+    #endif
     exceptionCatcher.SetVerbose(true);
     ScriptController::callFunction(m_scriptState->executionContext(), m_callback.newLocal(m_scriptState->isolate()), m_scriptState->context()->Global(), 1, argv, m_scriptState->isolate());
     return !exceptionCatcher.HasCaught();

@@ -317,7 +317,9 @@ static void installV8HTMLDocumentTemplate(v8::Local<v8::FunctionTemplate> functi
     ALLOW_UNUSED_LOCAL(instanceTemplate);
     v8::Local<v8::ObjectTemplate> prototypeTemplate = functionTemplate->PrototypeTemplate();
     ALLOW_UNUSED_LOCAL(prototypeTemplate);
+    #if V8_MAJOR_VERSION < 8
     functionTemplate->SetHiddenPrototype(true);
+    #endif
 
     // Custom toString template
 #if V8_MAJOR_VERSION < 7

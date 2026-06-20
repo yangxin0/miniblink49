@@ -8198,7 +8198,9 @@ void V8Window::installV8WindowTemplate(v8::Local<v8::FunctionTemplate> functionT
     V8DOMConfiguration::installAttribute(isolate, prototypeTemplate, v8::Local<v8::ObjectTemplate>(), toStringOriginSafeAttributeConfiguration);
 
     prototypeTemplate->SetInternalFieldCount(V8Window::internalFieldCount);
+    #if V8_MAJOR_VERSION < 8
     functionTemplate->SetHiddenPrototype(true);
+    #endif
     instanceTemplate->SetInternalFieldCount(V8Window::internalFieldCount);
 
     // Cross-origin access check

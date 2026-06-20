@@ -314,7 +314,9 @@ void V8NamedNodeMap::visitDOMWrapper(v8::Isolate* isolate, ScriptWrappable* scri
     // The element() method may return a reference or a pointer.
     if (Node* owner = WTF::getPtr(impl->element())) {
         Node* root = V8GCController::opaqueRootForGC(isolate, owner);
+        #if V8_MAJOR_VERSION < 8
         isolate->SetReferenceFromGroup(v8::UniqueId(reinterpret_cast<intptr_t>(root)), wrapper);
+        #endif
         return;
     }
 }

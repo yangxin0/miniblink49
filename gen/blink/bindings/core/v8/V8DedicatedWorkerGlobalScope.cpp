@@ -223,7 +223,9 @@ void V8DedicatedWorkerGlobalScope::installV8DedicatedWorkerGlobalScopeTemplate(v
         V8DOMConfiguration::installAttribute(isolate, instanceTemplate, prototypeTemplate, attributeConfiguration);
     }
 #endif
+    #if V8_MAJOR_VERSION < 8
     functionTemplate->SetHiddenPrototype(true);
+    #endif
 
     // Custom toString template
 #if V8_MAJOR_VERSION < 7

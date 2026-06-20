@@ -915,7 +915,7 @@ static void getPtrForTestMethodCallback(const v8::FunctionCallbackInfo<v8::Value
     OutputDebugStringA(output);
     free(output);
 
-    v8SetReturnValueUnsigned(info, (unsigned int)impl);
+    v8SetReturnValueUnsigned(info, (unsigned int)(uintptr_t)impl);
     TRACE_EVENT_SET_SAMPLING_STATE("v8", "V8Execution");
 }
 

@@ -169,7 +169,9 @@ void V8DOMImplementation::visitDOMWrapper(v8::Isolate* isolate, ScriptWrappable*
     // The document() method may return a reference or a pointer.
     if (Node* owner = WTF::getPtr(impl->document())) {
         Node* root = V8GCController::opaqueRootForGC(isolate, owner);
+        #if V8_MAJOR_VERSION < 8
         isolate->SetReferenceFromGroup(v8::UniqueId(reinterpret_cast<intptr_t>(root)), wrapper);
+        #endif
         return;
     }
 }

@@ -195,7 +195,9 @@ void V8SharedWorkerGlobalScope::installV8SharedWorkerGlobalScopeTemplate(v8::Loc
         {"PromiseRejectionEvent", v8ConstructorAttributeGetter, SharedWorkerGlobalScopeV8Internal::SharedWorkerGlobalScopeConstructorAttributeSetterCallback, 0, 0, const_cast<WrapperTypeInfo*>(&V8PromiseRejectionEvent::wrapperTypeInfo), static_cast<v8::AccessControl>(v8::DEFAULT), static_cast<v8::PropertyAttribute>(v8::DontEnum), V8DOMConfiguration::ExposedToAllScripts, V8DOMConfiguration::OnInstance, V8DOMConfiguration::CheckHolder};
         V8DOMConfiguration::installAttribute(isolate, instanceTemplate, prototypeTemplate, attributeConfiguration);
     }
+    #if V8_MAJOR_VERSION < 8
     functionTemplate->SetHiddenPrototype(true);
+    #endif
 
     // Custom toString template
 #if V8_MAJOR_VERSION < 7

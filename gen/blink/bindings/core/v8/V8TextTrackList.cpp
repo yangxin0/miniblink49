@@ -223,7 +223,9 @@ void V8TextTrackList::visitDOMWrapper(v8::Isolate* isolate, ScriptWrappable* scr
     // The owner() method may return a reference or a pointer.
     if (Node* owner = WTF::getPtr(impl->owner())) {
         Node* root = V8GCController::opaqueRootForGC(isolate, owner);
+        #if V8_MAJOR_VERSION < 8
         isolate->SetReferenceFromGroup(v8::UniqueId(reinterpret_cast<intptr_t>(root)), wrapper);
+        #endif
         return;
     }
 }

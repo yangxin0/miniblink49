@@ -10,10 +10,14 @@ set(GENB "${CMAKE_SOURCE_DIR}/gen/blink/bindings")
 
 file(GLOB_RECURSE BLINK_BINDINGS_SRC "${GENB}/*.cpp")
 list(FILTER BLINK_BINDINGS_SRC EXCLUDE REGEX "Test\\.cpp$")
-# 150 of 863 generated wrappers fail (specific interfaces with V8 7.5->8.7 binding
-# patterns the generator emitted — collection indexers, certain dictionaries,
-# track/media types). Listed in blink_bindings_skip.txt; deferred (a generator-
-# template-level migration). 713 wrappers compile.
+# Build the per-interface INDIVIDUAL wrappers (not the V8Generated*Bindings unity
+# amalgams, which #include the same individuals -> would duplicate symbols). The
+# V8 7.5->8.7 generated-code deltas were migrated in place, version-guarded:
+#   - isolate->SetReferenceFromGroup(...) and FunctionTemplate::SetHiddenPrototype
+#     (V8-8-removed GC/proto hints, replaced by unified-heap wrapper tracing)
+#   - v8::TryCatch now takes an Isolate* (block(isolate) / exceptionCatcher(...))
+# skip list = all 39 amalgams + the 3 webmidi wrappers still abstract on macOS
+# (ActiveDOMObject::toScriptWrappable unimplemented — a blink quirk, deferred).
 file(STRINGS "${CMAKE_SOURCE_DIR}/gen/blink_bindings_skip.txt" BLINK_BINDINGS_SKIP)
 foreach(_skip ${BLINK_BINDINGS_SKIP})
     list(FILTER BLINK_BINDINGS_SRC EXCLUDE REGEX "/${_skip}\\.cpp$")
@@ -29,5 +33,8 @@ set_target_properties(blink_bindings PROPERTIES CXX_STANDARD 14)
 if(NOT MSVC)
     target_compile_options(blink_bindings PRIVATE
         -fdeclspec -fno-exceptions -Wno-unused -Wno-deprecated-declarations
-        -Wno-error=incompatible-function-pointer-types -Wno-error=int-conversion)
+        -Wno-error=incompatible-function-pointer-types -Wno-error=int-conversion
+        # Generated GL/IDL constant tables brace-init unsigned values (0xFFFFFFFF)
+        # into int fields; MSVC accepts this, clang flags -Wc++11-narrowing.
+        -Wno-c++11-narrowing)
 endif()
