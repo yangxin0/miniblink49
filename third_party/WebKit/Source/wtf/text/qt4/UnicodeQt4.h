@@ -37,6 +37,7 @@
 #endif
 
 #include <ctype.h>
+#include <wctype.h>   // iswpunct/iswspace/iswalnum (wide ctype)
 
 QT_BEGIN_NAMESPACE
 namespace QUnicodeTables {

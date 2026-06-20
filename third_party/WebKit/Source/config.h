@@ -149,3 +149,13 @@
 #if USING_VC6RT == 1
 #include <algorithmvc6.h>
 #endif
+
+// Portable DebugBreak() for non-Windows (WTF uses it as a debug trap; on Windows
+// it comes from <windows.h>).
+#if !defined(_WIN32) && !defined(DebugBreak)
+#if defined(__has_builtin) && __has_builtin(__builtin_debugtrap)
+#define DebugBreak() __builtin_debugtrap()
+#else
+#define DebugBreak() __builtin_trap()
+#endif
+#endif
