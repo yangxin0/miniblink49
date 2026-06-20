@@ -3,6 +3,8 @@
 // found in the LICENSE file.
 
 #include "base/command_line.h"
+#include "base/strings/string16.h"
+#include <stdint.h>
 
 #include <algorithm>
 #include <ostream>
@@ -21,8 +23,6 @@
 #include <shellapi.h>
 #endif
 
-#include "third_party/WebKit/Source/wtf/text/WTFStringUtil.h"
-
 namespace base {
 
 // (string16/char16 come from base/strings/string16.h — do not redefine.)
@@ -35,46 +35,55 @@ const CommandLine::CharType kSwitchTerminator[] = FILE_PATH_LITERAL("--");
 const CommandLine::CharType kSwitchValueSeparator[] = FILE_PATH_LITERAL("=");
 
 //const wchar_t kWhitespaceWide[] = L" ";
-const char16 kWhitespaceUTF16[] = L" ";
+const char16 kWhitespaceUTF16[] = { static_cast<char16>(0x20), 0 };
 const char kWhitespaceASCII[] = " ";
 
-std::string utf16ToChar(string16 src, UINT codePage) {
-    std::string result;
-
-    int n = ::WideCharToMultiByte(codePage, 0, src.c_str(), src.size(), NULL, 0, NULL, NULL);
-    if (0 == n)
-        return "";
-
-    std::vector<char> charBuf(n + 5);
-    memset(charBuf.data(), 0, sizeof(char) * (n + 5));
-
-    ::WideCharToMultiByte(codePage, 0, src.c_str(), src.size(), charBuf.data(), n, NULL, NULL);
-    result = charBuf.data();
-    
-    return result;
+// Self-contained UTF conversions (portable; replace the Win32 codepage APIs).
+// Kept local to command_line.cc to avoid clashing with base/strings/string_util.
+std::string utf16ToChar(const string16& src) {
+    std::string out;
+    for (size_t i = 0; i < src.size(); ) {
+        uint32_t cp = static_cast<uint16_t>(src[i++]);
+        if (cp >= 0xD800 && cp <= 0xDBFF && i < src.size()) {
+            uint32_t lo = static_cast<uint16_t>(src[i]);
+            if (lo >= 0xDC00 && lo <= 0xDFFF) { cp = 0x10000 + ((cp - 0xD800) << 10) + (lo - 0xDC00); ++i; }
+        }
+        if (cp < 0x80) out.push_back((char)cp);
+        else if (cp < 0x800) { out.push_back((char)(0xC0|(cp>>6))); out.push_back((char)(0x80|(cp&0x3F))); }
+        else if (cp < 0x10000) { out.push_back((char)(0xE0|(cp>>12))); out.push_back((char)(0x80|((cp>>6)&0x3F))); out.push_back((char)(0x80|(cp&0x3F))); }
+        else { out.push_back((char)(0xF0|(cp>>18))); out.push_back((char)(0x80|((cp>>12)&0x3F))); out.push_back((char)(0x80|((cp>>6)&0x3F))); out.push_back((char)(0x80|(cp&0x3F))); }
+    }
+    return out;
 }
 
-std::wstring charToWide(const std::string& src, UINT codePage) {
-    std::wstring result;
-    size_t n = ::MultiByteToWideChar(codePage, 0, src.c_str(), src.size(), nullptr, 0);
-    if (0 == n)
-        return L"";
-
-    std::vector<wchar_t> wcharBuf(n + 5);
-    memset(wcharBuf.data(), 0, sizeof(wchar_t) * (n + 5));
-
-    ::MultiByteToWideChar(codePage, 0, src.c_str(), src.size(), &wcharBuf[0], n);
-    result = wcharBuf.data();
-
-    return result;
+std::wstring charToWide(const std::string& src) {
+    std::wstring out;
+    for (size_t i = 0; i < src.size(); ) {
+        unsigned char c = (unsigned char)src[i++];
+        uint32_t cp; int extra;
+        if (c < 0x80) { cp = c; extra = 0; }
+        else if ((c & 0xE0) == 0xC0) { cp = c & 0x1F; extra = 1; }
+        else if ((c & 0xF0) == 0xE0) { cp = c & 0x0F; extra = 2; }
+        else if ((c & 0xF8) == 0xF0) { cp = c & 0x07; extra = 3; }
+        else { cp = 0xFFFD; extra = 0; }
+        for (int k = 0; k < extra && i < src.size(); ++k) { cp = (cp << 6) | ((unsigned char)src[i++] & 0x3F); }
+        if (sizeof(wchar_t) >= 4 || cp <= 0xFFFF) {
+            out.push_back((wchar_t)cp);
+        } else {
+            cp -= 0x10000;
+            out.push_back((wchar_t)(0xD800 | (cp >> 10)));
+            out.push_back((wchar_t)(0xDC00 | (cp & 0x3FF)));
+        }
+    }
+    return out;
 }
 
 std::wstring UTF8ToWide(const std::string& utf8) {
-    return charToWide(utf8, CP_UTF8);
+    return charToWide(utf8);
 }
 
 std::wstring ASCIIToWide(const std::string& ascii) {
-    return charToWide(ascii, CP_ACP);
+    return charToWide(ascii);
 }
 // 
 // std::wstring ASCIIToWide(const StringPiece& ascii) {
@@ -88,7 +97,7 @@ std::wstring ASCIIToWide(const std::string& ascii) {
 // }
 
 std::string UTF16ToASCII(const string16& utf16) {
-    return utf16ToChar(utf16, CP_ACP);
+    return utf16ToChar(utf16);
 }
 
 enum TrimPositions {
@@ -131,19 +140,19 @@ TrimPositions TrimWhitespace(const string16& input, TrimPositions positions, str
     return TrimStringT(input, base::string16(kWhitespaceUTF16), positions, output);
 }
 
-// TrimPositions TrimWhitespaceASCII(const std::string& input,
-//     TrimPositions positions,
-//     std::string* output) {
-//     return TrimStringT(input, std::string(kWhitespaceASCII), positions, output);
-// }
+// std::string overload (needed where CommandLine::StringType is std::string,
+// i.e. on POSIX/macOS).
+TrimPositions TrimWhitespaceASCII(const std::string& input,
+    TrimPositions positions,
+    std::string* output) {
+    return TrimStringT(input, std::string(kWhitespaceASCII), positions, output);
+}
 
-// This function is only for backward-compatibility.
-// To be removed when all callers are updated.
-// TrimPositions TrimWhitespace(const std::string& input,
-//     TrimPositions positions,
-//     std::string* output) {
-//     return TrimWhitespaceASCII(input, positions, output);
-// }
+TrimPositions TrimWhitespace(const std::string& input,
+    TrimPositions positions,
+    std::string* output) {
+    return TrimWhitespaceASCII(input, positions, output);
+}
 
 
 // Since we use a lazy match, make sure that longer versions (like "--") are
@@ -173,8 +182,8 @@ size_t GetSwitchPrefixLength(const CommandLine::StringType& string) {
 bool IsSwitch(const CommandLine::StringType& string,
               CommandLine::StringType* switch_string,
               CommandLine::StringType* switch_value) {
-  *switch_string = L"";
-  *switch_value = L"";
+  *switch_string = FILE_PATH_LITERAL("");
+  *switch_value = FILE_PATH_LITERAL("");
   size_t prefix_length = GetSwitchPrefixLength(string);
   if (prefix_length == 0 || prefix_length == string.length())
     return false;
@@ -526,14 +535,16 @@ void CommandLine::PrependWrapper(const CommandLine::StringType& wrapper) {
   // The wrapper may have embedded arguments (like "gdb --args"). In this case,
   // we don't pretend to do anything fancy, we just split on spaces.
   StringVector wrapper_argv;
-  //SplitString(wrapper, FILE_PATH_LITERAL(' '), &wrapper_argv);
-
-  String strData((const UChar*)wrapper.c_str(), wrapper.size());
-  WTF::Vector<String> wrapper_argv_wtf;
-  splitStringToVector(strData, ' ', false, wrapper_argv_wtf);
-  for (size_t i = 0; i < wrapper_argv_wtf.size(); ++i) {
-    String arg = wrapper_argv_wtf[i];
-    wrapper_argv.push_back(WTF::ensureUTF16UChar(arg, true).data());
+  // Split on spaces (portable; drops the previous WTF-based implementation).
+  // Works for both std::string and std::wstring StringType.
+  const CommandLine::CharType kSpace = static_cast<CommandLine::CharType>(' ');
+  for (size_t start = 0; start < wrapper.size(); ) {
+    size_t end = wrapper.find(kSpace, start);
+    if (end == StringType::npos)
+      end = wrapper.size();
+    if (end > start)
+      wrapper_argv.push_back(wrapper.substr(start, end - start));
+    start = end + 1;
   }
 
   // Prepend the wrapper and update the switches/arguments |begin_args_|.

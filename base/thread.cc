@@ -2,7 +2,6 @@
 
 #if defined(_WIN32)
 #include <windows.h>
-#endif
 
 typedef struct tagTHREADNAME_INFO {
     DWORD dwType; // must be 0x1000
@@ -10,12 +9,16 @@ typedef struct tagTHREADNAME_INFO {
     DWORD dwThreadID; // thread ID (-1=caller thread)
     DWORD dwFlags; // reserved for future use, must be zero
 } THREADNAME_INFO;
+#else
+#include <pthread.h>
+#endif
 
 namespace base {
 
 void SetThreadName(const char* szThreadName) {
 
-#if ENABLE_NOT_MEM_LOAD // °ÑdllÍ¨¹ýÄÚ´æ¼ÓÔØµÄÊ±ºò²»ÄÜÖ÷¶¯Å×Òì³££¬·ñÔò»á±ÀÀ£
+#if defined(_WIN32)
+#if ENABLE_NOT_MEM_LOAD // ï¿½ï¿½dllÍ¨ï¿½ï¿½ï¿½Ú´ï¿½ï¿½ï¿½Øµï¿½Ê±ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ì³£ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
     THREADNAME_INFO info;
     info.dwType = 0x1000;
     info.szName = szThreadName;
@@ -27,6 +30,12 @@ void SetThreadName(const char* szThreadName) {
     }
     __except (EXCEPTION_CONTINUE_EXECUTION) {
     }
+#endif
+#elif defined(__APPLE__)
+    // macOS: pthread_setname_np sets the name of the calling thread only.
+    pthread_setname_np(szThreadName);
+#else
+    pthread_setname_np(pthread_self(), szThreadName);
 #endif
 }
 
