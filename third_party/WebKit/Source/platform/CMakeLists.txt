@@ -37,18 +37,25 @@ set(BLINK_CORE_SOURCES
 )
 list(TRANSFORM BLINK_CORE_SOURCES PREPEND "${BSRC}/")
 
-# --- Compile-verified: graphics / text / fonts (glob, minus deferred deps) -----
+# --- Compile-verified: heap / graphics / text / fonts (glob, minus deferred) ---
+# INSIDE_BLINK=1 (set below) is the standard blink build flag; it gates internal
+# APIs like FROM_HERE and the WebString<->String conversions, and unlocks the
+# bulk of these dirs (heap 11/12, graphics 39/49, text 21/23, fonts 16/17).
+file(GLOB BLINK_HEAP     "${BSRC}/heap/*.cpp")
 file(GLOB BLINK_GRAPHICS "${BSRC}/graphics/*.cpp")
 file(GLOB BLINK_TEXT     "${BSRC}/text/*.cpp")
 file(GLOB BLINK_FONTS    "${BSRC}/fonts/*.cpp")
-# Unit tests (need gtest) and the value types already in the core list.
+# Unit tests (gtest) and the value types already in the core list.
+list(FILTER BLINK_HEAP     EXCLUDE REGEX "Test\\.cpp$|RunAllTests\\.cpp$")
 list(FILTER BLINK_GRAPHICS EXCLUDE REGEX "Test\\.cpp$|/Color\\.cpp$|/GraphicsTypes\\.cpp$")
 list(FILTER BLINK_TEXT     EXCLUDE REGEX "Test\\.cpp$")
 list(FILTER BLINK_FONTS    EXCLUDE REGEX "Test\\.cpp$")
-# GPU (Ganesh/GLES2), Oilpan heap, GDI/Win, and a few API-skew files: deferred.
-list(FILTER BLINK_GRAPHICS EXCLUDE REGEX "BitmapImage|Canvas2DLayer|ContentLayerDelegate|GDIPlusInit|GradientGeneratedImage|GraphicsContext|GraphicsLayer|GraphicsLayerDebugInfo|/Image\\.cpp$|ImageBuffer|ImageBufferSurface|PictureSnapshot|RecordingImageBufferSurface|UnacceleratedImageBufferSurface")
+# V8 EmbedderHeapTracer API skew (final/virtual): deferred.
+list(FILTER BLINK_HEAP EXCLUDE REGEX "UnifiedHeapController")
+# GPU (Ganesh/GLES2), canvas-layer/compositor, GDI/Win: deferred.
+list(FILTER BLINK_GRAPHICS EXCLUDE REGEX "Canvas2DLayerBridge|Canvas2DLayerManager|GDIPlusInit|GradientGeneratedImage|GraphicsContext|ImageBuffer|ImageBufferSurface|PictureSnapshot|RecordingImageBufferSurface|UnacceleratedImageBufferSurface")
 # Calendar/date ICU (ucal/udat) + Windows locale: deferred.
-list(FILTER BLINK_TEXT EXCLUDE REGEX "LocaleICU|LocaleWin|PlatformLocale")
+list(FILTER BLINK_TEXT EXCLUDE REGEX "LocaleICU|LocaleWin")
 # Needs the font platform-data backend (CoreText): deferred.
 list(FILTER BLINK_FONTS EXCLUDE REGEX "FontCustomPlatformData")
 
@@ -57,8 +64,8 @@ list(FILTER BLINK_FONTS EXCLUDE REGEX "FontCustomPlatformData")
 set(BLINK_BASE_SHIM "${CMAKE_SOURCE_DIR}/orig_chrome/base/debug/alias.cc")
 
 add_library(blink_platform STATIC
-    ${BLINK_CORE_SOURCES} ${BLINK_GRAPHICS} ${BLINK_TEXT} ${BLINK_FONTS}
-    ${BLINK_BASE_SHIM})
+    ${BLINK_CORE_SOURCES} ${BLINK_HEAP} ${BLINK_GRAPHICS} ${BLINK_TEXT}
+    ${BLINK_FONTS} ${BLINK_BASE_SHIM})
 # alias.cc is plain Chromium base, not WTF: don't force-include WTF's config.h.
 set_source_files_properties("${BLINK_BASE_SHIM}" PROPERTIES COMPILE_OPTIONS "")
 
@@ -82,7 +89,7 @@ endif()
 # blink/WTF need the config bootstrap force-included; skia needs SK_RELEASE and
 # blink uses __declspec annotations (-fdeclspec) and is built without exceptions.
 target_compile_options(blink_platform PUBLIC -include "${WSRC}/config.h")
-target_compile_definitions(blink_platform PUBLIC OFFICIAL_BUILD U_DISABLE_RENAMING=1)
+target_compile_definitions(blink_platform PUBLIC OFFICIAL_BUILD U_DISABLE_RENAMING=1 INSIDE_BLINK=1)
 set_target_properties(blink_platform PROPERTIES CXX_STANDARD 14)
 if(NOT MSVC)
     target_compile_options(blink_platform PRIVATE
