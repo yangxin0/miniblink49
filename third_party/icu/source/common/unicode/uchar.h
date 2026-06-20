@@ -27,6 +27,9 @@
 #include "uscript.h"
 #include "utypes.h"
 #include "utrie2.h"
+#if defined(MINIBLINK_HARFBUZZ_ICU)
+#include "unicode/utf16.h"
+#endif
 
 int8_t u_charType(UChar32 c);
 
@@ -927,5 +930,33 @@ typedef enum UCharCategory
 uint32_t u_getUnicodeProperties(UChar32 c, int32_t column);
 UScriptCode uscript_getScript(UChar32 c, UErrorCode* pErrorCode);
 UBool uscript_hasScript(UChar32 c, UScriptCode sc);
+
+// --- Additions for harfbuzz's hb-icu.cc (macOS) ----------------------------------
+// Subset of the full ICU uchar.h API. Integer values MUST match ICU exactly
+// (system libicucore implements these). Symbols are unversioned (U_DISABLE_RENAMING).
+// Guarded to the harfbuzz build only (MINIBLINK_HARFBUZZ_ICU): blink already ships
+// its own shims (e.g. blink::uscript_getShortName in HarfBuzzShaper.cpp) and must
+// keep using the in-tree ICU subset unchanged, identical to the Windows build.
+#if defined(MINIBLINK_HARFBUZZ_ICU)
+typedef enum UProperty {
+    UCHAR_EAST_ASIAN_WIDTH = 0x1004,
+    UCHAR_GENERAL_CATEGORY = 0x1005
+} UProperty;
+
+typedef enum UEastAsianWidth {
+    U_EA_NEUTRAL,    /*[N]*/
+    U_EA_AMBIGUOUS,  /*[A]*/
+    U_EA_HALFWIDTH,  /*[H]*/
+    U_EA_FULLWIDTH,  /*[F]*/
+    U_EA_NARROW,     /*[Na]*/
+    U_EA_WIDE,       /*[W]*/
+    U_EA_COUNT
+} UEastAsianWidth;
+
+uint8_t u_getCombiningClass(UChar32 c);
+UChar32 u_charMirror(UChar32 c);
+int32_t u_getIntPropertyValue(UChar32 c, UProperty which);
+const char* uscript_getShortName(UScriptCode scriptCode);
+#endif // MINIBLINK_HARFBUZZ_ICU
 
 #endif // UCHAR_H

@@ -34,7 +34,7 @@
 
 #include "third_party/harfbuzz-ng/src/hb-ot.h"
 #include "third_party/harfbuzz-ng/src/hb.h"
-#if OS(MACOSX)
+#if OS(MACOSX) && defined(USE_HARFBUZZ_CORETEXT)
 #include "hb-coretext.h"
 #endif
 #include "SkPaint.h"
@@ -318,7 +318,10 @@ static hb_font_funcs_t* harfBuzzSkiaGetFontFuncs()
     return harfBuzzSkiaFontFuncs;
 }
 
-#if !OS(MACOSX)
+// This macOS port shapes via harfbuzz's portable Skia-table path (the same path the
+// Windows build uses), not harfbuzz's CoreText backend (hb-coretext is not built),
+// so the Skia table getter is compiled on macOS too.
+#if !OS(MACOSX) || !defined(USE_HARFBUZZ_CORETEXT)
 
 void __cdecl hbDestroyFuncWrap(void *user_data)
 {
@@ -355,7 +358,7 @@ static void __cdecl destroyHarfBuzzFontData(void* userData)
 
 hb_face_t* HarfBuzzFace::createFace()
 {
-#if OS(MACOSX)
+#if OS(MACOSX) && defined(USE_HARFBUZZ_CORETEXT)
     hb_face_t* face = hb_coretext_face_create(m_platformData->cgFont());
 #else
     hb_face_t* face = hb_face_create_for_tables(harfBuzzSkiaGetTable, m_platformData->typeface(), 0);

@@ -47,7 +47,7 @@ file(GLOB BLINK_HEAP     "${BSRC}/heap/*.cpp")
 # graphics/gpu is excluded below (Ganesh/GLES2 not brought up).
 file(GLOB_RECURSE BLINK_GRAPHICS "${BSRC}/graphics/*.cpp")
 file(GLOB BLINK_TEXT     "${BSRC}/text/*.cpp")
-file(GLOB BLINK_FONTS    "${BSRC}/fonts/*.cpp")
+file(GLOB_RECURSE BLINK_FONTS "${BSRC}/fonts/*.cpp")  # incl. fonts/shaping (harfbuzz)
 # More platform sublayers the link needs (all compile clean on macOS): scroll
 # (ScrollableArea/Scrollbar), network (ResourceRequest/Response), mhtml,
 # mediastream.
@@ -82,8 +82,10 @@ list(FILTER BLINK_SUBLAYERS EXCLUDE REGEX "KURL_new\\.cpp$|KURL_w\\.cpp$")
 list(FILTER BLINK_GRAPHICS EXCLUDE REGEX "/gpu/|Canvas2DLayerBridge|GDIPlusInit|/ImageBuffer\\.cpp$")
 # Calendar/date ICU (ucal/udat) + Windows locale: deferred.
 list(FILTER BLINK_TEXT EXCLUDE REGEX "LocaleICU|LocaleWin")
-# Needs the font platform-data backend (CoreText): deferred.
-list(FILTER BLINK_FONTS EXCLUDE REGEX "FontCustomPlatformData")
+# Deferred font backends: FontCustomPlatformData/FontCacheSkia (CoreText/fontconfig
+# platform-data), OpenTypeSanitizer (ots library my_ntohl), and the non-mac
+# platform subdirs (win/android/linux). fonts/shaping (harfbuzz) is kept.
+list(FILTER BLINK_FONTS EXCLUDE REGEX "FontCustomPlatformData|FontCacheSkia|/opentype/OpenTypeSanitizer|/win/|/android/|/linux/")
 
 # --- Platform infrastructure: the Platform interface, exported Web* wrappers,
 #     and support objects the heap (and the rest of blink) need at link time. ---
@@ -129,11 +131,12 @@ target_include_directories(blink_platform PUBLIC
     "${CMAKE_SOURCE_DIR}/third_party/icu/source/common"   # unicode/*.h
     "${MINIBLINK_V8_ROOT}/include"              # v8.h (bindings-adjacent headers)
     "${CMAKE_SOURCE_DIR}/third_party/khronos"   # GLES2/* (DragImage and other root files)
+    "${CMAKE_SOURCE_DIR}/third_party/harfbuzz-ng/src"  # hb.h (fonts/shaping)
     "${CMAKE_SOURCE_DIR}/third_party/v8shim"    # v8-debug.h shim (plugins/heap pull ScriptState)
     "${CMAKE_SOURCE_DIR}/win_compat"            # <windows.h> shim (ImageBuffer pulls wke)
     "${CMAKE_SOURCE_DIR}/orig_chrome")
 
-target_link_libraries(blink_platform PUBLIC wtf skia)
+target_link_libraries(blink_platform PUBLIC wtf skia harfbuzz)
 if(APPLE)
     # System ICU (unversioned symbols) + CoreText/CoreGraphics for fonts.
     target_link_libraries(blink_platform PUBLIC
