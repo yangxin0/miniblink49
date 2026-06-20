@@ -24,7 +24,8 @@ file(GLOB BLINK_CORE_SRC
     "${CSRC}/loader/*.cpp" "${CSRC}/fetch/*.cpp" "${CSRC}/timing/*.cpp"
     "${CSRC}/fileapi/*.cpp" "${CSRC}/xml/*.cpp" "${CSRC}/clipboard/*.cpp"
     "${CSRC}/svg/*.cpp" "${CSRC}/paint/*.cpp" "${CSRC}/editing/*.cpp"
-    "${CSRC}/workers/*.cpp")
+    "${CSRC}/workers/*.cpp" "${CSRC}/streams/*.cpp" "${CSRC}/xmlhttprequest/*.cpp"
+    "${CSRC}/input/*.cpp" "${CSRC}/imagebitmap/*.cpp")
 
 # Unit tests + *TestHelper.
 list(FILTER BLINK_CORE_SRC EXCLUDE REGEX "Test\\.cpp$|TestHelper\\.cpp$")
