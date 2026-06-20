@@ -35,7 +35,9 @@
 #include <string.h>
 
 size_t g_blinkMemSize = 0;
-#include "base/process/CallAddrsRecord.h"
+#if defined(_WIN32)
+#include "base/process/CallAddrsRecord.h"  // Win-only call-address debug utility
+#endif
 
 namespace WTF {
 

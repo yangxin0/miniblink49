@@ -1,7 +1,9 @@
 #ifndef base_process_CallAddrsRecord_h
 #define base_process_CallAddrsRecord_h
 
-#include <xmmintrin.h>
+#if defined(__i386__) || defined(__x86_64__) || defined(_M_IX86) || defined(_M_X64)
+#include <xmmintrin.h>   // x86 SSE only (not available on arm64)
+#endif
 #include <map>
 #include <set>
 #include <intrin.h>
