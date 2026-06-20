@@ -157,6 +157,14 @@ template <>
 struct is_void<void> : true_type {
 };
 
+// orig_chrome's base headers (callback_internal.h) expect YesType/NoType in
+// base::internal. This file shares an include guard with base/template_util.h,
+// so provide them here too (whichever copy is included must supply both).
+namespace internal {
+typedef char YesType;
+struct NoType { YesType dummy[2]; };
+}  // namespace internal
+
 namespace cef_internal {
 
     // Types YesType and NoType are guaranteed such that sizeof(YesType) <

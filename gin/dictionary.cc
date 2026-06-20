@@ -100,7 +100,8 @@ void Dictionary::GetBydefaultVal(const char* name, std::string defaultVal, std::
 
 void Dictionary::GetBydefaultVal(const char* name, std::wstring defaultVal, std::wstring* outResult) const
 {
-    std::string defaultValA = base::UTF16ToUTF8(defaultVal);
+    // std::wstring is UTF-32 on macOS (UTF-16 on Windows); go via string16.
+    std::string defaultValA = base::UTF16ToUTF8(base::WideToUTF16(defaultVal));
     std::string outResultA;
     GetBydefaultVal(name, defaultValA, &outResultA);
 
