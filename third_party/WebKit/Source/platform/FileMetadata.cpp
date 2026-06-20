@@ -35,20 +35,18 @@
 #include "public/platform/WebFileInfo.h"
 #include "public/platform/WebFileUtilities.h"
 #include "third_party/WebKit/Source/wtf/text/WTFStringUtil.h"
+#if !defined(_WIN32)
+#include <sys/stat.h>
+#endif
 
 namespace blink {
 
 bool getFileSize(const String& path, long long& result)
 {
-//     FileMetadata metadata;
-//     if (!getFileMetadata(path, metadata))
-//         return false;
-//     result = metadata.length;
-//     return true;
-
     if (path.isEmpty())
         return false;
 
+#if defined(_WIN32)
     Vector<UChar> buffer = WTF::ensureUTF16UChar(path, true);
     OutputDebugStringA("getFileSize entry\n");
 
@@ -69,6 +67,17 @@ bool getFileSize(const String& path, long long& result)
     ::CloseHandle(hFile);
 
     return true;
+#else
+    // POSIX port of the Windows CreateFile/GetFileSizeEx path: stat the file.
+    CString fsPath = path.utf8();
+    struct stat st;
+    if (stat(fsPath.data(), &st) != 0) {
+        result = 0;
+        return false;
+    }
+    result = st.st_size;
+    return true;
+#endif
 }
 
 bool getFileModificationTime(const String& path, double& result)

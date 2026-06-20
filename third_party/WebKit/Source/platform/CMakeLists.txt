@@ -60,8 +60,9 @@ file(GLOB BLINK_SUBLAYERS
     "${BSRC}/*.cpp")             # platform-root files (JSONValues/Widget/SharedBuffer/DateComponents/...)
 # platform-root: 48/50 compile. The 4 value types already in BLINK_CORE_SOURCES
 # (Length/LengthBox/LengthFunctions/Decimal) are excluded here to avoid duplicate
-# objects; FileMetadata (stat/Win path skew) + NotImplemented (Win logging) deferred.
-list(FILTER BLINK_SUBLAYERS EXCLUDE REGEX "/(Length|LengthBox|LengthFunctions|Decimal|FileMetadata|NotImplemented)\\.cpp$")
+# objects; NotImplemented (Win logging) deferred. FileMetadata is kept (getFileSize
+# ported to posix stat).
+list(FILTER BLINK_SUBLAYERS EXCLUDE REGEX "/(Length|LengthBox|LengthFunctions|Decimal|NotImplemented)\\.cpp$")
 # Unit tests (gtest) and the value types already in the core list.
 list(FILTER BLINK_HEAP      EXCLUDE REGEX "Test\\.cpp$|RunAllTests\\.cpp$")
 list(FILTER BLINK_GRAPHICS  EXCLUDE REGEX "Test\\.cpp$|/Color\\.cpp$|/GraphicsTypes\\.cpp$")
