@@ -69,6 +69,7 @@ endif()
 if(MINIBLINK_BUILD_BLINK)
     add_subdirectory(third_party/WebKit/Source/platform)
     include(third_party/WebKit/Source/core/blink_core.cmake)  # blink_core archive
+    include(third_party/WebKit/Source/web/blink_web.cmake)    # blink_web embedding layer
     add_subdirectory(test/blink)  # smoke test: prove geometry links + computes
 endif()
 
