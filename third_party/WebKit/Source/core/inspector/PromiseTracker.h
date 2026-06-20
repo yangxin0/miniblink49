@@ -57,7 +57,12 @@ private:
     RawPtrWillBeMember<Listener> m_listener;
 
     v8::Isolate* m_isolate;
+#if V8_MAJOR_VERSION < 8
     v8::Persistent<v8::NativeWeakMap> m_promiseToId;
+#else
+    // V8 8.7 removed NativeWeakMap; v8::Map is its replacement for promise->id tracking.
+    v8::Persistent<v8::Map> m_promiseToId;
+#endif
 
     WeakPtrFactory<PromiseTracker> m_weakPtrFactory;
 
