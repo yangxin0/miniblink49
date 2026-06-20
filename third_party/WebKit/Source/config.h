@@ -159,3 +159,7 @@
 #define DebugBreak() __builtin_trap()
 #endif
 #endif
+#if !defined(_WIN32) && !defined(OutputDebugStringA)
+#include <cstdio>
+#define OutputDebugStringA(s) std::fputs((s), stderr)
+#endif

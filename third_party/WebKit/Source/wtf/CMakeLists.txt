@@ -29,6 +29,8 @@ set(WTF_SOURCES
     MainThread.cpp
     PageAllocator.cpp
     PartitionAlloc.cpp
+    PartitionAllocator.cpp
+    Partitions.cpp
     PrintStream.cpp
     RefCountedLeakCounter.cpp
     SizeLimits.cpp
@@ -40,6 +42,7 @@ set(WTF_SOURCES
     text/CString.cpp
     text/StringBuilder.cpp
     text/StringConcatenate.cpp
+    text/StringImpl.cpp
     text/StringStatics.cpp
     text/TextCodec.cpp
     text/TextCodecLatin1.cpp
@@ -52,15 +55,6 @@ set(WTF_SOURCES
     text/TextPosition.cpp
     text/UTF8.cpp
     text/WTFString.cpp
-)
-
-# --- 4 files fenced (deep WTF platform/version tail, TODO): the allocator
-#     glue (PartitionAllocator/Partitions: Partitions::fastMalloc API skew),
-#     StringImpl (Win VirtualAlloc -> needs mmap), WTFStringUtil (Win types).
-set(WTF_SOURCES_TODO
-    PartitionAllocator.cpp
-    Partitions.cpp
-    text/StringImpl.cpp
     text/WTFStringUtil.cpp
 )
 

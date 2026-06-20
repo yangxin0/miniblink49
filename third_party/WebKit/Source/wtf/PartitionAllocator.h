@@ -107,7 +107,11 @@ public:
     template <typename Return, typename Metadata>
     static Return malloc(size_t size, const char* typeName)
     {
-        return reinterpret_cast<Return>(Partitions::fastMalloc(size, typeName));
+        // Use the global fastMalloc (matches free() using fastFree). The old
+        // Partitions::fastMalloc(size, typeName) doesn't exist in this WTF; the
+        // typeName is a heap-profiler hint only (disabled under OFFICIAL_BUILD).
+        (void)typeName;
+        return reinterpret_cast<Return>(fastMalloc(size));
     }
 
     static inline bool expandHashTableBacking(void*, size_t)

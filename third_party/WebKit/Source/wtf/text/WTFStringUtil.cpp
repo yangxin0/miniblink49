@@ -60,7 +60,7 @@ Vector<UChar> ensureUTF16UChar(const String& string, bool isNullTermination)
 String ensureUTF16String(const String& string)
 {
     if (string.isNull() || string.isEmpty())
-        return String(L"");
+        return String("");  // L"" (wchar_t) isn't a valid String ctor on macOS
     if (!string.is8Bit())
         return String(string.characters16(), string.length());
 
@@ -148,6 +148,7 @@ void stringTrim(String& stringInOut, bool leftTrim, bool rightTrim)
     }
 }
 
+#if defined(_WIN32)
 void MByteToWChar(const char* lpcszStr, size_t cbMultiByte, std::vector<UChar>* out, UINT codePage)
 {
     out->clear();
@@ -163,7 +164,7 @@ void MByteToWChar(const char* lpcszStr, size_t cbMultiByte, std::vector<UChar>* 
     MultiByteToWideChar(codePage, 0, lpcszStr, cbMultiByte, &out->at(0), dwMinSize);
 }
 
-void WCharToMByte(const wchar_t* lpWideCharStr, size_t cchWideChar, std::vector<char>* out, UINT codePage)
+void WCharToMByte(const UChar* lpWideCharStr, size_t cchWideChar, std::vector<char>* out, UINT codePage)
 {
     out->clear();
 
@@ -177,6 +178,50 @@ void WCharToMByte(const wchar_t* lpWideCharStr, size_t cchWideChar, std::vector<
     // Convert headers from ASCII to Unicode.
     WideCharToMultiByte(codePage, 0, lpWideCharStr, cchWideChar, &out->at(0), dwMinSize, NULL, FALSE);
 }
+#else
+// POSIX: codepage conversion isn't available. Handle UTF-8 exactly; treat other
+// code pages as Latin-1 (1:1) as a best effort. (Note: the wide type here is the
+// platform wchar_t to match the Win signatures used by callers.)
+static const unsigned kCpUtf8 = 65001;  // CP_UTF8
+
+void MByteToWChar(const char* lpcszStr, size_t cbMultiByte, std::vector<UChar>* out, unsigned codePage)
+{
+    out->clear();
+    const unsigned char* s = reinterpret_cast<const unsigned char*>(lpcszStr);
+    if (codePage == kCpUtf8) {
+        for (size_t i = 0; i < cbMultiByte; ) {
+            unsigned char c = s[i++];
+            uint32_t cp; int extra;
+            if (c < 0x80) { cp = c; extra = 0; }
+            else if ((c & 0xE0) == 0xC0) { cp = c & 0x1F; extra = 1; }
+            else if ((c & 0xF0) == 0xE0) { cp = c & 0x0F; extra = 2; }
+            else if ((c & 0xF8) == 0xF0) { cp = c & 0x07; extra = 3; }
+            else { cp = 0xFFFD; extra = 0; }
+            for (int k = 0; k < extra && i < cbMultiByte; ++k) cp = (cp << 6) | (s[i++] & 0x3F);
+            if (cp <= 0xFFFF) { out->push_back((UChar)cp); }
+            else { cp -= 0x10000; out->push_back((UChar)(0xD800 | (cp >> 10))); out->push_back((UChar)(0xDC00 | (cp & 0x3FF))); }
+        }
+    } else {
+        for (size_t i = 0; i < cbMultiByte; ++i) out->push_back((UChar)s[i]);  // Latin-1
+    }
+}
+
+void WCharToMByte(const UChar* lpWideCharStr, size_t cchWideChar, std::vector<char>* out, unsigned codePage)
+{
+    out->clear();
+    for (size_t i = 0; i < cchWideChar; ++i) {
+        uint32_t cp = (uint32_t)lpWideCharStr[i];
+        if (codePage == kCpUtf8) {
+            if (cp < 0x80) out->push_back((char)cp);
+            else if (cp < 0x800) { out->push_back((char)(0xC0 | (cp >> 6))); out->push_back((char)(0x80 | (cp & 0x3F))); }
+            else if (cp < 0x10000) { out->push_back((char)(0xE0 | (cp >> 12))); out->push_back((char)(0x80 | ((cp >> 6) & 0x3F))); out->push_back((char)(0x80 | (cp & 0x3F))); }
+            else { out->push_back((char)(0xF0 | (cp >> 18))); out->push_back((char)(0x80 | ((cp >> 12) & 0x3F))); out->push_back((char)(0x80 | ((cp >> 6) & 0x3F))); out->push_back((char)(0x80 | (cp & 0x3F))); }
+        } else {
+            out->push_back((char)(cp & 0xFF));  // Latin-1
+        }
+    }
+}
+#endif
 
 void Utf8ToMByte(const char* lpUtf8CharStr, size_t cchUtf8Char, std::vector<char>* out, UINT codePage)
 {
@@ -250,16 +295,16 @@ std::string WTFStringToStdString(const WTF::String& str)
 bool isTextUTF8(const char *str, int length)
 {
     int i = 0;
-    DWORD nBytes = 0; // UFT8¿ÉÓÃ1-6¸ö×Ö½Ú±àÂë,ASCIIÓÃÒ»¸ö×Ö½Ú
+    DWORD nBytes = 0; // UFT8ï¿½ï¿½ï¿½ï¿½1-6ï¿½ï¿½ï¿½Ö½Ú±ï¿½ï¿½ï¿½,ASCIIï¿½ï¿½Ò»ï¿½ï¿½ï¿½Ö½ï¿½
     UCHAR chr = 0;
-    bool bAllAscii = true; // Èç¹ûÈ«²¿¶¼ÊÇASCII, ËµÃ÷²»ÊÇUTF-8
+    bool bAllAscii = true; // ï¿½ï¿½ï¿½È«ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ASCII, Ëµï¿½ï¿½ï¿½ï¿½ï¿½ï¿½UTF-8
     for (i = 0; i < length; i++) {
         chr = (UCHAR)* (str + i);
 
-        if ((chr & 0x80) != 0) // ÅÐ¶ÏÊÇ·ñASCII±àÂë,Èç¹û²»ÊÇ,ËµÃ÷ÓÐ¿ÉÄÜÊÇUTF-8,ASCIIÓÃ7Î»±àÂë,µ«ÓÃÒ»¸ö×Ö½Ú´æ,×î¸ßÎ»±ê¼ÇÎª0,o0xxxxxxx
+        if ((chr & 0x80) != 0) // ï¿½Ð¶ï¿½ï¿½Ç·ï¿½ASCIIï¿½ï¿½ï¿½ï¿½,ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½,Ëµï¿½ï¿½ï¿½Ð¿ï¿½ï¿½ï¿½ï¿½ï¿½UTF-8,ASCIIï¿½ï¿½7Î»ï¿½ï¿½ï¿½ï¿½,ï¿½ï¿½ï¿½ï¿½Ò»ï¿½ï¿½ï¿½Ö½Ú´ï¿½,ï¿½ï¿½ï¿½Î»ï¿½ï¿½ï¿½Îª0,o0xxxxxxx
             bAllAscii = false;
 
-        if (nBytes == 0) { // Èç¹û²»ÊÇASCIIÂë,Ó¦¸ÃÊÇ¶à×Ö½Ú·û,¼ÆËã×Ö½ÚÊý
+        if (nBytes == 0) { // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ASCIIï¿½ï¿½,Ó¦ï¿½ï¿½ï¿½Ç¶ï¿½ï¿½Ö½Ú·ï¿½,ï¿½ï¿½ï¿½ï¿½ï¿½Ö½ï¿½ï¿½ï¿½
 
             if (chr >= 0x80) {
                 if (chr >= 0xFC && chr <= 0xFD)
@@ -277,16 +322,16 @@ bool isTextUTF8(const char *str, int length)
                 }
                 nBytes--;
             }
-        } else { // ¶à×Ö½Ú·ûµÄ·ÇÊ××Ö½Ú,Ó¦Îª 10xxxxxx
+        } else { // ï¿½ï¿½ï¿½Ö½Ú·ï¿½ï¿½Ä·ï¿½ï¿½ï¿½ï¿½Ö½ï¿½,Ó¦Îª 10xxxxxx
             if ((chr & 0xC0) != 0x80)
                 return false;
             nBytes--;
         }
     }
-    if (nBytes > 0) //Î¥·µ¹æÔò
+    if (nBytes > 0) //Î¥ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
         return false;
 
-    if (bAllAscii) //Èç¹ûÈ«²¿¶¼ÊÇASCII, ËµÃ÷²»ÊÇUTF-8
+    if (bAllAscii) //ï¿½ï¿½ï¿½È«ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ASCII, Ëµï¿½ï¿½ï¿½ï¿½ï¿½ï¿½UTF-8
         return false;
     return true;
 }

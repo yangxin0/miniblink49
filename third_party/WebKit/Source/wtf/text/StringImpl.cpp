@@ -40,6 +40,10 @@
 // #include <unicode/translit.h>
 // #include <unicode/unistr.h>
 #include <unicode/utypes.h>
+#if !defined(_WIN32)
+#include <sys/mman.h>   // mmap for the SlowBuf debug allocator (posix)
+#include <unistd.h>     // sysconf
+#endif
 
 #ifdef STRING_STATS
 #include "wtf/DataLog.h"
@@ -268,6 +272,10 @@ void StringStats::printStats()
 
 #pragma optimize("", off)
 
+#if !defined(_WIN32)
+typedef uint32_t DWORD;  // for the page-aligned "SlowBuf" debug allocator below
+#endif
+
 struct SlowHead {
     int index;
     int size;
@@ -290,15 +298,25 @@ struct SlowBuf : public SlowHead {
     {
         DWORD size = sizeof(SlowBuf);
 
+#if defined(_WIN32)
         SYSTEM_INFO SI = { 0 };
         ::GetSystemInfo(&SI);
         DWORD dwPageSize = SI.dwPageSize;
-        UINT byteSize = size * sizeof(char);
+        unsigned byteSize = size * sizeof(char);
         int nPageNum = byteSize / dwPageSize + 1;
         kdwAllocSize = nPageNum * dwPageSize;
 
         void* newAddress = ::VirtualAlloc(NULL, kdwAllocSize, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
-
+#else
+        long pageSize = ::sysconf(_SC_PAGESIZE);
+        unsigned byteSize = size * sizeof(char);
+        int nPageNum = byteSize / pageSize + 1;
+        kdwAllocSize = nPageNum * pageSize;
+        void* newAddress = ::mmap(nullptr, kdwAllocSize, PROT_READ | PROT_WRITE,
+                                  MAP_PRIVATE | MAP_ANON, -1, 0);
+        if (newAddress == MAP_FAILED)
+            newAddress = nullptr;
+#endif
         return (SlowBuf*)newAddress;
     }
 
@@ -324,7 +342,7 @@ public:
         m_buf.resize(kMaxSize);
         for (int i = 0; i < kMaxSize; ++i) {
             m_buf[i] = SlowBuf::create();
-            m_buf[i]->index = kIsIdleFlag; // kIsIdleFlag ±íÊ¾¿ÕÏÐ
+            m_buf[i]->index = kIsIdleFlag; // kIsIdleFlag ï¿½ï¿½Ê¾ï¿½ï¿½ï¿½ï¿½
             m_buf[i]->size = 0;
 
             m_buf[i]->freeAddr = nullptr;
@@ -371,11 +389,15 @@ public:
             SlowBuf* body = m_buf[i];
             if (kIsIdleFlag == body->index) {
 
-                DWORD flOldProtect = 0;
+                DWORD flOldProtect = 0; (void)flOldProtect;
+#if defined(_WIN32)
                 ::VirtualProtect(body, SlowBuf::kdwAllocSize, PAGE_READWRITE, &flOldProtect);
+#else
+                ::mprotect(body, SlowBuf::kdwAllocSize, PROT_READ | PROT_WRITE);
+#endif
 
                 m_allMallocNum++;
-                body->index = kNotIdleFlag; // i ±íÊ¾±»Õ¼ÓÃ
+                body->index = kNotIdleFlag; // i ï¿½ï¿½Ê¾ï¿½ï¿½Õ¼ï¿½ï¿½
                 body->size = size;
                 body->freeAddr = nullptr;
                 void* ret = &body->buf;
@@ -415,8 +437,12 @@ public:
         
         memset(&body->buf, 0xE, kBufLen);
 
-        DWORD flOldProtect = 0;
+        DWORD flOldProtect = 0; (void)flOldProtect;
+#if defined(_WIN32)
         ::VirtualProtect(body, SlowBuf::kdwAllocSize, PAGE_READONLY, &flOldProtect);
+#else
+        ::mprotect(body, SlowBuf::kdwAllocSize, PROT_READ);
+#endif
     }
 
     void find(SlowHead* head)
@@ -458,7 +484,7 @@ void* slowMalloc(size_t size)
         return result;
 
     SlowHead* head = (SlowHead*)malloc(size + sizeof(SlowHead));
-    head->index = SlowBufMgr::kSysMallocFlag; // -5 ±íÊ¾ÏµÍ³·ÖÅä
+    head->index = SlowBufMgr::kSysMallocFlag; // -5 ï¿½ï¿½Ê¾ÏµÍ³ï¿½ï¿½ï¿½ï¿½
     head->size = size; //
     return head + 1;
 }

@@ -6,6 +6,23 @@
 #include <vector>
 #include "wtf/text/WTFString.h"
 
+// Win type shims (this util was written against the Win32 codepage API).
+#if !defined(_WIN32)
+typedef unsigned int UINT;
+typedef unsigned long DWORD;
+typedef unsigned char UCHAR;
+typedef const char* LPCSTR;
+#ifndef CP_UTF8
+#define CP_UTF8 65001
+#endif
+#ifndef CP_ACP
+#define CP_ACP 0
+#endif
+#ifndef FALSE
+#define FALSE 0
+#endif
+#endif
+
 namespace WTF {
 
 String ensureUTF16String(const String& string);
@@ -20,7 +37,7 @@ bool isTextUTF8(const char* str, int length);
 bool splitStringToVector(const String& strData, const char strSplit, bool needTrim, WTF::Vector<String>& out);
 
 void MByteToWChar(const char* lpcszStr, size_t cbMultiByte, std::vector<UChar>* out, UINT codePage);
-void WCharToMByte(const wchar_t* lpWideCharStr, size_t cchWideChar, std::vector<char>* out, UINT codePage);
+void WCharToMByte(const UChar* lpWideCharStr, size_t cchWideChar, std::vector<char>* out, UINT codePage);
 void Utf8ToMByte(const char* lpUtf8CharStr, size_t cchUtf8Char, std::vector<char>* out, UINT codePage);
 void MByteToUtf8(const char* lpMCharStr, size_t cchMChar, std::vector<char>* out, UINT codePage);
 
