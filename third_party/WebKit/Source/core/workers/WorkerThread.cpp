@@ -495,7 +495,13 @@ void WorkerThread::destroyIsolate()
 void WorkerThread::terminateV8Execution()
 {
     ASSERT(isMainThread());
+#if V8_MAJOR_VERSION < 8
     v8::V8::TerminateExecution(m_isolate);
+#else
+    // V8 8.7 removed the static V8::TerminateExecution(isolate); it is now an
+    // instance method on Isolate.
+    m_isolate->TerminateExecution();
+#endif
 }
 
 void WorkerThread::appendDebuggerTask(PassOwnPtr<WebThread::Task> task)

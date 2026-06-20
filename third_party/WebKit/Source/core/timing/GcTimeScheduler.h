@@ -2,11 +2,15 @@
 #define GcTimeScheduler_h
 
 #include "public/platform/Platform.h"
+#if defined(_WIN32)
 #include "vc6/include/wnet/xpapi.h"
+#elif defined(__APPLE__)
+#include <mach/mach.h>
+#endif
 
 namespace blink {
 
-// Èç¹ûÄÚ´æ´óÓÚxxM£¬¾Í»ØÊÕÒ»´Î¡£µ«ÏÂ´ÎÈç¹ûÄÚ´æ»¹ÊÇ´óÓÚxxM£¬ÄÇ¾ÍµÈÒ»¶ÎÊ±¼äÔÙ»ØÊÕ£¬·ÀÖ¹²»Í£ÒòÎªÕâÔ­Òò»ØÊÕ
+// ï¿½ï¿½ï¿½ï¿½Ú´ï¿½ï¿½ï¿½ï¿½xxMï¿½ï¿½ï¿½Í»ï¿½ï¿½ï¿½Ò»ï¿½Î¡ï¿½ï¿½ï¿½ï¿½Â´ï¿½ï¿½ï¿½ï¿½ï¿½Ú´æ»¹ï¿½Ç´ï¿½ï¿½ï¿½xxMï¿½ï¿½ï¿½Ç¾Íµï¿½Ò»ï¿½ï¿½Ê±ï¿½ï¿½ï¿½Ù»ï¿½ï¿½Õ£ï¿½ï¿½ï¿½Ö¹ï¿½ï¿½Í£ï¿½ï¿½Îªï¿½ï¿½Ô­ï¿½ï¿½ï¿½ï¿½ï¿½
 class GcTimeScheduler {
 public:
     const double kNextFireIntervalSec = 60;
@@ -45,6 +49,7 @@ private:
             return false;
 
         m_lastQueryMemTime = time;
+#if defined(_WIN32)
         HANDLE handle = GetCurrentProcess();
         PROCESS_MEMORY_COUNTERS_EX pmc = { 0 };
         if (!GetProcessMemoryInfoXp(handle, (PROCESS_MEMORY_COUNTERS*)&pmc, sizeof(pmc)))
@@ -54,6 +59,22 @@ private:
             return true;
 
         return false;
+#elif defined(__APPLE__)
+        // macOS port of the Windows peak-memory check: query this task's physical
+        // footprint via mach task_info and trigger a GC past the same ~500MB
+        // threshold the Windows path uses.
+        task_vm_info_data_t vmInfo;
+        mach_msg_type_number_t infoCount = TASK_VM_INFO_COUNT;
+        if (task_info(mach_task_self(), TASK_VM_INFO, reinterpret_cast<task_info_t>(&vmInfo), &infoCount) != KERN_SUCCESS)
+            return false;
+
+        if (vmInfo.phys_footprint / (1024 * 1024) > 500)
+            return true;
+
+        return false;
+#else
+        return false;
+#endif
     }
 
     double m_lastGcTime;

@@ -54,6 +54,7 @@ file(GLOB BLINK_FONTS    "${BSRC}/fonts/*.cpp")
 file(GLOB BLINK_SUBLAYERS
     "${BSRC}/scroll/*.cpp" "${BSRC}/network/*.cpp"
     "${BSRC}/mhtml/*.cpp" "${BSRC}/mediastream/*.cpp" "${BSRC}/blob/*.cpp"
+    "${BSRC}/plugins/*.cpp"
     "${BSRC}/weborigin/*.cpp"    # KURL recovered; KURL_new/KURL_w variants excluded below
     "${BSRC}/*.cpp")             # platform-root files (JSONValues/Widget/SharedBuffer/DateComponents/...)
 # platform-root: 48/50 compile. The 4 value types already in BLINK_CORE_SOURCES
@@ -69,8 +70,8 @@ list(FILTER BLINK_SUBLAYERS EXCLUDE REGEX "Test\\.cpp$")
 # weborigin: keep KURL.cpp (recovered); the alternate KURL_new (chromium url/) and
 # KURL_w (copyASCII skew) variants are not used on macOS.
 list(FILTER BLINK_SUBLAYERS EXCLUDE REGEX "KURL_new\\.cpp$|KURL_w\\.cpp$")
-# V8 EmbedderHeapTracer API skew (final/virtual): deferred.
-list(FILTER BLINK_HEAP EXCLUDE REGEX "UnifiedHeapController")
+# UnifiedHeapController now compiles: migrated to the V8 8.7 EmbedderHeapTracer API
+# (TracePrologue(TraceFlags)/TraceEpilogue(TraceSummary*)/TracedReferenceBase).
 # Most of graphics/ is skia-2D and compiles clean (GraphicsContext, the
 # *ImageBufferSurface recorders, PictureSnapshot, GradientGeneratedImage, ...).
 # Truly deferred: graphics/gpu (Ganesh/GLES2 not brought up), Canvas2DLayerBridge
@@ -128,6 +129,7 @@ target_include_directories(blink_platform PUBLIC
     "${CMAKE_SOURCE_DIR}/third_party/icu/source/common"   # unicode/*.h
     "${MINIBLINK_V8_ROOT}/include"              # v8.h (bindings-adjacent headers)
     "${CMAKE_SOURCE_DIR}/third_party/khronos"   # GLES2/* (DragImage and other root files)
+    "${CMAKE_SOURCE_DIR}/third_party/v8shim"    # v8-debug.h shim (plugins/heap pull ScriptState)
     "${CMAKE_SOURCE_DIR}/win_compat"            # <windows.h> shim (ImageBuffer pulls wke)
     "${CMAKE_SOURCE_DIR}/orig_chrome")
 
@@ -151,6 +153,9 @@ target_compile_options(blink_platform PUBLIC -include "${WSRC}/config.h")
 # blink_core inherits it.
 target_compile_definitions(blink_platform PUBLIC
     OFFICIAL_BUILD U_DISABLE_RENAMING=1 INSIDE_BLINK=1 ENABLE_OILPAN=1
+    # plugins/heap now pull bindings headers (ScriptWrappable.h) which use the
+    # empty calling-convention macro V8CALL and the wke embedding hooks.
+    "V8CALL=" ENABLE_WKE=1
     # Match the V8 monolith ABI (pointer compression). PUBLIC so every blink
     # archive that links blink_platform (core/generated/bindings/modules/web)
     # inherits it — v8::Local/Persistent sizes depend on it, so all blink code

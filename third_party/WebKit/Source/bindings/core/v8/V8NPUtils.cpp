@@ -165,8 +165,14 @@ ExceptionCatcher::~ExceptionCatcher()
     if (!m_tryCatch.HasCaught())
         return;
 
-    if (topHandler)
+    if (topHandler) {
+#if V8_MAJOR_VERSION < 8
         topHandler->handler(topHandler->data, *v8::String::Utf8Value(m_tryCatch.Exception()));
+#else
+        // String::Utf8Value now requires an explicit Isolate* first argument.
+        topHandler->handler(topHandler->data, *v8::String::Utf8Value(v8::Isolate::GetCurrent(), m_tryCatch.Exception()));
+#endif
+    }
 }
 
 } // namespace blink

@@ -33,8 +33,9 @@ file(GLOB_RECURSE BLINK_CORE_SRC
 
 # Unit tests + *TestHelper.
 list(FILTER BLINK_CORE_SRC EXCLUDE REGEX "Test\\.cpp$|TestHelper\\.cpp$")
-# html: plugin element (GPU/plugin host) + a generated-in straggler.
-list(FILTER BLINK_CORE_SRC EXCLUDE REGEX "HTMLPlugInElement\\.cpp$|HTMLMetaElement-in\\.cpp$")
+# html: a generated-in straggler. HTMLPlugInElement now compiles (npapi include +
+# Carbon TextEncoding guard), mirroring the Windows build.
+list(FILTER BLINK_CORE_SRC EXCLUDE REGEX "HTMLMetaElement-in\\.cpp$")
 # nested-subdir stragglers: API skews / platform variants (HTMLParserScheduler
 # recovered by the workflow).
 list(FILTER BLINK_CORE_SRC EXCLUDE REGEX "CustomElementNone\\.cpp$|FileInputType\\.cpp$|CanvasRenderingContextFactory\\.cpp$")
@@ -42,8 +43,9 @@ list(FILTER BLINK_CORE_SRC EXCLUDE REGEX "CustomElementNone\\.cpp$|FileInputType
 list(FILTER BLINK_CORE_SRC EXCLUDE REGEX "LayoutTheme(Android|Default|Linux|Win|FontProviderWin)\\.cpp$")
 # paint: non-mac theme painter (we keep the mac path).
 list(FILTER BLINK_CORE_SRC EXCLUDE REGEX "ThemePainterDefault\\.cpp$")
-# workers: threading-proxy files with API skews (deferred).
-list(FILTER BLINK_CORE_SRC EXCLUDE REGEX "WorkerMessagingProxy\\.cpp$|WorkerThread\\.cpp$")
+# workers: WorkerMessagingProxy + WorkerThread now compile (WorkerThread's
+# v8::V8::TerminateExecution -> isolate->TerminateExecution migration; GcTimeScheduler.h
+# Windows memory-query guarded with a macOS mach task_info port).
 
 add_library(blink_core STATIC ${BLINK_CORE_SRC})
 

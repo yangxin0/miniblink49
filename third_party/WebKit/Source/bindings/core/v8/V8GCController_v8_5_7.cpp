@@ -67,7 +67,7 @@ static void addReferencesForNodeWithEventListeners(v8::Isolate* isolate, Node* n
 #if V8_MAJOR_VERSION >= 7
     Node* root = V8GCController::opaqueRootForGC(isolate, node);
     if (!root->isDocumentNode())
-        return; // weolar: vue·¢ÏÖµÄÄÚ´æÐ¹Â¶,¼ûW:\test\web_test\yunci\ru2\dist\assets\RecommenSoft-7ac9c6d1.js
+        return; // weolar: vueï¿½ï¿½ï¿½Öµï¿½ï¿½Ú´ï¿½Ð¹Â¶,ï¿½ï¿½W:\test\web_test\yunci\ru2\dist\assets\RecommenSoft-7ac9c6d1.js
 
     v8::EmbedderHeapTracer* tracer = V8PerIsolateData::from(isolate)->getEmbedderHeapTracer(isolate);
     std::vector<std::pair<void*, void*> > refs;           
@@ -82,7 +82,12 @@ static void addReferencesForNodeWithEventListeners(v8::Isolate* isolate, Node* n
         if (!v8listener->hasExistingListenerObject())
             continue;
 
+#if V8_MAJOR_VERSION < 8
         isolate->SetReference(wrapper, v8::Persistent<v8::Value>::Cast(v8listener->existingListenerObjectPersistentHandle()));
+#else
+        // SetReference was removed in V8 8; unified-heap wrapper tracing
+        // (RegisterV8References below) replaces it. No 8.7 equivalent.
+#endif
 #if V8_MAJOR_VERSION >= 7
         v8::Persistent<v8::Value>* newPersistent = new v8::Persistent<v8::Value>();
         newPersistent->Reset(isolate, v8listener->existingListenerObjectPersistentHandle());
@@ -140,7 +145,12 @@ public:
         // MinorGC does not collect objects because it may be expensive to
         // update references during minorGC
         if (classId == WrapperTypeInfo::ObjectClassId) {
+#if V8_MAJOR_VERSION < 8
             v8::Persistent<v8::Object>::Cast(*value).MarkActive();
+#else
+            // MarkActive was removed in V8 8; unified-heap wrapper tracing
+            // replaced the minor-GC liveness hints. No 8.7 equivalent.
+#endif
             return;
         }
 
@@ -150,7 +160,11 @@ public:
         const WrapperTypeInfo* type = toWrapperTypeInfo(wrapper);
         ActiveDOMObject* activeDOMObject = type->toActiveDOMObject(wrapper);
         if (activeDOMObject && activeDOMObject->hasPendingActivity()) {
+#if V8_MAJOR_VERSION < 8
             v8::Persistent<v8::Object>::Cast(*value).MarkActive();
+#else
+            // MarkActive was removed in V8 8. No 8.7 equivalent.
+#endif
             return;
         }
 
@@ -158,7 +172,11 @@ public:
             ASSERT(V8Node::hasInstance(wrapper, m_isolate));
             Node* node = V8Node::toImpl(wrapper);
             if (node->hasEventListeners()) {
+#if V8_MAJOR_VERSION < 8
                 v8::Persistent<v8::Object>::Cast(*value).MarkActive();
+#else
+                // MarkActive was removed in V8 8. No 8.7 equivalent.
+#endif
                 return;
             }
             // FIXME: Remove the special handling for SVG elements.
@@ -166,7 +184,11 @@ public:
             // strong references from SVG property tear-offs keeping context SVG
             // element alive.
             if (node->isSVGElement()) {
+#if V8_MAJOR_VERSION < 8
                 v8::Persistent<v8::Object>::Cast(*value).MarkActive();
+#else
+                // MarkActive was removed in V8 8. No 8.7 equivalent.
+#endif
                 return;
             }
         }
@@ -217,14 +239,18 @@ public:
             // TODO(haraken): Implement correct lifetime using traceWrapper.
             ExecutionContext* context = toExecutionContext(wrapper->CreationContext());
             if (context/* && !context->isContextDestroyed()*/) {
+#if V8_MAJOR_VERSION < 8
+                // Object groups were removed in V8 8; unified-heap wrapper
+                // tracing (RegisterV8References below) replaces them.
                 m_isolate->SetObjectGroupId(*value, liveRootId());
                 ++m_domObjectsWithPendingActivity;
+#endif
             }
 
 #if V8_MAJOR_VERSION >= 7
             ScriptWrappable* scriptWrap = toScriptWrappable(wrapper);
 
-            // ÕâÀïµ÷ÓÃRegisterEmbedderReferenceÎÞÐ§£¬ÒªÔÚv8::EmbedderHeapTracer::AdvanceTracing»Øµ÷Àïµ÷ÓÃ²ÅÐÐ
+            // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½RegisterEmbedderReferenceï¿½ï¿½Ð§ï¿½ï¿½Òªï¿½ï¿½v8::EmbedderHeapTracer::AdvanceTracingï¿½Øµï¿½ï¿½ï¿½ï¿½ï¿½Ã²ï¿½ï¿½ï¿½
             std::vector<std::pair<void*, void*>> refs;
             if (type->ginEmbedder == gin::GinEmbedder::kEmbedderBlink && scriptWrap) {
                 v8::Persistent<v8::Value>* newPersistent = new v8::Persistent<v8::Value>();
@@ -250,7 +276,11 @@ public:
                 addReferencesForNodeWithEventListeners(m_isolate, node, v8::Persistent<v8::Object>::Cast(*value));
 
             Node* root = V8GCController::opaqueRootForGC(m_isolate, node);
+#if V8_MAJOR_VERSION < 8
+            // SetObjectGroupId/v8::UniqueId (object groups) were removed in
+            // V8 8; unified-heap wrapper tracing replaces them. No 8.7 equivalent.
             m_isolate->SetObjectGroupId(*value, v8::UniqueId(reinterpret_cast<intptr_t>(root)));
+#endif
 
             if (m_constructRetainedObjectInfos)
                 m_groupsWhichNeedRetainerInfo.append(root);
@@ -289,6 +319,7 @@ public:
     }
 
 private:
+#if V8_MAJOR_VERSION < 8
     v8::UniqueId liveRootId()
     {
         const v8::Persistent<v8::Value>& liveRoot = V8PerIsolateData::from(m_isolate)->ensureLiveRoot();
@@ -301,6 +332,7 @@ private:
         }
         return id;
     }
+#endif // v8::UniqueId/object groups were removed in V8 8; no 8.7 equivalent.
 
     v8::Isolate* m_isolate;
     // v8 guarantees that Blink will not regain control while a v8 GC runs
@@ -626,7 +658,7 @@ private:
 
 void V8GCController::traceDOMWrappers(v8::Isolate* isolate, Visitor* parentVisitor) {
 #if V8_MAJOR_VERSION >= 7
-    // ²»ÐèÒªÔÚÕâÀïÊÖ¶¯trace¡£Ö»Òªv8::EmbedderHeapTracer::AdvanceTracingÀï×¢²áÁË£¬v8¶¼»á±»DOMWrapperForwardingVisitor±éÀú³öÀ´
+    // ï¿½ï¿½ï¿½ï¿½Òªï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ö¶ï¿½traceï¿½ï¿½Ö»Òªv8::EmbedderHeapTracer::AdvanceTracingï¿½ï¿½×¢ï¿½ï¿½ï¿½Ë£ï¿½v8ï¿½ï¿½ï¿½á±»DOMWrapperForwardingVisitorï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 //    std::vector<std::pair<void*, void*>>* v8References = V8PerIsolateData::from(isolate)->leakV8References();
 //
 //     for (size_t i = 0; v8References && i < v8References->size(); ++i) {

@@ -45,19 +45,34 @@ std::vector<std::pair<void*, void*>>* UnifiedHeapController::leakV8References()
     return nullptr;
 }
 
+#if V8_MAJOR_VERSION < 8
 void UnifiedHeapController::TracePrologue()
 {
     m_isTracingDone = false;
 }
+#else
+// V8 8.7 added a TraceFlags argument to this hook.
+void UnifiedHeapController::TracePrologue(v8::EmbedderHeapTracer::TraceFlags)
+{
+    m_isTracingDone = false;
+}
+#endif
 
 void UnifiedHeapController::EnterFinalPause(EmbedderStackState stack_state)
 {
 
 }
 
+#if V8_MAJOR_VERSION < 8
 void UnifiedHeapController::TraceEpilogue()
 {
 }
+#else
+// V8 8.7 added a TraceSummary* argument to this hook.
+void UnifiedHeapController::TraceEpilogue(v8::EmbedderHeapTracer::TraceSummary*)
+{
+}
+#endif
 
 void UnifiedHeapController::RegisterV8References(const std::vector<std::pair<void*, void*>>& refs)
 {
@@ -69,7 +84,7 @@ void UnifiedHeapController::RegisterV8References(const std::vector<std::pair<voi
         void* first = internalFields.first;
         WTF::HashMap<void*, void*>::iterator it = m_v8References.find(first);
 
-        if (!internalFields.second) { // Èç¹ûÊÇÕâÖÖÇé¿ö£¬ËµÃ÷ÊÇScopedPersistentÉèÖÃ¸øMajorGCWrapperVisitor::VisitPersistentHandle
+        if (!internalFields.second) { // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ëµï¿½ï¿½ï¿½ï¿½ScopedPersistentï¿½ï¿½ï¿½Ã¸ï¿½MajorGCWrapperVisitor::VisitPersistentHandle
             if (it != m_v8References.end())
                 continue;
             m_v8References.add(internalFields.first, nullptr);
@@ -88,7 +103,7 @@ void UnifiedHeapController::RegisterV8References(const std::vector<std::pair<voi
             continue;
         }
 
-        m_v8References.add(scriptWrappable, wrapperTypeInfo); // ×¢ÒâË³Ðò·´ÁËÒ»ÏÂ
+        m_v8References.add(scriptWrappable, wrapperTypeInfo); // ×¢ï¿½ï¿½Ë³ï¿½ï¿½ï¿½ï¿½Ò»ï¿½ï¿½
     }
     m_isTracingDone = false;
 }
@@ -109,7 +124,12 @@ bool UnifiedHeapController::AdvanceTracing(double deadline_in_ms)
             v8::Persistent<v8::Value>* value = (v8::Persistent<v8::Value>*)it->key;
             v8::Local<v8::Value> wrapper = v8::Local<v8::Value>::New(isolate, v8::Persistent<v8::Value>::Cast(*value));
             v8::TracedGlobal<v8::Value> traceObj(isolate, wrapper);
+#if V8_MAJOR_VERSION < 8
             tracer->RegisterEmbedderReference(traceObj);
+#else
+            // V8 8.7 takes a TracedReferenceBase<v8::Data>&.
+            tracer->RegisterEmbedderReference(traceObj.As<v8::Data>());
+#endif
 
 //             v8::TracedGlobal<v8::Value>* value = (v8::TracedGlobal<v8::Value>*)it->key;
 //             tracer->RegisterEmbedderReference(*value);
@@ -125,19 +145,31 @@ bool UnifiedHeapController::AdvanceTracing(double deadline_in_ms)
 
         const v8::TracedGlobal<v8::Object>& traceObj = scriptWrappable->GetMainWorldWrapper();
         if (!traceObj.IsEmpty()) {
+#if V8_MAJOR_VERSION < 8
             tracer->RegisterEmbedderReference(traceObj.As<v8::Value>());
+#else
+            // V8 8.7 takes a TracedReferenceBase<v8::Data>&.
+            tracer->RegisterEmbedderReference(traceObj.As<v8::Data>());
+#endif
         } else if (!(WTF::isMainThread())) {
             if (isolate->GetCurrentContext().IsEmpty()) {
+#if defined(_WIN32)
                 char* output = (char*)malloc(0x100);
                 sprintf_s(output, 0x99, "UnifiedHeapController::AdvanceTracing fail: %p\n", isolate);
                 OutputDebugStringA(output);
                 free(output);
+#endif
                 continue;
             }
 
             v8::Local<v8::Object> wrapper = DOMDataStore::getWrapper(scriptWrappable, isolate);
             v8::TracedGlobal<v8::Value> traceWrapObj(isolate, wrapper.As<v8::Value>());
+#if V8_MAJOR_VERSION < 8
             tracer->RegisterEmbedderReference(traceWrapObj.As<v8::Value>());
+#else
+            // V8 8.7 takes a TracedReferenceBase<v8::Data>&.
+            tracer->RegisterEmbedderReference(traceWrapObj.As<v8::Data>());
+#endif
         }
 
 //         char* output = (char*)malloc(0x100);

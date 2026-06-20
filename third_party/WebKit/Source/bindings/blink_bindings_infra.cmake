@@ -8,9 +8,11 @@ set(BIV8 "${CMAKE_SOURCE_DIR}/third_party/WebKit/Source/bindings/core/v8")
 
 file(GLOB BLINK_BINDINGS_INFRA "${BIV8}/*.cpp" "${BIV8}/custom/*.cpp")
 list(FILTER BLINK_BINDINGS_INFRA EXCLUDE REGEX "Test\\.cpp$")
-# Deferred: NPAPI plugin bindings (need third_party/npapi + a macOS Carbon guard)
-# and an old V8GCController version-variant.
-list(FILTER BLINK_BINDINGS_INFRA EXCLUDE REGEX "/npruntime\\.cpp$|/NPV8Object\\.cpp$|/V8NPObject\\.cpp$|/V8NPUtils\\.cpp$|/ScriptController\\.cpp$|/V8GCController_v8_5_7\\.cpp$|/V8HTMLPlugInElementCustom\\.cpp$")
+# The NPAPI plugin bindings (npruntime/NPV8Object/V8NPObject/V8NPUtils/
+# V8HTMLPlugInElementCustom), ScriptController and the modern V8GCController_v8_5_7
+# variant now all compile on macOS (third_party/npapi + win_compat includes, the
+# Carbon TextEncoding guard, and the V8 7.5->8.7 migration of V8NPObject/V8NPUtils/
+# V8GCController_v8_5_7). They mirror what the Windows miniblink.vcxproj compiles.
 
 add_library(blink_bindings_infra STATIC ${BLINK_BINDINGS_INFRA})
 target_link_libraries(blink_bindings_infra PUBLIC blink_core)
