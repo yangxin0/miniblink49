@@ -20,7 +20,11 @@ set(CSRC "${CMAKE_SOURCE_DIR}/third_party/WebKit/Source/core")
 file(GLOB BLINK_CORE_SRC
     "${CSRC}/dom/*.cpp"   "${CSRC}/html/*.cpp"  "${CSRC}/css/*.cpp"
     "${CSRC}/layout/*.cpp" "${CSRC}/events/*.cpp" "${CSRC}/frame/*.cpp"
-    "${CSRC}/page/*.cpp")
+    "${CSRC}/page/*.cpp"  "${CSRC}/style/*.cpp" "${CSRC}/animation/*.cpp"
+    "${CSRC}/loader/*.cpp" "${CSRC}/fetch/*.cpp" "${CSRC}/timing/*.cpp"
+    "${CSRC}/fileapi/*.cpp" "${CSRC}/xml/*.cpp" "${CSRC}/clipboard/*.cpp"
+    "${CSRC}/svg/*.cpp" "${CSRC}/paint/*.cpp" "${CSRC}/editing/*.cpp"
+    "${CSRC}/workers/*.cpp")
 
 # Unit tests + *TestHelper.
 list(FILTER BLINK_CORE_SRC EXCLUDE REGEX "Test\\.cpp$|TestHelper\\.cpp$")
@@ -29,6 +33,12 @@ list(FILTER BLINK_CORE_SRC EXCLUDE REGEX "HTMLPlugInElement\\.cpp$|HTMLMetaEleme
 # layout: non-mac platform themes (we keep LayoutThemeMac) + 2 API-skew files.
 list(FILTER BLINK_CORE_SRC EXCLUDE REGEX "LayoutTheme(Android|Default|Linux|Win|FontProviderWin)\\.cpp$")
 list(FILTER BLINK_CORE_SRC EXCLUDE REGEX "LayoutReplaced\\.cpp$|LayoutText\\.cpp$")
+# fetch: resource subclasses with API skews (deferred).
+list(FILTER BLINK_CORE_SRC EXCLUDE REGEX "CSSStyleSheetResource\\.cpp$|ImageResource\\.cpp$|ScriptResource\\.cpp$")
+# paint: non-mac theme painter (we keep the mac path).
+list(FILTER BLINK_CORE_SRC EXCLUDE REGEX "ThemePainterDefault\\.cpp$")
+# workers: threading-proxy files with API skews (deferred).
+list(FILTER BLINK_CORE_SRC EXCLUDE REGEX "WorkerMessagingProxy\\.cpp$|WorkerThread\\.cpp$")
 
 add_library(blink_core STATIC ${BLINK_CORE_SRC})
 
