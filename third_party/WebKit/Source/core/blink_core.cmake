@@ -29,7 +29,8 @@ file(GLOB_RECURSE BLINK_CORE_SRC
     "${CSRC}/svg/*.cpp" "${CSRC}/paint/*.cpp" "${CSRC}/editing/*.cpp"
     "${CSRC}/workers/*.cpp" "${CSRC}/streams/*.cpp" "${CSRC}/xmlhttprequest/*.cpp"
     "${CSRC}/input/*.cpp" "${CSRC}/imagebitmap/*.cpp"
-    "${CSRC}/inspector/*.cpp")   # recovered via the deferred-file workflow
+    "${CSRC}/inspector/*.cpp"    # recovered via the deferred-file workflow
+    "${CSRC}/*.cpp")             # core root: Init.cpp (CoreInitializer::init/shutdown)
 
 # Unit tests + *TestHelper.
 list(FILTER BLINK_CORE_SRC EXCLUDE REGEX "Test\\.cpp$|TestHelper\\.cpp$")

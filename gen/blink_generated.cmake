@@ -9,7 +9,8 @@
 
 set(GENSRC "${CMAKE_SOURCE_DIR}/gen/blink")
 
-file(GLOB_RECURSE BLINK_GEN_SRC "${GENSRC}/core/*.cpp" "${GENSRC}/platform/*.cpp")
+file(GLOB_RECURSE BLINK_GEN_SRC "${GENSRC}/core/*.cpp" "${GENSRC}/platform/*.cpp"
+    "${GENSRC}/modules/*.cpp")   # EventModules*/EventTargetModules*/IndexedDB names (EventNames::initModules etc.)
 # CSSTokenizerCodepoints needs core CSSTokenizer; InspectorInstrumentationImpl
 # pulls the inspector debugger (v8::NativeWeakMap, removed in 8.7) — deferred.
 # CSSTokenizerCodepoints needs core CSSTokenizer; InspectorInstrumentationImpl is
