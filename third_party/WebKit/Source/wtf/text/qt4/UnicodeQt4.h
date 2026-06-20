@@ -98,7 +98,9 @@ typedef uint16_t UChar;
 #endif
 
 #if !USE(QT_ICU_TEXT_BREAKING)
-typedef uint32_t UChar32;
+// int32_t to match ICU/Chromium's UChar32 (avoids a typedef conflict when the
+// system ICU's umachine.h is pulled in via TextCodecICU.h). A code point fits.
+typedef int32_t UChar32;
 #endif
 
 namespace WTF {
