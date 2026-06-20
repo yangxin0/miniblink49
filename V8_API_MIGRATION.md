@@ -12,12 +12,20 @@ only a handful of leftover V8 7.5-isms; they have been migrated:
 After migration, the engine-wide count of deprecated no-arg
 `To*()/BooleanValue()` and 2-arg `Set`/1-arg `Get` v8 calls is **0**.
 
-Verification status: gin files are **compile-verified** (syntax-only) against the
-V8 8.7 headers. `wke/wkeJsBind.cpp` edits are mechanically correct per the 8.7
-API but **not yet compile-verified** (wke can't build until the base/engine port
-advances — see BUILD_CROSSPLATFORM.md). The `Object::Get` sites in wke use
-`.FromMaybe(Local())` (not `.ToLocalChecked()`) to preserve the original
-exception/empty-handling semantics.
+Verification status: **`gin` has 0 V8-API errors against V8 8.7** — verified by
+compiling the `gin` target (`-DMINIBLINK_BUILD_GIN=ON`) against `libbase.a` +
+`orig_chrome` + the V8 8.7 monolith. 8/26 gin files compile fully; the remaining
+gin compile errors are base/WTF/orig_chrome/CEF **dependency-resolution** issues
+(a stale `v8_7_5/` reference, WTF `COMPILER` config, `trace_event` headers, CEF
+internals) — **none are V8-API incompatibilities**. Final V8 deltas fixed:
+`function_template.h` (`Utf8Value` isolate arg), `isolate_holder.cc`
+(`CreateParams::entry_hook` removed in V8 7+, `v8::base::SysInfo` not in the
+public headers → portable physical-memory query).
+
+`wke/wkeJsBind.cpp` edits are mechanically correct per the 8.7 API but **not yet
+compile-verified** (wke needs the engine port to advance). The `Object::Get`
+sites in wke use `.FromMaybe(Local())` (not `.ToLocalChecked()`) to preserve the
+original exception/empty-handling semantics.
 
 
 
