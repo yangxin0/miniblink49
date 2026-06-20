@@ -165,7 +165,9 @@ static void callOnMainThreadFunction(WTF::MainThreadFunction function, void* con
 
 static void mainThreadadjustAmountOfExternalAllocatedMemory(void* sizePtr)
 {
-    v8::Isolate::GetCurrent()->AdjustAmountOfExternalAllocatedMemory((int)sizePtr);
+    // sizePtr is an int size smuggled through a void* (see the (void*)size cast
+    // below); round-trip via intptr_t so it's valid on 64-bit.
+    v8::Isolate::GetCurrent()->AdjustAmountOfExternalAllocatedMemory(static_cast<int>(reinterpret_cast<intptr_t>(sizePtr)));
 }
 
 static void adjustAmountOfExternalAllocatedMemory(int size)
@@ -190,7 +192,7 @@ void initializeWithoutV8(Platform* platform)
     s_webKitInitialized = true;
 
     ASSERT(platform);
-    //Platform::initialize(platform); // weolar:因为Platform::initialize需要创建mainthread，所以等初始化好了main thread再调用，放到后面去。
+    //Platform::initialize(platform); // weolar:锟斤拷为Platform::initialize锟斤拷要锟斤拷锟斤拷mainthread锟斤拷锟斤拷锟皆等筹拷始锟斤拷锟斤拷锟斤拷main thread锟劫碉拷锟矫ｏ拷锟脚碉拷锟斤拷锟斤拷去锟斤拷
 
     WTF::setRandomSource(cryptographicallyRandomValues);
     WTF::initialize(currentTimeFunction, monotonicallyIncreasingTimeFunction, systemTraceTimeFunction, histogramEnumerationFunction, adjustAmountOfExternalAllocatedMemory);

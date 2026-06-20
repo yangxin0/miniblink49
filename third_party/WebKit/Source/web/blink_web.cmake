@@ -13,10 +13,12 @@ set(WEBSRC "${CMAKE_SOURCE_DIR}/third_party/WebKit/Source/web")
 
 file(GLOB BLINK_WEB_SRC "${WEBSRC}/*.cpp")
 list(FILTER BLINK_WEB_SRC EXCLUDE REGEX "Test\\.cpp$")
-# Deferred: devtools/inspector glue (legacy v8::Debug API), the central
-# WebKit.cpp/WebLocalFrameImpl.cpp + their TextFinder/worker deps, NPAPI
-# WebBindings, and a couple of misc skews (WebMutationEvent, NativeWeakMap).
-list(FILTER BLINK_WEB_SRC EXCLUDE REGEX "DevTools|WebDevTools|InspectorOverlayImplNone|TextFinder\\.cpp$|WebBindings\\.cpp$|WebEmbeddedWorkerImpl\\.cpp$|WebSharedWorkerImpl\\.cpp$|WebKit\\.cpp$|WebLocalFrameImpl\\.cpp$|WebMutationEvent\\.cpp$|WebTestingSupport\\.cpp$")
+# Deferred: devtools/inspector glue (legacy v8::Debug API), find-in-page
+# (TextFinder, guard quirk), NPAPI WebBindings, the worker glue that pulls the
+# inspector debugger (v8::NativeWeakMap, removed in 8.7), and WebMutationEvent
+# (missing public header). WebKit.cpp (blink::initialize) and WebLocalFrameImpl
+# now compile and are included.
+list(FILTER BLINK_WEB_SRC EXCLUDE REGEX "DevTools|WebDevTools|InspectorOverlayImplNone|TextFinder\\.cpp$|WebBindings\\.cpp$|WebEmbeddedWorkerImpl\\.cpp$|WebSharedWorkerImpl\\.cpp$|WebMutationEvent\\.cpp$|WebTestingSupport\\.cpp$")
 
 add_library(blink_web STATIC ${BLINK_WEB_SRC})
 

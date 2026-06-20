@@ -121,7 +121,10 @@ class SK_API PlatformDevice {
   virtual bool DrawToNativeContext(PlatformSurface surface, int x, int y,
                                    const PlatformRect* src_rect) = 0;
 
+#if defined(OS_WIN)
+  // Windows-only: uses the Win32 RECT/layered-window APIs.
   virtual bool DrawToNativeLayeredContext(PlatformSurface surface, const RECT* src_rect, const RECT* client_rect) = 0;
+#endif
 
   // Returns true if GDI operations can be used for drawing into the bitmap.
   virtual bool SupportsPlatformPaint();
