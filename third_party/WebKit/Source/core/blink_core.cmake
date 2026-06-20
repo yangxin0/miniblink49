@@ -28,19 +28,20 @@ file(GLOB_RECURSE BLINK_CORE_SRC
     "${CSRC}/fileapi/*.cpp" "${CSRC}/xml/*.cpp" "${CSRC}/clipboard/*.cpp"
     "${CSRC}/svg/*.cpp" "${CSRC}/paint/*.cpp" "${CSRC}/editing/*.cpp"
     "${CSRC}/workers/*.cpp" "${CSRC}/streams/*.cpp" "${CSRC}/xmlhttprequest/*.cpp"
-    "${CSRC}/input/*.cpp" "${CSRC}/imagebitmap/*.cpp")
+    "${CSRC}/input/*.cpp" "${CSRC}/imagebitmap/*.cpp"
+    "${CSRC}/inspector/*.cpp")   # recovered via the deferred-file workflow
 
 # Unit tests + *TestHelper.
 list(FILTER BLINK_CORE_SRC EXCLUDE REGEX "Test\\.cpp$|TestHelper\\.cpp$")
 # html: plugin element (GPU/plugin host) + a generated-in straggler.
 list(FILTER BLINK_CORE_SRC EXCLUDE REGEX "HTMLPlugInElement\\.cpp$|HTMLMetaElement-in\\.cpp$")
-# nested-subdir stragglers (4 of ~320): API skews / platform variants.
-list(FILTER BLINK_CORE_SRC EXCLUDE REGEX "CustomElementNone\\.cpp$|FileInputType\\.cpp$|HTMLParserScheduler\\.cpp$|CanvasRenderingContextFactory\\.cpp$")
-# layout: non-mac platform themes (we keep LayoutThemeMac) + 2 API-skew files.
+# nested-subdir stragglers: API skews / platform variants (HTMLParserScheduler
+# recovered by the workflow).
+list(FILTER BLINK_CORE_SRC EXCLUDE REGEX "CustomElementNone\\.cpp$|FileInputType\\.cpp$|CanvasRenderingContextFactory\\.cpp$")
+# layout: non-mac platform themes (we keep LayoutThemeMac). LayoutText/LayoutReplaced recovered.
 list(FILTER BLINK_CORE_SRC EXCLUDE REGEX "LayoutTheme(Android|Default|Linux|Win|FontProviderWin)\\.cpp$")
-list(FILTER BLINK_CORE_SRC EXCLUDE REGEX "LayoutReplaced\\.cpp$|LayoutText\\.cpp$")
-# fetch: resource subclasses with API skews (deferred).
-list(FILTER BLINK_CORE_SRC EXCLUDE REGEX "CSSStyleSheetResource\\.cpp$|ImageResource\\.cpp$|ScriptResource\\.cpp$")
+# fetch: resource subclasses with API skews (ScriptResource recovered; these 2 deferred).
+list(FILTER BLINK_CORE_SRC EXCLUDE REGEX "CSSStyleSheetResource\\.cpp$|ImageResource\\.cpp$")
 # paint: non-mac theme painter (we keep the mac path).
 list(FILTER BLINK_CORE_SRC EXCLUDE REGEX "ThemePainterDefault\\.cpp$")
 # workers: threading-proxy files with API skews (deferred).

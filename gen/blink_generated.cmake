@@ -12,7 +12,9 @@ set(GENSRC "${CMAKE_SOURCE_DIR}/gen/blink")
 file(GLOB_RECURSE BLINK_GEN_SRC "${GENSRC}/core/*.cpp" "${GENSRC}/platform/*.cpp")
 # CSSTokenizerCodepoints needs core CSSTokenizer; InspectorInstrumentationImpl
 # pulls the inspector debugger (v8::NativeWeakMap, removed in 8.7) — deferred.
-list(FILTER BLINK_GEN_SRC EXCLUDE REGEX "CSSTokenizerCodepoints\\.cpp$|InspectorInstrumentationImpl\\.cpp$")
+# CSSTokenizerCodepoints needs core CSSTokenizer; InspectorInstrumentationImpl is
+# recovered now (PromiseTracker NativeWeakMap->Map fix unblocked the inspector chain).
+list(FILTER BLINK_GEN_SRC EXCLUDE REGEX "CSSTokenizerCodepoints\\.cpp$")
 
 add_library(blink_generated STATIC ${BLINK_GEN_SRC})
 target_link_libraries(blink_generated PUBLIC blink_platform)

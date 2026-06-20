@@ -50,13 +50,17 @@ file(GLOB BLINK_FONTS    "${BSRC}/fonts/*.cpp")
 # mediastream.
 file(GLOB BLINK_SUBLAYERS
     "${BSRC}/scroll/*.cpp" "${BSRC}/network/*.cpp"
-    "${BSRC}/mhtml/*.cpp" "${BSRC}/mediastream/*.cpp")
+    "${BSRC}/mhtml/*.cpp" "${BSRC}/mediastream/*.cpp"
+    "${BSRC}/weborigin/*.cpp")   # KURL recovered; KURL_new/KURL_w variants excluded below
 # Unit tests (gtest) and the value types already in the core list.
 list(FILTER BLINK_HEAP      EXCLUDE REGEX "Test\\.cpp$|RunAllTests\\.cpp$")
 list(FILTER BLINK_GRAPHICS  EXCLUDE REGEX "Test\\.cpp$|/Color\\.cpp$|/GraphicsTypes\\.cpp$")
 list(FILTER BLINK_TEXT      EXCLUDE REGEX "Test\\.cpp$")
 list(FILTER BLINK_FONTS     EXCLUDE REGEX "Test\\.cpp$")
 list(FILTER BLINK_SUBLAYERS EXCLUDE REGEX "Test\\.cpp$")
+# weborigin: keep KURL.cpp (recovered); the alternate KURL_new (chromium url/) and
+# KURL_w (copyASCII skew) variants are not used on macOS.
+list(FILTER BLINK_SUBLAYERS EXCLUDE REGEX "KURL_new\\.cpp$|KURL_w\\.cpp$")
 # V8 EmbedderHeapTracer API skew (final/virtual): deferred.
 list(FILTER BLINK_HEAP EXCLUDE REGEX "UnifiedHeapController")
 # GPU (Ganesh/GLES2), canvas-layer/compositor, GDI/Win: deferred.
