@@ -81,9 +81,10 @@ list(FILTER BLINK_SUBLAYERS EXCLUDE REGEX "ClipboardUtilitiesWin\\.cpp$")
 # Truly deferred: graphics/gpu (Ganesh/GLES2 not brought up), Canvas2DLayerBridge
 # (WebExternalTextureMailbox::syncPoint API skew), ImageBuffer.cpp (pulls wke ->
 # windows.h), GDIPlusInit (Win-only).
-# ImageBuffer.cpp's toDataURL path uses wke::CString (full wke layer, not just the
-# windows.h shim) -> deferred with the rest of the wke embedding bring-up.
-list(FILTER BLINK_GRAPHICS EXCLUDE REGEX "/gpu/|Canvas2DLayerBridge|GDIPlusInit|/ImageBuffer\\.cpp$")
+# graphics/gpu compiles (uses the virtual gpu::gles2::GLES2Interface, not direct GL).
+# Still deferred: Canvas2DLayerBridge (WebExternalTextureMailbox::syncPoint skew),
+# GDIPlusInit (Win-only).
+list(FILTER BLINK_GRAPHICS EXCLUDE REGEX "Canvas2DLayerBridge|GDIPlusInit")
 # Calendar/date ICU (ucal/udat) + Windows locale: deferred.
 list(FILTER BLINK_TEXT EXCLUDE REGEX "LocaleICU|LocaleWin")
 # Deferred font backends: FontCustomPlatformData/FontCacheSkia (CoreText/fontconfig
