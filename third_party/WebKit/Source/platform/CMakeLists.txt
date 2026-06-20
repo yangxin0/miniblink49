@@ -28,6 +28,29 @@ set(BLINK_GEOMETRY_SOURCES
     geometry/Region.cpp
     geometry/TransformState.cpp
 )
+
+# Math primitives + transforms: Length/Decimal and the 2D/3D transform operations
+# (pure math on top of geometry; no ICU/heap/GC dependencies). Plus the two
+# foundational graphics value types (Color, GraphicsTypes).
+list(APPEND BLINK_GEOMETRY_SOURCES
+    Length.cpp
+    LengthBox.cpp
+    LengthFunctions.cpp
+    Decimal.cpp
+    transforms/AffineTransform.cpp
+    transforms/InterpolatedTransformOperation.cpp
+    transforms/Matrix3DTransformOperation.cpp
+    transforms/MatrixTransformOperation.cpp
+    transforms/PerspectiveTransformOperation.cpp
+    transforms/RotateTransformOperation.cpp
+    transforms/ScaleTransformOperation.cpp
+    transforms/SkewTransformOperation.cpp
+    transforms/TransformationMatrix.cpp
+    transforms/TransformOperations.cpp
+    transforms/TranslateTransformOperation.cpp
+    graphics/Color.cpp
+    graphics/GraphicsTypes.cpp
+)
 list(TRANSFORM BLINK_GEOMETRY_SOURCES PREPEND "${BSRC}/")
 
 # base::debug::Alias — a tiny no-op blink references to defeat optimization. Pull
@@ -42,6 +65,9 @@ target_include_directories(blink_platform PUBLIC
     "${CMAKE_SOURCE_DIR}"   # third_party/skia/include/core/SkRect.h style paths
     "${WSRC}"               # platform/..., wtf/...
     "${WK}"                 # public/platform/WebCommon.h
+    "${CMAKE_SOURCE_DIR}/gen/blink"             # generated *Names.h headers
+    "${CMAKE_SOURCE_DIR}/third_party/icu/source/common"   # unicode/*.h
+    "${MINIBLINK_V8_ROOT}/include"              # v8.h (bindings-adjacent headers)
     "${CMAKE_SOURCE_DIR}/orig_chrome")
 
 target_link_libraries(blink_platform PUBLIC wtf skia)
