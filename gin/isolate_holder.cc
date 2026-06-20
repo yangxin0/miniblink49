@@ -18,6 +18,14 @@
 //#include "sys-info.h"
 #include "v8.h"
 
+// v8::base::SysInfo is not part of the public (monolith) V8 headers, so query
+// physical memory via the OS instead.
+#if defined(__APPLE__)
+#include <sys/sysctl.h>
+#elif defined(OS_POSIX)
+#include <unistd.h>
+#endif
+
 namespace v8 {
 namespace base {
 
@@ -54,11 +62,11 @@ public:
 //     ::CloseHandle(hFile);
 // }
 // 
-// //Ò»¸öº¯Êý£¬ÊµÏÖÔÚjsÖÐµ÷ÓÃC++º¯Êý
+// //Ò»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Êµï¿½ï¿½ï¿½ï¿½jsï¿½Ðµï¿½ï¿½ï¿½C++ï¿½ï¿½ï¿½ï¿½
 // void testAlert(const v8::FunctionCallbackInfo<v8::Value>& args)
 // {
 //     //     v8::String::Utf8Value str(args[0]);
-//     //     printf("day--£º%s\n", *str);
+//     //     printf("day--ï¿½ï¿½%s\n", *str);
 //     v8::Local<v8::Value> str = args[0];
 //     v8::Local<v8::String> info = str->ToString(args.GetIsolate());
 // 
@@ -136,11 +144,23 @@ IsolateHolder::IsolateHolder(AccessMode access_mode)
   v8::ArrayBuffer::Allocator* allocator = g_array_buffer_allocator;
   CHECK(allocator); // << "You need to invoke gin::IsolateHolder::Initialize first";
   v8::Isolate::CreateParams params;
-#if V8_MAJOR_VERSION != 7
+#if V8_MAJOR_VERSION < 7
   params.entry_hook = DebugImpl::GetFunctionEntryHook();
 #endif
   params.code_event_handler = DebugImpl::GetJitCodeEventHandler();
-  params.constraints.ConfigureDefaults(v8::base::SysInfo::AmountOfPhysicalMemory(), v8::base::SysInfo::AmountOfVirtualMemory());
+  uint64_t physicalMemory = 0;
+#if defined(_WIN32)
+  MEMORYSTATUSEX memStatus; memStatus.dwLength = sizeof(memStatus);
+  if (GlobalMemoryStatusEx(&memStatus)) physicalMemory = memStatus.ullTotalPhys;
+#elif defined(__APPLE__)
+  { int mib[2] = { CTL_HW, HW_MEMSIZE }; size_t len = sizeof(physicalMemory);
+    sysctl(mib, 2, &physicalMemory, &len, nullptr, 0); }
+#elif defined(OS_POSIX)
+  physicalMemory = static_cast<uint64_t>(sysconf(_SC_PHYS_PAGES)) *
+                   static_cast<uint64_t>(sysconf(_SC_PAGE_SIZE));
+#endif
+  // V8 8.7: ConfigureDefaults(physical_memory, virtual_memory_limit).
+  params.constraints.ConfigureDefaults(physicalMemory, 0);
   params.array_buffer_allocator = allocator;
   isolate_ = v8::Isolate::New(params);
 

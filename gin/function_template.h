@@ -286,12 +286,12 @@ struct Dispatcher<ReturnType(ArgTypes...)> {
                 std::string funcNameWTF;
 
                 if (!scriptName.IsEmpty()) {
-                    v8::String::Utf8Value scriptNameUtf8(scriptName);
+                    v8::String::Utf8Value scriptNameUtf8(info.GetIsolate(), scriptName);
                     scriptNameWTF = *scriptNameUtf8;
                 }
 
                 if (!funcName.IsEmpty()) {
-                    v8::String::Utf8Value funcNameUtf8(funcName);
+                    v8::String::Utf8Value funcNameUtf8(info.GetIsolate(), funcName);
                     funcNameWTF = *funcNameUtf8;
                 }
                 std::vector<char> output;

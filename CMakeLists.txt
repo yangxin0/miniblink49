@@ -40,8 +40,12 @@ enable_testing()
 
 # ---- Engine base library (port in progress) ---------------------------------
 option(MINIBLINK_BUILD_BASE "Build the engine base/ library (macOS port WIP)" OFF)
-if(MINIBLINK_BUILD_BASE)
-    add_subdirectory(base)
+option(MINIBLINK_BUILD_GIN  "Build the gin V8 integration layer (macOS port WIP)" OFF)
+if(MINIBLINK_BUILD_BASE OR MINIBLINK_BUILD_GIN)
+    add_subdirectory(base)   # gin depends on base
+endif()
+if(MINIBLINK_BUILD_GIN)
+    add_subdirectory(gin)
 endif()
 
 # ---- Imported V8 monolith target -------------------------------------------
