@@ -71,8 +71,13 @@ void V8MutationObserver::visitDOMWrapper(v8::Isolate* isolate, ScriptWrappable* 
     MutationObserver* observer = scriptWrappable->toImpl<MutationObserver>();
     WillBeHeapHashSet<RawPtrWillBeMember<Node>> observedNodes = observer->getObservedNodes();
     for (WillBeHeapHashSet<RawPtrWillBeMember<Node>>::iterator it = observedNodes.begin(); it != observedNodes.end(); ++it) {
+#if V8_MAJOR_VERSION < 8
         v8::UniqueId id(reinterpret_cast<intptr_t>(V8GCController::opaqueRootForGC(isolate, *it)));
         isolate->SetReferenceFromGroup(id, wrapper);
+#else
+        // Object-group GC hints (UniqueId / SetReferenceFromGroup) were removed in V8 8.x; no-op.
+        (void)V8GCController::opaqueRootForGC(isolate, *it);
+#endif
     }
 }
 

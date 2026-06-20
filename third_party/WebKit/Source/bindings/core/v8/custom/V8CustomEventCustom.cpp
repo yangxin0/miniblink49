@@ -80,9 +80,14 @@ void V8CustomEvent::initCustomEventMethodCustom(const v8::FunctionCallbackInfo<v
     TOSTRING_VOID(V8StringResource<>, typeArg, info[0]);
     bool canBubbleArg;
     bool cancelableArg;
+#if V8_MAJOR_VERSION < 8
     if (!v8Call(info[1]->BooleanValue(info.GetIsolate()->GetCurrentContext()), canBubbleArg)
         || !v8Call(info[2]->BooleanValue(info.GetIsolate()->GetCurrentContext()), cancelableArg))
         return;
+#else
+    canBubbleArg = info[1]->BooleanValue(info.GetIsolate());
+    cancelableArg = info[2]->BooleanValue(info.GetIsolate());
+#endif
     v8::Local<v8::Value> detailsArg = info[3];
 
     event->initEvent(typeArg, canBubbleArg, cancelableArg);

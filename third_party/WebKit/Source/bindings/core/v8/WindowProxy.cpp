@@ -388,8 +388,13 @@ void WindowProxy::updateDocumentProperty()
     ASSERT(documentWrapper->IsObject());
     // TODO(bashi): Avoid using ForceSet(). When we use accessors to implement
     // attributes, we may be able to remove updateDocumentProperty().
+#if V8_MAJOR_VERSION < 8
     if (!v8CallBoolean(context->Global()->ForceSet(context, v8AtomicString(m_isolate, "document"), documentWrapper, static_cast<v8::PropertyAttribute>(v8::ReadOnly | v8::DontDelete))))
         return;
+#else
+    if (!v8CallBoolean(context->Global()->DefineOwnProperty(context, v8AtomicString(m_isolate, "document"), documentWrapper, static_cast<v8::PropertyAttribute>(v8::ReadOnly | v8::DontDelete))))
+        return;
+#endif
 
     // We also stash a reference to the document on the inner global object so that
     // LocalDOMWindow objects we obtain from JavaScript references are guaranteed to have

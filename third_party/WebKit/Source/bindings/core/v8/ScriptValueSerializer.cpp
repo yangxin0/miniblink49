@@ -97,7 +97,11 @@ void SerializedScriptValueWriter::writeBooleanObject(bool value)
 void SerializedScriptValueWriter::writeOneByteString(v8::Local<v8::String>& string)
 {
     int stringLength = string->Length();
+#if V8_MAJOR_VERSION < 8
     int utf8Length = string->Utf8Length();
+#else
+    int utf8Length = string->Utf8Length(v8::Isolate::GetCurrent());
+#endif
     ASSERT(stringLength >= 0 && utf8Length >= 0);
 
     append(StringTag);
@@ -106,10 +110,18 @@ void SerializedScriptValueWriter::writeOneByteString(v8::Local<v8::String>& stri
 
     // ASCII fast path.
     if (stringLength == utf8Length) {
+#if V8_MAJOR_VERSION < 8
         string->WriteOneByte(byteAt(m_position), 0, utf8Length, v8StringWriteOptions());
+#else
+        string->WriteOneByte(v8::Isolate::GetCurrent(), byteAt(m_position), 0, utf8Length, v8StringWriteOptions());
+#endif
     } else {
         char* buffer = reinterpret_cast<char*>(byteAt(m_position));
+#if V8_MAJOR_VERSION < 8
         string->WriteUtf8(buffer, utf8Length, 0, v8StringWriteOptions());
+#else
+        string->WriteUtf8(v8::Isolate::GetCurrent(), buffer, utf8Length, 0, v8StringWriteOptions());
+#endif
     }
     m_position += utf8Length;
 }
@@ -130,7 +142,11 @@ void SerializedScriptValueWriter::writeUCharString(v8::Local<v8::String>& string
 
     ASSERT(!(m_position & 1));
     uint16_t* buffer = reinterpret_cast<uint16_t*>(byteAt(m_position));
+#if V8_MAJOR_VERSION < 8
     string->Write(buffer, 0, length, v8StringWriteOptions());
+#else
+    string->Write(v8::Isolate::GetCurrent(), buffer, 0, length, v8StringWriteOptions());
+#endif
     m_position += size;
 }
 
@@ -302,7 +318,11 @@ void SerializedScriptValueWriter::writeImageData(uint32_t width, uint32_t height
 void SerializedScriptValueWriter::writeRegExp(v8::Local<v8::String> pattern, v8::RegExp::Flags flags)
 {
     append(RegExpTag);
+#if V8_MAJOR_VERSION < 8
     v8::String::Utf8Value patternUtf8Value(pattern);
+#else
+    v8::String::Utf8Value patternUtf8Value(v8::Isolate::GetCurrent(), pattern);
+#endif
     doWriteString(*patternUtf8Value, patternUtf8Value.length());
     doWriteUint32(static_cast<uint32_t>(flags));
 }
@@ -858,7 +878,11 @@ void ScriptValueSerializer::writeString(v8::Local<v8::Value> value)
 void ScriptValueSerializer::writeStringObject(v8::Local<v8::Value> value)
 {
     v8::Local<v8::StringObject> stringObject = value.As<v8::StringObject>();
+#if V8_MAJOR_VERSION < 8
     v8::String::Utf8Value stringValue(stringObject->ValueOf());
+#else
+    v8::String::Utf8Value stringValue(v8::Isolate::GetCurrent(), stringObject->ValueOf());
+#endif
     m_writer.writeStringObject(*stringValue, stringValue.length());
 }
 

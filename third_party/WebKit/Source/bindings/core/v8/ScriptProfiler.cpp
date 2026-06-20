@@ -48,12 +48,39 @@ namespace blink {
 
 typedef HashMap<String, double> ProfileNameIdleTimeMap;
 
+#if V8_MAJOR_VERSION < 8
+#else
+// v8::Isolate::GetCpuProfiler() was removed in V8 8.x. A CpuProfiler must now be
+// created explicitly via v8::CpuProfiler::New(isolate). To preserve the original
+// behavior (a single profiler shared across start/stop/setSamplingInterval/setIdle),
+// lazily create and cache one CpuProfiler for the current isolate.
+static v8::CpuProfiler* currentCpuProfiler()
+{
+    v8::Isolate* isolate = v8::Isolate::GetCurrent();
+    if (!isolate)
+        return nullptr;
+    static v8::Isolate* cachedIsolate = nullptr;
+    static v8::CpuProfiler* cachedProfiler = nullptr;
+    if (cachedIsolate != isolate || !cachedProfiler) {
+        cachedIsolate = isolate;
+        cachedProfiler = v8::CpuProfiler::New(isolate);
+    }
+    return cachedProfiler;
+}
+#endif
+
 void ScriptProfiler::setSamplingInterval(int intervalUs)
 {
+#if V8_MAJOR_VERSION < 8
     v8::Isolate* isolate = v8::Isolate::GetCurrent();
     v8::CpuProfiler* profiler = isolate->GetCpuProfiler();
     if (profiler)
         profiler->SetSamplingInterval(intervalUs);
+#else
+    v8::CpuProfiler* profiler = currentCpuProfiler();
+    if (profiler)
+        profiler->SetSamplingInterval(intervalUs);
+#endif
 }
 
 void ScriptProfiler::start(const String& title)
@@ -64,7 +91,11 @@ void ScriptProfiler::start(const String& title)
     profileNameIdleTimeMap->add(title, 0);
 
     v8::Isolate* isolate = v8::Isolate::GetCurrent();
+#if V8_MAJOR_VERSION < 8
     v8::CpuProfiler* profiler = isolate->GetCpuProfiler();
+#else
+    v8::CpuProfiler* profiler = currentCpuProfiler();
+#endif
     if (!profiler)
         return;
     v8::HandleScope handleScope(isolate);
@@ -74,7 +105,11 @@ void ScriptProfiler::start(const String& title)
 PassRefPtrWillBeRawPtr<ScriptProfile> ScriptProfiler::stop(const String& title)
 {
     v8::Isolate* isolate = v8::Isolate::GetCurrent();
+#if V8_MAJOR_VERSION < 8
     v8::CpuProfiler* profiler = isolate->GetCpuProfiler();
+#else
+    v8::CpuProfiler* profiler = currentCpuProfiler();
+#endif
     if (!profiler)
         return nullptr;
     v8::HandleScope handleScope(isolate);
@@ -242,6 +277,7 @@ PassRefPtr<ScriptHeapSnapshot> ScriptProfiler::takeHeapSnapshot(HeapSnapshotProg
     return snapshot ? ScriptHeapSnapshot::create(snapshot) : nullptr;
 }
 
+#if V8_MAJOR_VERSION < 8
 static v8::RetainedObjectInfo* retainedDOMInfo(uint16_t classId, v8::Local<v8::Value> wrapper)
 {
     ASSERT(classId == WrapperTypeInfo::NodeClassId);
@@ -250,13 +286,19 @@ static v8::RetainedObjectInfo* retainedDOMInfo(uint16_t classId, v8::Local<v8::V
     Node* node = V8Node::toImpl(wrapper.As<v8::Object>());
     return node ? new RetainedDOMInfo(node) : 0;
 }
+#endif
 
 void ScriptProfiler::initialize()
 {
+#if V8_MAJOR_VERSION < 8
     v8::Isolate* isolate = v8::Isolate::GetCurrent();
     v8::HeapProfiler* profiler = isolate->GetHeapProfiler();
     if (profiler)
         profiler->SetWrapperClassInfoProvider(WrapperTypeInfo::NodeClassId, &retainedDOMInfo);
+#else
+    // v8::RetainedObjectInfo and HeapProfiler::SetWrapperClassInfoProvider were
+    // removed in V8 8.x; nothing to register on the new heap snapshot path.
+#endif
 }
 
 ProfileNameIdleTimeMap* ScriptProfiler::currentProfileNameIdleTimeMap()
@@ -268,8 +310,14 @@ ProfileNameIdleTimeMap* ScriptProfiler::currentProfileNameIdleTimeMap()
 void ScriptProfiler::setIdle(bool isIdle)
 {
     v8::Isolate* isolate = v8::Isolate::GetCurrent();
+#if V8_MAJOR_VERSION < 8
     if (v8::CpuProfiler* profiler = isolate->GetCpuProfiler())
         profiler->SetIdle(isIdle);
+#else
+    // v8::CpuProfiler::SetIdle was removed in V8 8.x; the equivalent now lives on
+    // the isolate.
+    isolate->SetIdle(isIdle);
+#endif
 }
 
 } // namespace blink

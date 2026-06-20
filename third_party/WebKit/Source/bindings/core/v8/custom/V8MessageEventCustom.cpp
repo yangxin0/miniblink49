@@ -103,9 +103,14 @@ void V8MessageEvent::initMessageEventMethodCustom(const v8::FunctionCallbackInfo
     TOSTRING_VOID(V8StringResource<>, typeArg, info[0]);
     bool canBubbleArg;
     bool cancelableArg;
+#if V8_MAJOR_VERSION < 8
     if (!v8Call(info[1]->BooleanValue(info.GetIsolate()->GetCurrentContext()), canBubbleArg)
         || !v8Call(info[2]->BooleanValue(info.GetIsolate()->GetCurrentContext()), cancelableArg))
         return;
+#else
+    canBubbleArg = info[1]->BooleanValue(info.GetIsolate());
+    cancelableArg = info[2]->BooleanValue(info.GetIsolate());
+#endif
     v8::Local<v8::Value> dataArg = info[3];
     TOSTRING_VOID(V8StringResource<>, originArg, info[4]);
     TOSTRING_VOID(V8StringResource<>, lastEventIdArg, info[5]);

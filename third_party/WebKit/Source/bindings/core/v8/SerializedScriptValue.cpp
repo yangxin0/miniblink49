@@ -124,7 +124,11 @@ PassOwnPtr<SerializedScriptValue::ArrayBufferContentsArray> SerializedScriptValu
         acculumateArrayBuffersForAllWorlds(isolate, arrayBuffers[i].get(), bufferHandles);
         bool isNeuterable = true;
         for (size_t j = 0; j < bufferHandles.size(); j++)
+#if V8_MAJOR_VERSION < 8
             isNeuterable &= bufferHandles[j]->IsNeuterable();
+#else
+            isNeuterable &= bufferHandles[j]->IsDetachable();
+#endif
 
         RefPtr<DOMArrayBuffer> toTransfer = arrayBuffers[i];
         if (!isNeuterable)
@@ -137,7 +141,11 @@ PassOwnPtr<SerializedScriptValue::ArrayBufferContentsArray> SerializedScriptValu
 
         if (isNeuterable)
             for (size_t j = 0; j < bufferHandles.size(); j++)
+#if V8_MAJOR_VERSION < 8
                 bufferHandles[j]->Neuter();
+#else
+                bufferHandles[j]->Detach();
+#endif
     }
     return contents.release();
 }

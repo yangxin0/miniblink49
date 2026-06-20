@@ -40,7 +40,11 @@
 #include "core/frame/UseCounter.h"
 #include "core/inspector/ScriptDebuggerBase.h"
 #include "public/platform/Platform.h"
+#if V8_MAJOR_VERSION < 8
 #include "include/v8-platform.h"
+#else
+#include "v8-platform.h"
+#endif
 #include "gin/v8_task_runner.h"
 #include "wtf/MainThread.h"
 
@@ -289,7 +293,13 @@ static void constructorOfToString(const v8::FunctionCallbackInfo<v8::Value>& inf
     // obscure and unlikely to be a problem.
     v8::Isolate* isolate = info.GetIsolate();
     v8::Local<v8::Value> value;
+#if V8_MAJOR_VERSION < 8
     if (!info.Callee()->Get(isolate->GetCurrentContext(), v8AtomicString(isolate, "toString")).ToLocal(&value) || !value->IsFunction()) {
+#else
+    // v8::FunctionCallbackInfo::Callee() was removed in V8 8.x; use the
+    // receiver (the DOM constructor on which toString was invoked).
+    if (!info.This()->Get(isolate->GetCurrentContext(), v8AtomicString(isolate, "toString")).ToLocal(&value) || !value->IsFunction()) {
+#endif
         v8SetReturnValue(info, v8::String::Empty(isolate));
         return;
     }

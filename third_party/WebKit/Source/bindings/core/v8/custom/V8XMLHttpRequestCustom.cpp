@@ -88,7 +88,11 @@ void V8XMLHttpRequest::responseAttributeGetterCustom(const v8::FunctionCallbackI
             // spec says. https://xhr.spec.whatwg.org/#response-body
             v8::TryCatch exceptionCatcher(isolate);
             v8::Local<v8::Value> json;
+#if V8_MAJOR_VERSION < 8
             if (v8Call(v8::JSON::Parse(isolate, jsonSource.v8Value()), json, exceptionCatcher))
+#else
+            if (v8Call(v8::JSON::Parse(isolate->GetCurrentContext(), jsonSource.v8Value()), json, exceptionCatcher))
+#endif
                 v8SetReturnValue(info, json);
             else
                 v8SetReturnValue(info, v8::Null(isolate));

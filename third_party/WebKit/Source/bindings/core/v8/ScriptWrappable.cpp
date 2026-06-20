@@ -126,7 +126,11 @@ bool ScriptWrappable::isEqualTo(const v8::Local<v8::Object>& other) const
 
 bool ScriptWrappable::setReturnValue(v8::ReturnValue<v8::Value> returnValue)
 {
+#if V8_MAJOR_VERSION < 8
     returnValue.Set(m_wrapper);
+#else
+    returnValue.Set(v8::Local<v8::Object>::New(returnValue.GetIsolate(), m_wrapper));
+#endif
     return containsWrapper();
 }
 
@@ -135,6 +139,7 @@ void ScriptWrappable::markAsDependentGroup(ScriptWrappable* groupRoot, v8::Isola
     ASSERT(containsWrapper());
     ASSERT(groupRoot && groupRoot->containsWrapper());
 
+#if V8_MAJOR_VERSION < 8
     // FIXME: There has to be a better way.
     v8::UniqueId groupId(*reinterpret_cast<intptr_t*>(&groupRoot->m_wrapper));
     //zero
@@ -142,11 +147,14 @@ void ScriptWrappable::markAsDependentGroup(ScriptWrappable* groupRoot, v8::Isola
     m_wrapper.MarkPartiallyDependent();
 #endif
     isolate->SetObjectGroupId(v8::Persistent<v8::Value>::Cast(m_wrapper), groupId);
+#endif
 }
 
 void ScriptWrappable::setReference(const v8::Persistent<v8::Object>& parent, v8::Isolate* isolate)
 {
+#if V8_MAJOR_VERSION < 8
     isolate->SetReference(parent, m_wrapper);
+#endif
 }
 
 void ScriptWrappable::disposeWrapper(const v8::WeakCallbackInfo<ScriptWrappable>& data)

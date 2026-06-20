@@ -540,6 +540,7 @@ unsigned char data[] = {
 
 void readFile(const wchar_t* path, std::vector<char>* buffer)
 {
+#if V8_MAJOR_VERSION < 8
     HANDLE hFile = CreateFileW(path, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
     if (INVALID_HANDLE_VALUE == hFile) {
         return;
@@ -553,6 +554,7 @@ void readFile(const wchar_t* path, std::vector<char>* buffer)
     BOOL b = ::ReadFile(hFile, &buffer->at(0), bufferSize, &numberOfBytesRead, nullptr);
     ::CloseHandle(hFile);
     b = b;
+#endif
 }
 
 v8::Local<v8::Value> ScriptController::executeScriptAndReturnValue(v8::Local<v8::Context> context, const ScriptSourceCode& source, AccessControlStatus accessControlStatus, double* compilationFinishTime)
@@ -741,7 +743,11 @@ void ScriptController::registerExtensionIfNeeded(v8::Extension* extension)
         if (extensions[i] == extension)
             return;
     }
+#if V8_MAJOR_VERSION < 8
     v8::RegisterExtension(extension);
+#else
+    v8::RegisterExtension(std::unique_ptr<v8::Extension>(extension));
+#endif
     registeredExtensions().append(extension);
 }
 
@@ -820,7 +826,11 @@ void ScriptController::clearWindowProxy()
 
 void ScriptController::setCaptureCallStackForUncaughtExceptions(bool value)
 {
+#if V8_MAJOR_VERSION < 8
     v8::V8::SetCaptureStackTraceForUncaughtExceptions(value, ScriptCallStack::maxCallStackSizeToCapture, stackTraceOptions);
+#else
+    v8::Isolate::GetCurrent()->SetCaptureStackTraceForUncaughtExceptions(value, ScriptCallStack::maxCallStackSizeToCapture, stackTraceOptions);
+#endif
 }
 
 void ScriptController::collectIsolatedContexts(Vector<std::pair<ScriptState*, SecurityOrigin*>>& result)

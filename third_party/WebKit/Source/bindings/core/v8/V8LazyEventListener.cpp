@@ -206,9 +206,15 @@ void V8LazyEventListener::prepareListenerObject(ExecutionContext* executionConte
     // source returned (sometimes a RegExp is applied as well) for some
     // other use. That fails miserably if the actual wrapper source is
     // returned.
+#if V8_MAJOR_VERSION < 8
     v8::Local<v8::Function> toStringFunction = v8::Function::New(isolate(), V8LazyEventListenerToString);
     if (toStringFunction.IsEmpty())
         return;
+#else
+    v8::Local<v8::Function> toStringFunction;
+    if (!v8::Function::New(scriptState->context(), V8LazyEventListenerToString).ToLocal(&toStringFunction))
+        return;
+#endif
     String toStringString = "function " + m_functionName + "(" + m_eventParameterName + ") {\n  " + m_code + "\n}";
     V8HiddenValue::setHiddenValue(isolate(), wrappedFunction, V8HiddenValue::toStringString(isolate()), v8String(isolate(), toStringString));
     if (!v8CallBoolean(wrappedFunction->Set(scriptState->context(), v8AtomicString(isolate(), "toString"), toStringFunction)))

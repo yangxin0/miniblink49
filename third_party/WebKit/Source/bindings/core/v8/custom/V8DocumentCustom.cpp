@@ -67,7 +67,13 @@ void V8Document::openMethodCustom(const v8::FunctionCallbackInfo<v8::Value>& inf
             return;
         v8::Local<v8::Object> global = context->Global();
         // Get the open property of the global object.
+#if V8_MAJOR_VERSION < 8
         v8::Local<v8::Value> function = global->Get(v8AtomicString(info.GetIsolate(), "open"));
+#else
+        v8::Local<v8::Value> function;
+        if (!global->Get(context, v8AtomicString(info.GetIsolate(), "open")).ToLocal(&function))
+            return;
+#endif
         // Failed; return without throwing (new) exception.
         if (function.IsEmpty())
             return;
