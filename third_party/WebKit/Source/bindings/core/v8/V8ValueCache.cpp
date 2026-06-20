@@ -129,7 +129,9 @@ v8::Local<v8::String> StringCache::createStringAndInsertIntoCache(v8::Isolate* i
     v8::UniquePersistent<v8::String> wrapper(isolate, newString);
 
     stringImpl->ref();
-    wrapper.MarkIndependent();
+#if V8_MAJOR_VERSION < 8
+    wrapper.MarkIndependent();  // removed in V8 8.7 (GC scheduling hint)
+#endif
     m_stringCache.Set(stringImpl, wrapper.Pass(), &m_lastV8String);
     m_lastStringImpl = stringImpl;
 

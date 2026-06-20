@@ -61,7 +61,12 @@ struct V8StringTwoBytesTrait {
     typedef UChar CharType;
     ALWAYS_INLINE static void write(v8::Local<v8::String> v8String, CharType* buffer, int length)
     {
+#if V8_MAJOR_VERSION < 8
         v8String->Write(reinterpret_cast<uint16_t*>(buffer), 0, length);
+#else
+        // V8 8.7: String::Write takes the isolate first.
+        v8String->Write(v8::Isolate::GetCurrent(), reinterpret_cast<uint16_t*>(buffer), 0, length);
+#endif
     }
 };
 
@@ -69,7 +74,11 @@ struct V8StringOneByteTrait {
     typedef LChar CharType;
     ALWAYS_INLINE static void write(v8::Local<v8::String> v8String, CharType* buffer, int length)
     {
+#if V8_MAJOR_VERSION < 8
         v8String->WriteOneByte(buffer, 0, length);
+#else
+        v8String->WriteOneByte(v8::Isolate::GetCurrent(), buffer, 0, length);
+#endif
     }
 };
 
