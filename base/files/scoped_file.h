@@ -15,6 +15,7 @@
 #include "cef/include/base/cef_scoped_ptr.h"
 #endif
 #include "build/build_config.h"
+#include "base/scoped_generic.h"  // base::ScopedGeneric, used below on all platforms
 
 namespace base {
 

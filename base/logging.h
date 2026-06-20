@@ -5,6 +5,16 @@
 #ifndef BASE_LOGGING_H_
 #define BASE_LOGGING_H_
 
+// Portable DebugBreak() for non-Windows (used by CHECK below). On Windows it
+// comes from <windows.h>.
+#if !defined(_WIN32) && !defined(DebugBreak)
+#if defined(__has_builtin) && __has_builtin(__builtin_debugtrap)
+#define DebugBreak() __builtin_debugtrap()
+#else
+#define DebugBreak() __builtin_trap()
+#endif
+#endif
+
 #ifndef CHECK
 #define CHECK(condition)  \
   do {                    \
@@ -39,6 +49,17 @@
 #define DCHECK_IS_ON() 0
 #else
 #define DCHECK_IS_ON() 1
+#endif
+
+// Additional logging macros used by base/ that the trimmed logging.h omitted.
+#ifndef NOTREACHED
+#define NOTREACHED() DCHECK(false)
+#endif
+#ifndef NOTIMPLEMENTED
+#define NOTIMPLEMENTED() ((void)0)
+#endif
+#ifndef PCHECK
+#define PCHECK(condition) CHECK(condition)
 #endif
 
 #endif // BASE_LOGGING_H_

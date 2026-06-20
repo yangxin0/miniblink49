@@ -1,6 +1,8 @@
 #include "base/thread.h"
 
+#if defined(_WIN32)
 #include <windows.h>
+#endif
 
 typedef struct tagTHREADNAME_INFO {
     DWORD dwType; // must be 0x1000

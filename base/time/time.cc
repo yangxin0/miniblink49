@@ -9,7 +9,7 @@
 
 #include "base/float_util.h"
 // #include "base/lazy_instance.h"
-// #include "base/logging.h"
+#include "base/logging.h"
 #if NO_USE_ORIG_CHROME != 1
 #include "base/third_party/nspr/prtime.h"
 #endif

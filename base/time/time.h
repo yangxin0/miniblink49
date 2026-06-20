@@ -300,6 +300,31 @@ std::ostream& operator<<(std::ostream& os, TimeDelta time_delta);
 // TimeBase members via those classes.
 namespace time_internal {
 
+    // Saturating int64 add/sub of a TimeDelta and a microsecond count, used by
+    // TimeBase below. Implemented inline via the public ToInternalValue()
+    // accessor so the trimmed base/ doesn't need base/numerics (orig_chrome's
+    // version used CheckedNumeric). <limits> is already pulled in by TimeDelta.
+    inline int64 SaturatedAdd(TimeDelta delta, int64 value) {
+        int64 a = delta.ToInternalValue();
+        if (value >= 0) {
+            if (a > std::numeric_limits<int64>::max() - value)
+                return std::numeric_limits<int64>::max();
+        } else if (a < std::numeric_limits<int64>::min() - value) {
+            return std::numeric_limits<int64>::min();
+        }
+        return a + value;
+    }
+    inline int64 SaturatedSub(TimeDelta delta, int64 value) {
+        int64 a = delta.ToInternalValue();
+        if (value >= 0) {
+            if (a < std::numeric_limits<int64>::min() + value)
+                return std::numeric_limits<int64>::min();
+        } else if (a > std::numeric_limits<int64>::max() + value) {
+            return std::numeric_limits<int64>::max();
+        }
+        return a - value;
+    }
+
     // TimeBase--------------------------------------------------------------------
 
     // Provides value storage and comparison/math operations common to all time

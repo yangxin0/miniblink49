@@ -10,7 +10,9 @@
 #include <string.h>
 #include <algorithm>
 #include <ostream>
+#if defined(_WIN32)
 #include <windows.h>
+#endif
 namespace base {
 
 namespace {

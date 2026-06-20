@@ -234,7 +234,7 @@ string16 UTF8ToUTF16WithAdjustments(
 string16 UTF8ToUTF16AndAdjustOffsets(const std::string& utf8, std::vector<size_t>* offsets_for_adjustment) {
   std::for_each(offsets_for_adjustment->begin(),
                 offsets_for_adjustment->end(),
-                LimitOffset<std::stringe>(utf8.length()));
+                LimitOffset<std::string>(utf8.length()));
   OffsetAdjuster::Adjustments adjustments;
   string16 result = UTF8ToUTF16WithAdjustments(utf8, &adjustments);
   OffsetAdjuster::AdjustOffsets(adjustments, offsets_for_adjustment);

@@ -215,4 +215,17 @@
   typedef void MoveOnlyTypeForCPP03; \
  private:
 
+// Newer Chromium move-only macro used by files pulled from orig_chrome (e.g.
+// scoped_generic.h). On a C++11+ compiler this just deletes the copy ops; the
+// class itself supplies its own move constructor/assignment.
+#ifndef MOVE_ONLY_TYPE_WITH_MOVE_CONSTRUCTOR_FOR_CPP_03
+#define MOVE_ONLY_TYPE_WITH_MOVE_CONSTRUCTOR_FOR_CPP_03(type) \
+ private: \
+  type(const type&) = delete; \
+  type& operator=(const type&) = delete; \
+ public: \
+  typedef void MoveOnlyTypeForCPP03; \
+ private:
+#endif
+
 #endif  // BASE_MOVE_H_
