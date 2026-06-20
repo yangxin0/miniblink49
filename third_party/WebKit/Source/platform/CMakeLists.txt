@@ -56,6 +56,7 @@ file(GLOB BLINK_SUBLAYERS
     "${BSRC}/mhtml/*.cpp" "${BSRC}/mediastream/*.cpp" "${BSRC}/blob/*.cpp"
     "${BSRC}/plugins/*.cpp" "${BSRC}/clipboard/*.cpp" "${BSRC}/scheduler/*.cpp"
     "${BSRC}/image-decoders/*.cpp"   # base ImageDecoder/ImageFrame/ImagePlanes (codec subdirs deferred)
+    "${BSRC}/animation/*.cpp"        # TimingFunction (Steps/Linear/CubicBezier vtables)
     "${BSRC}/weborigin/*.cpp"    # KURL recovered; KURL_new/KURL_w variants excluded below
     "${BSRC}/*.cpp")             # platform-root files (JSONValues/Widget/SharedBuffer/DateComponents/...)
 # platform-root: 48/50 compile. The 4 value types already in BLINK_CORE_SOURCES
