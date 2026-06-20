@@ -86,6 +86,7 @@ if(MINIBLINK_BUILD_BLINK)
     include(third_party/WebKit/Source/bindings/blink_bindings_infra.cmake)  # hand-written V8 glue
     include(third_party/WebKit/Source/modules/blink_modules.cmake)  # web-platform feature modules
     include(net/net_portable.cmake)                          # portable net/ subset
+    include(wke/wke_globals.cmake)                            # wke embedding-layer globals blink links against
     add_subdirectory(test/blink)  # smoke test: prove geometry links + computes
 
     if(APPLE)
