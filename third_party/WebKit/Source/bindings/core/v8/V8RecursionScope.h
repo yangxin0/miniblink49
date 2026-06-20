@@ -65,7 +65,12 @@ public:
         V8PerIsolateData::from(m_isolate)->incrementRecursionLevel();
         // If you want V8 to autorun microtasks, this class needs to have a
         // v8::Isolate::SuppressMicrotaskExecutionScope member.
+#if V8_MAJOR_VERSION < 8
         ASSERT(!isolate->WillAutorunMicrotasks());
+#else
+        // V8 8.7 replaced WillAutorunMicrotasks() with the microtasks policy.
+        ASSERT(isolate->GetMicrotasksPolicy() != v8::MicrotasksPolicy::kAuto);
+#endif
     }
 
     ~V8RecursionScope()
