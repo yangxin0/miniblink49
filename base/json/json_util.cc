@@ -2,6 +2,7 @@
 #include "base/json/json_util.h"
 #include "base/strings/string_util.h"
 #include "base/strings/string_piece.h"
+#include "base/scoped_clear_errno.h"
 
 #include <vector>
 #include <limits>
@@ -268,10 +269,14 @@ inline int baseVsnprintf(char* buffer, size_t size,
     const char* format, va_list arguments)
 {
     //int length = vsnprintf_s(buffer, size, size - 1, format, arguments);
+#if defined(OS_WIN)
     int length = _vsnprintf(buffer, size - 1, format, arguments);
     if (length < 0)
         return _vscprintf(format, arguments);
     return length;
+#else
+    return vsnprintf(buffer, size, format, arguments);
+#endif
 }
 
 inline int vsnprintfT(char* buffer,
