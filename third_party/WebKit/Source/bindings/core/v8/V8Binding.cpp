@@ -115,8 +115,13 @@ bool toBooleanSlow(v8::Isolate* isolate, v8::Local<v8::Value> value, ExceptionSt
 
     v8::TryCatch block(isolate);
     bool result = false;
+#if V8_MAJOR_VERSION < 8
     if (!v8Call(value->BooleanValue(isolate->GetCurrentContext()), result, block))
         exceptionState.rethrowV8Exception(block.Exception());
+#else
+    // V8 8.7: BooleanValue(Isolate*) returns bool directly (no Maybe, never throws).
+    result = value->BooleanValue(isolate);
+#endif
     return result;
 }
 
@@ -696,7 +701,11 @@ LocalDOMWindow* currentDOMWindow(v8::Isolate* isolate)
 
 LocalDOMWindow* callingDOMWindow(v8::Isolate* isolate)
 {
+#if V8_MAJOR_VERSION < 8
     v8::Local<v8::Context> context = isolate->GetCallingContext();
+#else
+    v8::Local<v8::Context> context = isolate->GetEnteredOrMicrotaskContext();
+#endif
     if (context.IsEmpty()) {
         // Unfortunately, when processing script from a plugin, we might not
         // have a calling context. In those cases, we fall back to the
@@ -732,7 +741,11 @@ ExecutionContext* currentExecutionContext(v8::Isolate* isolate)
 
 ExecutionContext* callingExecutionContext(v8::Isolate* isolate)
 {
+#if V8_MAJOR_VERSION < 8
     v8::Local<v8::Context> context = isolate->GetCallingContext();
+#else
+    v8::Local<v8::Context> context = isolate->GetEnteredOrMicrotaskContext();
+#endif
     if (context.IsEmpty()) {
         // Unfortunately, when processing script from a plugin, we might not
         // have a calling context. In those cases, we fall back to the
@@ -802,7 +815,8 @@ v8::Local<v8::Context> toV8ContextEvenIfDetached(Frame* frame, DOMWrapperWorld& 
 
 void crashIfV8IsDead()
 {
-    if (v8::V8::IsDead()) {
+    // V8 8.7 removed v8::V8::IsDead() (no queryable "dead" state); treat as alive.
+    if (V8_MAJOR_VERSION < 8 && false /* v8::V8::IsDead() */) {
         // FIXME: We temporarily deal with V8 internal error situations
         // such as out-of-memory by crashing the renderer.
         //CRASH(); // weolar
