@@ -51,15 +51,27 @@
 namespace blink {
 
 static V8PerIsolateData* mainThreadPerIsolateData = 0;
+#if defined(_WIN32)
 static DWORD s_threadLocalV8PerIsolateData = 0;
+#else
+#include <pthread.h>
+static pthread_key_t s_tlsKey;
+static pthread_once_t s_tlsOnce = PTHREAD_ONCE_INIT;
+static void ensureV8PerIsolateDataTlsKey() { pthread_key_create(&s_tlsKey, 0); }
+#endif
 gin::IsolateHolder* initIsolateHolder(V8PerIsolateData* data)
 {
     if (isMainThread())
         mainThreadPerIsolateData = data;
 
+#if defined(_WIN32)
     if (0 == s_threadLocalV8PerIsolateData)
         s_threadLocalV8PerIsolateData = ::TlsAlloc();
     ::TlsSetValue(s_threadLocalV8PerIsolateData, data);
+#else
+    pthread_once(&s_tlsOnce, ensureV8PerIsolateDataTlsKey);
+    pthread_setspecific(s_tlsKey, data);
+#endif
 
     return new gin::IsolateHolder();
 }
@@ -384,9 +396,14 @@ WebThread* V8PerIsolateData::getThread() const
 std::shared_ptr<v8::TaskRunner> V8PerIsolateData::getThreadRunner(v8::Isolate* isolate)
 {
     V8PerIsolateData* self = static_cast<V8PerIsolateData*>(isolate->GetData(gin::kEmbedderBlink));
-    if (!self)
+    if (!self) {
+#if defined(_WIN32)
         self = (V8PerIsolateData*)::TlsGetValue(s_threadLocalV8PerIsolateData);
-    
+#else
+        pthread_once(&s_tlsOnce, ensureV8PerIsolateDataTlsKey);
+        self = (V8PerIsolateData*)pthread_getspecific(s_tlsKey);
+#endif
+    }
     return self->m_threadRunner;
 }
 #endif
