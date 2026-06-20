@@ -39,24 +39,36 @@ set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib")
 enable_testing()
 
 # ---- Engine base library (port in progress) ---------------------------------
-option(MINIBLINK_BUILD_BASE "Build the engine base/ library (macOS port WIP)" OFF)
-option(MINIBLINK_BUILD_GIN  "Build the gin V8 integration layer (macOS port WIP)" OFF)
+# ---- macOS port options (all off by default; default build stays green) ------
+option(MINIBLINK_BUILD_BASE  "Build the engine base/ library (macOS port WIP)" OFF)
+option(MINIBLINK_BUILD_GIN   "Build the gin V8 integration layer (macOS port WIP)" OFF)
+option(MINIBLINK_BUILD_WTF   "Build WebKit/WTF foundation lib (macOS port WIP)" OFF)
+option(MINIBLINK_BUILD_SKIA  "Build skia 2D graphics lib (macOS raster port WIP)" OFF)
+option(MINIBLINK_BUILD_BLINK "Build blink platform (geometry first) (macOS port WIP)" OFF)
+
+# Resolve inter-target dependencies before adding any subdirectory:
+#   gin   -> base ;  blink platform -> WTF + skia
+if(MINIBLINK_BUILD_BLINK)
+    set(MINIBLINK_BUILD_WTF ON)
+    set(MINIBLINK_BUILD_SKIA ON)
+endif()
+
 if(MINIBLINK_BUILD_BASE OR MINIBLINK_BUILD_GIN)
     add_subdirectory(base)   # gin depends on base
 endif()
 if(MINIBLINK_BUILD_GIN)
     add_subdirectory(gin)
 endif()
-
-option(MINIBLINK_BUILD_WTF "Build WebKit/WTF foundation lib (macOS port WIP)" OFF)
 if(MINIBLINK_BUILD_WTF)
     add_subdirectory(third_party/WebKit/Source/wtf)
 endif()
-
-option(MINIBLINK_BUILD_SKIA "Build skia 2D graphics lib (macOS raster port WIP)" OFF)
 if(MINIBLINK_BUILD_SKIA)
     add_subdirectory(third_party/skia)
     add_subdirectory(test/skia)   # smoke test: prove raster rendering works
+endif()
+if(MINIBLINK_BUILD_BLINK)
+    add_subdirectory(third_party/WebKit/Source/platform)
+    add_subdirectory(test/blink)  # smoke test: prove geometry links + computes
 endif()
 
 # ---- Imported V8 monolith target -------------------------------------------

@@ -45,6 +45,7 @@ set(WTF_SOURCES
     text/StringImpl.cpp
     text/StringStatics.cpp
     text/TextCodec.cpp
+    text/TextCodecICU.cpp
     text/TextCodecLatin1.cpp
     text/TextCodecReplacement.cpp
     text/TextCodecUserDefined.cpp
@@ -56,6 +57,18 @@ set(WTF_SOURCES
     text/UTF8.cpp
     text/WTFString.cpp
     text/WTFStringUtil.cpp
+    # double-conversion (dtoa.cpp above calls into these) and the qt4 Unicode
+    # backend (QChar case folding, Unicode::toLower/toUpper). Needed once a real
+    # consumer (blink) links WTF, not just compiles it.
+    dtoa/bignum-dtoa.cc
+    dtoa/bignum.cc
+    dtoa/cached-powers.cc
+    dtoa/diy-fp.cc
+    dtoa/double-conversion.cc
+    dtoa/fast-dtoa.cc
+    dtoa/fixed-dtoa.cc
+    dtoa/strtod.cc
+    text/qt4/UnicodeQt4.cpp
 )
 
 if(APPLE)

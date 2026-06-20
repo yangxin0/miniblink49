@@ -435,29 +435,19 @@ static Vector<UChar> decodeGbkWithLastData(char* data, int len, char* lastData, 
         }
     }
 
-    // 考虑兼容4字节， 用 MB_ERR_INVALID_CHARS 标志是用来报告错误
-    int size2 = MultiByteToWideChar(54936, MB_ERR_INVALID_CHARS, buffer, i, NULL, 0);
-    if (size2 <= 0) {
-        if (i < size) {
-            // 失败， 末尾有可能是 4字节截断
-            // 也有可能中间有乱码， 这样，我们再回退2字节不会更坏吧？
-            if (i >= 2) {
-                unsigned char c = buffer[i - 2];
-                if (c >= 0x80 && c != 0xA0) {
-                    i -= 2;
-                }
-            }
-        }
-        size2 = MultiByteToWideChar(54936, 0, buffer, i, NULL, 0);
-    }
+    // GB18030 (codepage 54936). The byte-boundary scan above keeps whole
+    // characters in [0, i); the tail is carried over via lastData. Decoding goes
+    // through WTF::MByteToWChar so it shares the cross-platform codepage path
+    // (the same one decodeBig5/decodeGbk below use).
     *lastLength = size - i;
     memcpy(lastData, buffer + i, *lastLength);
-    size2 = MultiByteToWideChar(54936, 0, buffer, i, NULL, 0);
+
+    std::vector<UChar> conv;
+    WTF::MByteToWChar(buffer, i, &conv, 54936);
 
     Vector<UChar> result;
-    result.resize(size2);
-    if (size2> 0)
-        MultiByteToWideChar(54936, 0, buffer, i, &result[0], size2);
+    if (!conv.empty())
+        result.append(&conv[0], conv.size());
     return result;
 }
 
@@ -598,13 +588,13 @@ bool TextCodecICU::hasValidChar()
     if (m_incrementalDataChunk == 0)
         return false;
 
-    m_incrementalDataChunk[m_incrementalDataChunkLength] = 'A';
-    m_incrementalDataChunk[m_incrementalDataChunkLength + 1] = '\0';
-    char* ptr = CharNextExA(GBK_CONV_CODE_PAGE, (LPCSTR)m_incrementalDataChunk, 0);
-    if (ptr > ((char*)m_incrementalDataChunk + m_incrementalDataChunkLength))
-        return false;
-
-    return true;
+    // Portable GBK char-boundary check (was Win32 CharNextExA): a GBK lead byte
+    // (0x81-0xFE) starts a 2-byte sequence, anything else is a single byte. The
+    // accumulated chunk holds a complete char when that first char fits within
+    // the bytes seen so far.
+    unsigned char c0 = m_incrementalDataChunk[0];
+    size_t charLen = (c0 >= 0x81 && c0 <= 0xFE) ? 2 : 1;
+    return charLen <= m_incrementalDataChunkLength;
 }
 
 bool TextCodecICU::toUnicode(unsigned char c, UChar& uc)
@@ -622,7 +612,13 @@ bool TextCodecICU::toUnicode(unsigned char c, UChar& uc)
             uc = L'\"'; 
             ret = 1;
         } else {
-            ret = MultiByteToWideChar(GBK_CONV_CODE_PAGE, 0, (LPSTR)m_incrementalDataChunk, m_incrementalDataChunkLength, &uc, 1);
+            // GBK -> UTF-16 for one char, via the cross-platform codepage path.
+            std::vector<UChar> conv;
+            WTF::MByteToWChar((const char*)m_incrementalDataChunk, m_incrementalDataChunkLength, &conv, GBK_CONV_CODE_PAGE);
+            if (!conv.empty()) {
+                uc = conv[0];
+                ret = 1;
+            }
         }
 
         m_incrementalDataChunkLength = 0;
