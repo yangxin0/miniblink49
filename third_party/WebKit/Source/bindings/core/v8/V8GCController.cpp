@@ -530,3 +530,60 @@ void V8GCController::traceDOMWrappers(v8::Isolate* isolate, Visitor* visitor)
 } // namespace blink
 
 #endif
+
+#if V8_MAJOR_VERSION >= 8
+
+#include "platform/ScriptForbiddenScope.h"
+
+namespace blink {
+
+// V8 8.7 traces DOM wrappers through the unified heap (see UnifiedHeapController and
+// v8::EmbedderHeapTracer), so the manual minor/major object-group and
+// persistent-handle visiting passes that the V8 4.x path above performed are gone:
+// V8 walks the embedder's wrapper graph itself. What blink still needs from the GC
+// callbacks is (a) the opaque GC root used to group a node's wrappers, and (b)
+// forbidding script execution while a major GC runs.
+
+Node* V8GCController::opaqueRootForGC(v8::Isolate*, Node* node)
+{
+    ASSERT(node);
+    // FIXME: Remove the special handling for image elements (crbug.com/164882).
+    if (node->inDocument() || (isHTMLImageElement(*node) && toHTMLImageElement(*node).hasPendingActivity())) {
+        Document& document = node->document();
+        if (HTMLImportsController* controller = document.importsController())
+            return controller->master();
+        return &document;
+    }
+
+    if (node->isAttributeNode()) {
+        Node* ownerElement = toAttr(node)->ownerElement();
+        if (!ownerElement)
+            return node;
+        node = ownerElement;
+    }
+
+    while (Node* parent = node->parentOrShadowHostOrTemplateHostNode())
+        node = parent;
+
+    return node;
+}
+
+void V8GCController::gcPrologue(v8::Isolate*, v8::GCType type, v8::GCCallbackFlags, void*)
+{
+    if (type == v8::kGCTypeMarkSweepCompact && isMainThread())
+        ScriptForbiddenScope::enter();
+}
+
+void V8GCController::gcEpilogue(v8::Isolate*, v8::GCType type, v8::GCCallbackFlags, void*)
+{
+    // Balances the ScriptForbiddenScope::enter() in gcPrologue for a major GC.
+    // FIXME: the V8 4.x path also drove a forced Oilpan collection here on
+    // kGCCallbackFlagForced and notified ThreadState::didV8MajorGC(); reinstate
+    // once the Oilpan unified-heap bridge (UnifiedHeapController) is brought up.
+    if (type == v8::kGCTypeMarkSweepCompact && isMainThread())
+        ScriptForbiddenScope::exit();
+}
+
+} // namespace blink
+
+#endif
