@@ -116,6 +116,15 @@ public:
     String(const LChar* characters);
     String(const char* characters);
 
+#if !defined(_WIN32)
+    // Construct from a wide (wchar_t) null-terminated source. On Windows WTF's
+    // UChar IS wchar_t, so the UChar overload already handles L"..."; off Windows
+    // wchar_t is 32-bit (UTF-32) and distinct from UChar (UTF-16), so convert.
+    // Implicit (like the others) so L"..." literals interoperate with the String
+    // API (append/compare/assign) the way the Win32-oriented sources expect.
+    String(const wchar_t* characters);
+#endif
+
     // Construct a string referencing an existing StringImpl.
     String(StringImpl* impl) : m_impl(impl) { }
     String(PassRefPtr<StringImpl> impl) : m_impl(impl) { }

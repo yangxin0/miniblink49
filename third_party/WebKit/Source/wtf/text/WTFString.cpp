@@ -79,6 +79,29 @@ String::String(const char* characters)
 {
 }
 
+#if !defined(_WIN32)
+// Convert a wchar_t (UTF-32 on non-Windows) null-terminated string to UTF-16.
+String::String(const wchar_t* characters)
+{
+    if (!characters)
+        return;
+    Vector<UChar, 256> utf16;
+    for (const wchar_t* p = characters; *p; ++p) {
+        unsigned int cp = static_cast<unsigned int>(*p);
+        if (cp <= 0xFFFF) {
+            utf16.append(static_cast<UChar>(cp));
+        } else if (cp <= 0x10FFFF) {
+            cp -= 0x10000;
+            utf16.append(static_cast<UChar>(0xD800 + (cp >> 10)));
+            utf16.append(static_cast<UChar>(0xDC00 + (cp & 0x3FF)));
+        } else {
+            utf16.append(static_cast<UChar>(0xFFFD));  // replacement char
+        }
+    }
+    m_impl = StringImpl::create(utf16.data(), utf16.size());
+}
+#endif
+
 void String::append(const String& string)
 {
     if (string.isEmpty())
