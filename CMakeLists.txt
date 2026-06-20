@@ -18,7 +18,7 @@
 cmake_minimum_required(VERSION 3.16)
 
 project(miniblink
-    LANGUAGES C CXX
+    LANGUAGES C CXX ASM
     DESCRIPTION "miniblink — single-file Chromium-based browser widget")
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")

@@ -59,13 +59,41 @@ list(FILTER BLINK_TEXT EXCLUDE REGEX "LocaleICU|LocaleWin")
 # Needs the font platform-data backend (CoreText): deferred.
 list(FILTER BLINK_FONTS EXCLUDE REGEX "FontCustomPlatformData")
 
+# --- Platform infrastructure: the Platform interface, exported Web* wrappers,
+#     and support objects the heap (and the rest of blink) need at link time. ---
+set(BLINK_INFRA_SOURCES
+    ScriptForbiddenScope.cpp
+    PartitionAllocMemoryDumpProvider.cpp
+    WebScheduler.cpp
+    EventTracer.cpp
+    exported/Platform.cpp
+    exported/WebCommon.cpp
+    exported/WebString.cpp
+    exported/WebCString.cpp
+    exported/WebTraceLocation.cpp
+    exported/WebMemoryDumpProvider.cpp
+    exported/WebConvertableToTraceFormat.cpp
+)
+list(TRANSFORM BLINK_INFRA_SOURCES PREPEND "${BSRC}/")
+
+# Oilpan conservative stack scanning needs an arch-specific register-save asm
+# routine (pushAllRegisters). The in-tree SaveRegisters_arm64.S is ELF-only;
+# SaveRegisters_arm64_mac.S is the Mach-O port. It must NOT receive blink's
+# C++ flags (the target force-includes config.h, which pulls <cstdio>), so it
+# lives in its own tiny library linked into blink_platform.
+if(APPLE AND CMAKE_SYSTEM_PROCESSOR MATCHES "arm64|aarch64")
+    add_library(blink_heap_asm STATIC "${BSRC}/heap/asm/SaveRegisters_arm64_mac.S")
+    set_source_files_properties("${BSRC}/heap/asm/SaveRegisters_arm64_mac.S"
+        PROPERTIES LANGUAGE ASM)
+endif()
+
 # base::debug::Alias — a tiny no-op blink references to defeat optimization. Pull
 # the single base file in directly rather than linking the whole base lib for it.
 set(BLINK_BASE_SHIM "${CMAKE_SOURCE_DIR}/orig_chrome/base/debug/alias.cc")
 
 add_library(blink_platform STATIC
     ${BLINK_CORE_SOURCES} ${BLINK_HEAP} ${BLINK_GRAPHICS} ${BLINK_TEXT}
-    ${BLINK_FONTS} ${BLINK_BASE_SHIM})
+    ${BLINK_FONTS} ${BLINK_INFRA_SOURCES} ${BLINK_BASE_SHIM})
 # alias.cc is plain Chromium base, not WTF: don't force-include WTF's config.h.
 set_source_files_properties("${BLINK_BASE_SHIM}" PROPERTIES COMPILE_OPTIONS "")
 
@@ -84,6 +112,9 @@ if(APPLE)
     target_link_libraries(blink_platform PUBLIC
         icucore "-framework CoreText" "-framework CoreGraphics"
         "-framework CoreFoundation")
+    if(TARGET blink_heap_asm)
+        target_link_libraries(blink_platform PUBLIC blink_heap_asm)
+    endif()
 endif()
 
 # blink/WTF need the config bootstrap force-included; skia needs SK_RELEASE and

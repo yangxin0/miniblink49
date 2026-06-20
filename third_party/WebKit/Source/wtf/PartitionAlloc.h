@@ -123,7 +123,13 @@ static const size_t kBucketShift = (kAllocationGranularity == 8) ? 3 : 2;
 // system page of the span. For our current max slot span size of 64k and other
 // constant values, we pack _all_ partitionAllocGeneric() sizes perfectly up
 // against the end of a system page.
+// Apple Silicon has 16KB system pages; the partition page must be >= 4x the
+// system page (see the static_asserts in PartitionAlloc.cpp), so use 64KB there.
+#if defined(__APPLE__) && defined(__aarch64__)
+static const size_t kPartitionPageShift = 16; // 64KB
+#else
 static const size_t kPartitionPageShift = 14; // 16KB
+#endif
 static const size_t kPartitionPageSize = 1 << kPartitionPageShift;
 static const size_t kPartitionPageOffsetMask = kPartitionPageSize - 1;
 static const size_t kPartitionPageBaseMask = ~kPartitionPageOffsetMask;

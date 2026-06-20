@@ -41,6 +41,8 @@ namespace WTF {
 
 #if OS(WIN)
 static const size_t kPageAllocationGranularityShift = 16; // 64KB
+#elif defined(__APPLE__) && defined(__aarch64__)
+static const size_t kPageAllocationGranularityShift = 14; // 16KB (Apple Silicon)
 #else
 static const size_t kPageAllocationGranularityShift = 12; // 4KB
 #endif
@@ -48,9 +50,14 @@ static const size_t kPageAllocationGranularity = 1 << kPageAllocationGranularity
 static const size_t kPageAllocationGranularityOffsetMask = kPageAllocationGranularity - 1;
 static const size_t kPageAllocationGranularityBaseMask = ~kPageAllocationGranularityOffsetMask;
 
-// All Blink-supported systems have 4096 sized system pages and can handle
-// permissions and commit / decommit at this granularity.
+// Most Blink-supported systems have 4096-byte system pages, but Apple Silicon
+// (arm64 macOS) uses 16KB pages — mprotect/mmap permission changes must honor
+// the real page size or they fail.
+#if defined(__APPLE__) && defined(__aarch64__)
+static const size_t kSystemPageSize = 16384;
+#else
 static const size_t kSystemPageSize = 4096;
+#endif
 static const size_t kSystemPageOffsetMask = kSystemPageSize - 1;
 static const size_t kSystemPageBaseMask = ~kSystemPageOffsetMask;
 
