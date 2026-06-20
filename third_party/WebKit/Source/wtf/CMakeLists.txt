@@ -29,8 +29,6 @@ set(WTF_SOURCES
     MainThread.cpp
     PageAllocator.cpp
     PartitionAlloc.cpp
-    PartitionAllocator.cpp
-    Partitions.cpp
     PrintStream.cpp
     RefCountedLeakCounter.cpp
     SizeLimits.cpp
@@ -42,7 +40,6 @@ set(WTF_SOURCES
     text/CString.cpp
     text/StringBuilder.cpp
     text/StringConcatenate.cpp
-    text/StringImpl.cpp
     text/StringStatics.cpp
     text/TextCodec.cpp
     text/TextCodecLatin1.cpp
@@ -55,6 +52,15 @@ set(WTF_SOURCES
     text/TextPosition.cpp
     text/UTF8.cpp
     text/WTFString.cpp
+)
+
+# --- 4 files fenced (deep WTF platform/version tail, TODO): the allocator
+#     glue (PartitionAllocator/Partitions: Partitions::fastMalloc API skew),
+#     StringImpl (Win VirtualAlloc -> needs mmap), WTFStringUtil (Win types).
+set(WTF_SOURCES_TODO
+    PartitionAllocator.cpp
+    Partitions.cpp
+    text/StringImpl.cpp
     text/WTFStringUtil.cpp
 )
 
@@ -73,6 +79,9 @@ add_library(wtf STATIC ${WTF_SOURCES})
 target_include_directories(wtf PUBLIC "${WSRC}" "${CMAKE_SOURCE_DIR}" "${CMAKE_SOURCE_DIR}/orig_chrome")
 # Force-include the WTF/blink config bootstrap.
 target_compile_options(wtf PRIVATE -include "${WSRC}/config.h")
+# OFFICIAL_BUILD makes WTF_HEAP_PROFILER_TYPE_NAME a no-op (the non-official path
+# needs getStringWithTypeName, which isn't available here).
+target_compile_definitions(wtf PRIVATE OFFICIAL_BUILD)
 if(NOT MSVC)
     target_compile_options(wtf PRIVATE
         -Wno-unused -Wno-deprecated-declarations -fdeclspec
