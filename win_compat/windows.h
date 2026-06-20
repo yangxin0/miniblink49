@@ -145,6 +145,33 @@ static inline LONG InterlockedDecrement(volatile LONG* v) { return __sync_sub_an
 static inline LONG InterlockedExchangeAdd(volatile LONG* v, LONG a) { return __sync_fetch_and_add(v, a); }
 static inline LONG InterlockedCompareExchange(volatile LONG* v, LONG ex, LONG cmp) { return __sync_val_compare_and_swap(v, cmp, ex); }
 
+// --- Dynamic loading + misc (posix-backed) -----------------------------------
+// wke's public header (wkeInitializeEx) loads the wke library via LoadLibrary/
+// GetProcAddress. Map to dlopen/dlsym (HMODULE is the dl handle).
+#include <dlfcn.h>
+#include <stdio.h>
+
+static inline HMODULE LoadLibraryA(const char* path) {
+    return path ? (HMODULE)dlopen(path, RTLD_NOW) : (HMODULE)0;
+}
+static inline HMODULE LoadLibraryW(const wchar_t* path) {
+    if (!path) return (HMODULE)0;
+    char buf[1024]; size_t i = 0;
+    for (; path[i] && i < sizeof(buf) - 1; ++i) buf[i] = (char)path[i];  // ASCII path
+    buf[i] = 0;
+    return (HMODULE)dlopen(buf, RTLD_NOW);
+}
+static inline void* GetProcAddress(HMODULE module, const char* name) {
+    return module ? dlsym((void*)module, name) : (void*)0;
+}
+static inline BOOL FreeLibrary(HMODULE module) {
+    return module ? (dlclose((void*)module) == 0) : 0;
+}
+static inline int MessageBoxA(HWND, const char* text, const char* caption, unsigned) {
+    fprintf(stderr, "[MessageBox] %s: %s\n", caption ? caption : "", text ? text : "");
+    return 0;
+}
+
 // --- Common constants --------------------------------------------------------
 #ifndef TRUE
 #define TRUE  1

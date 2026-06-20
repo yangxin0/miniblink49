@@ -299,6 +299,13 @@ public:
     void append(LChar);
     void append(char c) { append(static_cast<LChar>(c)); }
     void append(UChar);
+#if !defined(_WIN32)
+    // Wide char literal (L'x'). On Windows wchar_t IS UChar so append(UChar)
+    // matches; off Windows wchar_t is distinct, so L'x' would be ambiguous
+    // between append(LChar)/append(UChar). Resolve it (BMP only — fine for the
+    // ASCII/path char literals the Win32-oriented sources use).
+    void append(wchar_t c) { append(static_cast<UChar>(c)); }
+#endif
     void append(const LChar*, unsigned length);
     void append(const char* charactersToAppend, unsigned length) { append(reinterpret_cast<const LChar*>(charactersToAppend), length); }
     void append(const UChar*, unsigned length);
