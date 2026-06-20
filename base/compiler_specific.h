@@ -191,6 +191,13 @@
 // If available, it would look like:
 //   __attribute__((format(wprintf, format_param, dots_param)))
 
+// _Printf_format_string_ is a Microsoft SAL annotation; empty on non-MSVC.
+// orig_chrome's stringprintf.h uses it (root compiler_specific.h shadows
+// orig_chrome's, so it must be a superset).
+#ifndef _Printf_format_string_
+#define _Printf_format_string_
+#endif
+
 // MemorySanitizer annotations.
 #if defined(MEMORY_SANITIZER) && !defined(OS_NACL)
 #include <sanitizer/msan_interface.h>
