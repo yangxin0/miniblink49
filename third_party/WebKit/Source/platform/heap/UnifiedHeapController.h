@@ -50,8 +50,14 @@ public:
     std::vector<std::pair<void*, void*>>* leakV8References();
 
     // v8::EmbedderHeapTracer implementation.
+#if V8_MAJOR_VERSION >= 8
+    // V8 8.7 added arguments to these hooks.
+    void TracePrologue(v8::EmbedderHeapTracer::TraceFlags) final;
+    void TraceEpilogue(v8::EmbedderHeapTracer::TraceSummary*) final;
+#else
     void TracePrologue() final;
     void TraceEpilogue() final;
+#endif
     void EnterFinalPause(EmbedderStackState) final;
     void RegisterV8References(const std::vector<std::pair<void*, void*>>&) final;
     bool AdvanceTracing(double) final;

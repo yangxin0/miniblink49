@@ -33,6 +33,28 @@
 
 #include <v8-profiler.h>
 
+#if V8_MAJOR_VERSION >= 8
+// V8 8.7 removed the legacy heap-snapshot v8::RetainedObjectInfo API. blink still
+// subclasses it (for DOM heap-snapshot grouping). Provide the old interface as a
+// compat base so this builds; the devtools heap profiler that drives it is not
+// brought up on macOS.
+namespace v8 {
+class RetainedObjectInfo {
+public:
+    virtual void Dispose() = 0;
+    virtual bool IsEquivalent(RetainedObjectInfo* other) = 0;
+    virtual intptr_t GetHash() = 0;
+    virtual const char* GetLabel() = 0;
+    virtual const char* GetGroupLabel() { return GetLabel(); }
+    virtual intptr_t GetElementCount() { return -1; }
+    virtual intptr_t GetSizeInBytes() { return -1; }
+protected:
+    RetainedObjectInfo() {}
+    virtual ~RetainedObjectInfo() {}
+};
+} // namespace v8
+#endif
+
 namespace blink {
 
 class RetainedObjectInfo : public v8::RetainedObjectInfo {
