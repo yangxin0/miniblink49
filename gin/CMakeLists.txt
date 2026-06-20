@@ -62,6 +62,7 @@ target_include_directories(gin PRIVATE
 target_compile_definitions(gin PRIVATE
     V8_COMPRESS_POINTERS
     V8_31BIT_SMIS_ON_64BIT_ARCH
+    "V8CALL="
 )
 set_target_properties(gin PROPERTIES CXX_STANDARD 14)
 if(NOT MSVC)

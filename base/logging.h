@@ -56,6 +56,22 @@ inline NullStream& nullStream() { static NullStream s; return s; }
              ::base::logging_internal::nullStream()
 #endif
 
+// LOG/DLOG/VLOG: no-op streamable sinks (the severity token is never looked up,
+// so LOG(ERROR) etc. compile without ERROR/INFO/... being declared).
+#ifndef LOG
+#define LOG(severity) \
+  true ? (void)0 : ::base::logging_internal::LogVoidify() & ::base::logging_internal::nullStream()
+#endif
+#ifndef DLOG
+#define DLOG(severity) LOG(severity)
+#endif
+#ifndef VLOG
+#define VLOG(verboselevel) LOG(INFO)
+#endif
+#ifndef LOG_IF
+#define LOG_IF(severity, condition) LOG(severity)
+#endif
+
 // Comparison variants of DCHECK, also streamable.
 #ifndef DCHECK_EQ
 #define DCHECK_EQ(a, b) DCHECK((a) == (b))

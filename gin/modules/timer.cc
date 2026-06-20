@@ -45,8 +45,13 @@ Timer::Timer(v8::Isolate* isolate, bool repeating, int delay_ms,
       runner_(PerContextData::From(
           isolate->GetCurrentContext())->runner()->GetWeakPtr()),
       weak_factory_(this) {
-  GetWrapper(runner_->GetContextHolder()->isolate())->SetHiddenValue(
-      GetHiddenPropertyName(isolate), function);
+  // V8 8.7: SetHiddenValue -> SetPrivate(context, Private::ForApi(...), value).
+  {
+    v8::Local<v8::Context> ctx = runner_->GetContextHolder()->context();
+    GetWrapper(runner_->GetContextHolder()->isolate())->SetPrivate(
+        ctx, v8::Private::ForApi(isolate, GetHiddenPropertyName(isolate)),
+        function);
+  }
   timer_.Start(FROM_HERE, base::TimeDelta::FromMilliseconds(delay_ms),
                base::Bind(&Timer::OnTimerFired, weak_factory_.GetWeakPtr()));
 }
@@ -64,8 +69,12 @@ void Timer::OnTimerFired() {
 
   Runner::Scope scope(runner_.get());
   v8::Isolate* isolate = runner_->GetContextHolder()->isolate();
+  // V8 8.7: GetHiddenValue -> GetPrivate(context, Private::ForApi(...)).
+  v8::Local<v8::Context> ctx = runner_->GetContextHolder()->context();
   v8::Local<v8::Function> function = v8::Local<v8::Function>::Cast(
-      GetWrapper(isolate)->GetHiddenValue(GetHiddenPropertyName(isolate)));
+      GetWrapper(isolate)->GetPrivate(
+          ctx, v8::Private::ForApi(isolate, GetHiddenPropertyName(isolate)))
+          .ToLocalChecked());
   runner_->Call(function, v8::Undefined(isolate), 0, NULL);
 }
 
