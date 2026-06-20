@@ -101,6 +101,9 @@ std::wstring ASCIIToWide(const std::string& ascii);
 std::string UTF16ToASCII(const string16& utf16);
 std::string WideToUTF8(const string16& utf16);
 std::string UTF16ToUTF8(const string16& utf16);
+string16 UTF8ToUTF16(const std::string& utf8);
+string16 WideToUTF16(const std::wstring& wide);
+string16 ASCIIToUTF16(const std::string& ascii);
 
 }
 

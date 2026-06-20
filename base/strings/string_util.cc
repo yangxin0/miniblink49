@@ -168,4 +168,38 @@ string16 ASCIIToUTF16(const std::string& ascii) {
     return out;
 }
 
+// UTF-8 -> UTF-16 (string16), encoding surrogate pairs for cp > 0xFFFF.
+string16 UTF8ToUTF16(const std::string& utf8) {
+    string16 out;
+    out.reserve(utf8.size());
+    for (size_t i = 0; i < utf8.size(); ) {
+        uint32_t cp = decodeUtf8(utf8, i);
+        if (cp <= 0xFFFF) {
+            out.push_back(static_cast<char16>(cp));
+        } else {
+            cp -= 0x10000;
+            out.push_back(static_cast<char16>(0xD800 | (cp >> 10)));
+            out.push_back(static_cast<char16>(0xDC00 | (cp & 0x3FF)));
+        }
+    }
+    return out;
+}
+
+// wchar_t string (UTF-32 on macOS/Linux, UTF-16 on Windows) -> UTF-16 string16.
+string16 WideToUTF16(const std::wstring& wide) {
+    string16 out;
+    out.reserve(wide.size());
+    for (size_t i = 0; i < wide.size(); ++i) {
+        uint32_t cp = static_cast<uint32_t>(wide[i]);
+        if (sizeof(wchar_t) >= 4 && cp > 0xFFFF) {
+            cp -= 0x10000;
+            out.push_back(static_cast<char16>(0xD800 | (cp >> 10)));
+            out.push_back(static_cast<char16>(0xDC00 | (cp & 0x3FF)));
+        } else {
+            out.push_back(static_cast<char16>(cp));
+        }
+    }
+    return out;
+}
+
 }

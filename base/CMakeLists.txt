@@ -58,6 +58,11 @@ target_include_directories(base PUBLIC
     "${CMAKE_SOURCE_DIR}/electron"               # CEF headers: cef/include/...
     "${CMAKE_SOURCE_DIR}/third_party/WebKit/Source"  # WTF headers: wtf/...
 )
+if(APPLE)
+    # macOS filesystem paths are UTF-8: take FilePath's native-UTF8 code paths
+    # (avoids SysNativeMBToWide/locale conversions).
+    target_compile_definitions(base PRIVATE SYSTEM_NATIVE_UTF8)
+endif()
 if(NOT MSVC)
     target_compile_options(base PRIVATE -Wno-unused -Wno-deprecated-declarations)
 endif()

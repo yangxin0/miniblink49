@@ -587,7 +587,11 @@ bool FilePath::ReferencesParent() const {
 // platforms.  These encoding conversion functions are not quite correct.
 
 string16 FilePath::LossyDisplayName() const {
+#if defined(SYSTEM_NATIVE_UTF8)
+  return UTF8ToUTF16(path_);
+#else
   return WideToUTF16(SysNativeMBToWide(path_));
+#endif
 }
 
 std::string FilePath::MaybeAsASCII() const {
@@ -613,7 +617,9 @@ string16 FilePath::AsUTF16Unsafe() const {
 }
 
 // static
-FilePath FilePath::FromUTF8Unsafe(StringPiece utf8) {
+// Signature matches the declaration in file_path.h (const std::string& /
+// const string16&), not the newer StringPiece form.
+FilePath FilePath::FromUTF8Unsafe(const std::string& utf8) {
 #if defined(SYSTEM_NATIVE_UTF8)
   return FilePath(utf8);
 #else
@@ -622,11 +628,11 @@ FilePath FilePath::FromUTF8Unsafe(StringPiece utf8) {
 }
 
 // static
-FilePath FilePath::FromUTF16Unsafe(StringPiece16 utf16) {
+FilePath FilePath::FromUTF16Unsafe(const string16& utf16) {
 #if defined(SYSTEM_NATIVE_UTF8)
   return FilePath(UTF16ToUTF8(utf16));
 #else
-  return FilePath(SysWideToNativeMB(UTF16ToWide(utf16.as_string())));
+  return FilePath(SysWideToNativeMB(UTF16ToWide(utf16)));
 #endif
 }
 
@@ -1339,9 +1345,9 @@ bool FilePath::IsContentUri() const {
 #endif
 
 FilePath StringToFilePath(const std::string& pathStr) {
-    StringPiece16 stringPiece(base::UTF8ToWide(pathStr));
-    FilePath path(stringPiece);
-    return path;
+    // FromUTF8Unsafe is cross-platform (POSIX StringType is UTF-8 std::string;
+    // Windows StringType is UTF-16). Avoids the wstring/string16 conflation.
+    return FilePath::FromUTF8Unsafe(pathStr);
 }
 
 }  // namespace base
