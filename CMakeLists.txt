@@ -53,6 +53,12 @@ if(MINIBLINK_BUILD_WTF)
     add_subdirectory(third_party/WebKit/Source/wtf)
 endif()
 
+option(MINIBLINK_BUILD_SKIA "Build skia 2D graphics lib (macOS raster port WIP)" OFF)
+if(MINIBLINK_BUILD_SKIA)
+    add_subdirectory(third_party/skia)
+    add_subdirectory(test/skia)   # smoke test: prove raster rendering works
+endif()
+
 # ---- Imported V8 monolith target -------------------------------------------
 set(_v8_lib "${MINIBLINK_V8_ROOT}/${MINIBLINK_V8_OUT}/obj/libv8_monolith.a")
 set(_v8_inc "${MINIBLINK_V8_ROOT}/include")

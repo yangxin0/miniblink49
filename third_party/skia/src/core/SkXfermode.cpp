@@ -7,7 +7,11 @@
  */
 
 #include "SkXfermode.h"
+// SSE2 opts header is x86-only; the platform factory is resolved via the extern
+// declarations below and supplied by the per-arch SkXfermode_opts_*.cpp.
+#if defined(__i386__) || defined(__x86_64__) || defined(_M_IX86) || defined(_M_X64)
 #include "SkXfermode_opts_SSE2.h"
+#endif
 #include "SkXfermode_proccoeff.h"
 #include "Sk4pxXfermode.h"
 #include "SkColorPriv.h"

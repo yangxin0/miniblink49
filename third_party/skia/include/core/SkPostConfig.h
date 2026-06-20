@@ -12,6 +12,15 @@
 #  define SK_BUILD_FOR_WIN
 #endif
 
+// Portable DebugBreak(): parts of this in-tree skia were patched to call the
+// Win32 DebugBreak() directly. On non-Windows map it to a trap so those debug
+// paths still build and behave like a breakpoint.
+#if !defined(SK_BUILD_FOR_WIN)
+#  ifndef DebugBreak
+#    define DebugBreak() __builtin_trap()
+#  endif
+#endif
+
 #if defined(SK_DEBUG) && defined(SK_RELEASE)
 #  error "cannot define both SK_DEBUG and SK_RELEASE"
 #elif !defined(SK_DEBUG) && !defined(SK_RELEASE)
