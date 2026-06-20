@@ -407,7 +407,12 @@ void Body::resolveJSON(const String& string)
     v8::Local<v8::String> inputString = v8String(isolate, string);
     v8::TryCatch trycatch(isolate);
     v8::Local<v8::Value> parsed;
+#if V8_MAJOR_VERSION < 8
     if (v8Call(v8::JSON::Parse(isolate, inputString), parsed, trycatch))
+#else
+    // V8 8.7: JSON::Parse takes a Local<Context> and returns a MaybeLocal.
+    if (v8Call(v8::JSON::Parse(isolate->GetCurrentContext(), inputString), parsed, trycatch))
+#endif
         m_resolver->resolve(parsed);
     else
         m_resolver->reject(trycatch.Exception());

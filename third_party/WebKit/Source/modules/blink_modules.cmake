@@ -5,13 +5,18 @@
 
 set(MODSRC "${CMAKE_SOURCE_DIR}/third_party/WebKit/Source/modules")
 
-file(GLOB_RECURSE BLINK_MODULES_SRC "${MODSRC}/*.cpp")
+file(GLOB_RECURSE BLINK_MODULES_SRC "${MODSRC}/*.cpp"
+    # The hand-written modules V8 glue (WebGLAny, V8BindingForModules,
+    # ModuleBindingsInitializer, the modules serializers/dictionary helpers).
+    "${CMAKE_SOURCE_DIR}/third_party/WebKit/Source/bindings/modules/v8/*.cpp")
 list(FILTER BLINK_MODULES_SRC EXCLUDE REGEX "Test\\.cpp$|TestHelper\\.cpp$")
+# bindings/modules/v8/custom/* (V8Custom*Callback) still carry V8 7.5->8.7 skews; defer.
+list(FILTER BLINK_MODULES_SRC EXCLUDE REGEX "/bindings/modules/v8/custom/")
 # Per-feature stragglers (mostly promise/generated-binding-heavy or Win/API-skew):
 # web MIDI, IndexedDB txn/db/request, WebRTC peer/req, MediaKeys/EME, fetch Body,
 # crypto result, file-system, websocket channel, etc. Deferred per-file.
 list(FILTER BLINK_MODULES_SRC EXCLUDE REGEX "BatteryManager\\.cpp$|DatabaseContext\\.cpp$|MIDI[A-Za-z]*\\.cpp$|NavigatorWebMIDI\\.cpp$|Notification\\.cpp$|PresentationAvailability\\.cpp$|ServiceWorkerRegistration\\.cpp$|SQLiteFileSystemWin\\.cpp$")
-list(FILTER BLINK_MODULES_SRC EXCLUDE REGEX "CryptoResultImpl\\.cpp$|IDBTransaction\\.cpp$|IDBDatabase\\.cpp$|IDBOpenDBRequest\\.cpp$|IDBRequest\\.cpp$|PushMessageData\\.cpp$|MediaKeySession\\.cpp$|MediaKeys\\.cpp$|WebSocketChannel\\.cpp$|DOMFileSystemBase\\.cpp$|FileWriter\\.cpp$|DOMFileSystem\\.cpp$|PermissionStatus\\.cpp$|SpeechRecognition\\.cpp$|DataConsumerHandleTestUtil\\.cpp$|Body\\.cpp$|CompositorWorkerManager\\.cpp$")
+list(FILTER BLINK_MODULES_SRC EXCLUDE REGEX "CryptoResultImpl\\.cpp$|IDBTransaction\\.cpp$|IDBDatabase\\.cpp$|IDBOpenDBRequest\\.cpp$|IDBRequest\\.cpp$|PushMessageData\\.cpp$|MediaKeySession\\.cpp$|MediaKeys\\.cpp$|WebSocketChannel\\.cpp$|DOMFileSystemBase\\.cpp$|FileWriter\\.cpp$|DOMFileSystem\\.cpp$|PermissionStatus\\.cpp$|SpeechRecognition\\.cpp$|DataConsumerHandleTestUtil\\.cpp$|CompositorWorkerManager\\.cpp$")
 list(FILTER BLINK_MODULES_SRC EXCLUDE REGEX "RTCDTMFSender\\.cpp$|RTCSessionDescriptionRequestImpl\\.cpp$|RTCVoidRequestImpl\\.cpp$|RTCStatsRequestImpl\\.cpp$|MediaDevicesRequest\\.cpp$|RTCPeerConnection\\.cpp$")
 
 add_library(blink_modules STATIC ${BLINK_MODULES_SRC})
