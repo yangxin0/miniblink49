@@ -118,6 +118,14 @@ template <class T> struct is_const<const T> : true_type {};
 template <class T> struct is_void : false_type {};
 template <> struct is_void<void> : true_type {};
 
+// orig_chrome's base headers (callback_internal.h etc.) expect YesType/NoType in
+// base::internal (root base/ shadows orig_chrome's template_util.h, so provide a
+// matching definition here as a superset).
+namespace internal {
+typedef char YesType;
+struct NoType { YesType dummy[2]; };
+}  // namespace internal
+
 namespace cef_internal {
 
 // Types YesType and NoType are guaranteed such that sizeof(YesType) <

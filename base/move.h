@@ -228,4 +228,13 @@
  private:
 #endif
 
+// Used by orig_chrome's base/memory/ref_counted.h (scoped_refptr::Pass()).
+// Root base/move.h must be a superset of orig_chrome's since it shadows it.
+#ifndef TYPE_WITH_MOVE_CONSTRUCTOR_FOR_CPP_03
+#define TYPE_WITH_MOVE_CONSTRUCTOR_FOR_CPP_03(type)                          \
+ public:                                                                     \
+  type&& Pass() WARN_UNUSED_RESULT { return static_cast<type&&>(*this); }    \
+ private:
+#endif
+
 #endif  // BASE_MOVE_H_

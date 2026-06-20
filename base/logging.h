@@ -14,6 +14,11 @@
 #define DebugBreak() __builtin_trap()
 #endif
 #endif
+// Portable OutputDebugStringA() for non-Windows (engine debug logging uses it).
+#if !defined(_WIN32) && !defined(OutputDebugStringA)
+#include <cstdio>
+#define OutputDebugStringA(s) std::fputs((s), stderr)
+#endif
 
 #ifndef CHECK
 #define CHECK(condition)  \

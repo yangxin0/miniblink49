@@ -157,11 +157,10 @@ ObjectTemplateBuilder::~ObjectTemplateBuilder() {
 
 ObjectTemplateBuilder& ObjectTemplateBuilder::AddNamedPropertyInterceptor() {
   v8::Local<v8::Value> data;
-  template_->SetNamedPropertyHandler(&NamedPropertyGetter,
-                                     &NamedPropertySetter,
-                                     &NamedPropertyQuery,
-                                     NULL,
-                                     &NamedPropertyEnumerator, data);
+  // V8 8.7: SetNamedPropertyHandler -> SetHandler(NamedPropertyHandlerConfiguration).
+  template_->SetHandler(v8::NamedPropertyHandlerConfiguration(
+      &NamedPropertyGetter, &NamedPropertySetter, &NamedPropertyQuery,
+      NULL, &NamedPropertyEnumerator, data));
   return *this;
 }
 

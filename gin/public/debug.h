@@ -10,6 +10,18 @@
 //#include "v8/include/v8.h"
 #include "v8.h"
 
+// V8 8.7 removed v8::FunctionEntryHook (the JIT entry-hook feature is gone).
+// Provide a compatible typedef so gin's (now no-op) entry-hook API still
+// compiles. See isolate_holder.cc, which no longer wires it up.
+#if !defined(V8_FUNCTION_ENTRY_HOOK_COMPAT)
+#define V8_FUNCTION_ENTRY_HOOK_COMPAT
+#include <stdint.h>
+namespace v8 {
+typedef void (*FunctionEntryHook)(uintptr_t function,
+                                  uintptr_t return_addr_location);
+}  // namespace v8
+#endif
+
 namespace gin {
 
 class GIN_EXPORT Debug {

@@ -5,7 +5,7 @@
 #ifndef GIN_FUNCTION_TEMPLATE_H_
 #define GIN_FUNCTION_TEMPLATE_H_
 
-#include "cef/include/base/cef_callback.h"
+#include "base/callback.h"
 #include "base/logging.h"
 #include "gin/arguments.h"
 #include "gin/converter.h"
