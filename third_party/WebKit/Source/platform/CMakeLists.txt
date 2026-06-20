@@ -42,7 +42,10 @@ list(TRANSFORM BLINK_CORE_SOURCES PREPEND "${BSRC}/")
 # APIs like FROM_HERE and the WebString<->String conversions, and unlocks the
 # bulk of these dirs (heap 11/12, graphics 39/49, text 21/23, fonts 16/17).
 file(GLOB BLINK_HEAP     "${BSRC}/heap/*.cpp")
-file(GLOB BLINK_GRAPHICS "${BSRC}/graphics/*.cpp")
+# GLOB_RECURSE to pick up graphics/filters (SVG FE* effects, 28), graphics/paint
+# (DisplayItem* recorders, 19) and graphics/skia — all pure-CPU and compile clean.
+# graphics/gpu is excluded below (Ganesh/GLES2 not brought up).
+file(GLOB_RECURSE BLINK_GRAPHICS "${BSRC}/graphics/*.cpp")
 file(GLOB BLINK_TEXT     "${BSRC}/text/*.cpp")
 file(GLOB BLINK_FONTS    "${BSRC}/fonts/*.cpp")
 # More platform sublayers the link needs (all compile clean on macOS): scroll
@@ -50,8 +53,13 @@ file(GLOB BLINK_FONTS    "${BSRC}/fonts/*.cpp")
 # mediastream.
 file(GLOB BLINK_SUBLAYERS
     "${BSRC}/scroll/*.cpp" "${BSRC}/network/*.cpp"
-    "${BSRC}/mhtml/*.cpp" "${BSRC}/mediastream/*.cpp"
-    "${BSRC}/weborigin/*.cpp")   # KURL recovered; KURL_new/KURL_w variants excluded below
+    "${BSRC}/mhtml/*.cpp" "${BSRC}/mediastream/*.cpp" "${BSRC}/blob/*.cpp"
+    "${BSRC}/weborigin/*.cpp"    # KURL recovered; KURL_new/KURL_w variants excluded below
+    "${BSRC}/*.cpp")             # platform-root files (JSONValues/Widget/SharedBuffer/DateComponents/...)
+# platform-root: 48/50 compile. The 4 value types already in BLINK_CORE_SOURCES
+# (Length/LengthBox/LengthFunctions/Decimal) are excluded here to avoid duplicate
+# objects; FileMetadata (stat/Win path skew) + NotImplemented (Win logging) deferred.
+list(FILTER BLINK_SUBLAYERS EXCLUDE REGEX "/(Length|LengthBox|LengthFunctions|Decimal|FileMetadata|NotImplemented)\\.cpp$")
 # Unit tests (gtest) and the value types already in the core list.
 list(FILTER BLINK_HEAP      EXCLUDE REGEX "Test\\.cpp$|RunAllTests\\.cpp$")
 list(FILTER BLINK_GRAPHICS  EXCLUDE REGEX "Test\\.cpp$|/Color\\.cpp$|/GraphicsTypes\\.cpp$")
@@ -64,7 +72,7 @@ list(FILTER BLINK_SUBLAYERS EXCLUDE REGEX "KURL_new\\.cpp$|KURL_w\\.cpp$")
 # V8 EmbedderHeapTracer API skew (final/virtual): deferred.
 list(FILTER BLINK_HEAP EXCLUDE REGEX "UnifiedHeapController")
 # GPU (Ganesh/GLES2), canvas-layer/compositor, GDI/Win: deferred.
-list(FILTER BLINK_GRAPHICS EXCLUDE REGEX "Canvas2DLayerBridge|Canvas2DLayerManager|GDIPlusInit|GradientGeneratedImage|GraphicsContext|ImageBuffer|ImageBufferSurface|PictureSnapshot|RecordingImageBufferSurface|UnacceleratedImageBufferSurface")
+list(FILTER BLINK_GRAPHICS EXCLUDE REGEX "/gpu/|Canvas2DLayerBridge|Canvas2DLayerManager|GDIPlusInit|GradientGeneratedImage|GraphicsContext|ImageBuffer|ImageBufferSurface|PictureSnapshot|RecordingImageBufferSurface|UnacceleratedImageBufferSurface")
 # Calendar/date ICU (ucal/udat) + Windows locale: deferred.
 list(FILTER BLINK_TEXT EXCLUDE REGEX "LocaleICU|LocaleWin")
 # Needs the font platform-data backend (CoreText): deferred.
@@ -115,6 +123,7 @@ target_include_directories(blink_platform PUBLIC
     "${CMAKE_SOURCE_DIR}/gen/blink"             # generated *Names.h headers
     "${CMAKE_SOURCE_DIR}/third_party/icu/source/common"   # unicode/*.h
     "${MINIBLINK_V8_ROOT}/include"              # v8.h (bindings-adjacent headers)
+    "${CMAKE_SOURCE_DIR}/third_party/khronos"   # GLES2/* (DragImage and other root files)
     "${CMAKE_SOURCE_DIR}/orig_chrome")
 
 target_link_libraries(blink_platform PUBLIC wtf skia)
