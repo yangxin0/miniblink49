@@ -5,11 +5,51 @@
 #include <windows.h>
 #endif
 #include <vector>
+#include <stdint.h>
 
 namespace base {
 
+namespace {
+// Portable UTF-8 <-> UTF-16/UTF-32 conversion helpers (replace the Win32
+// MultiByteToWideChar/WideCharToMultiByte calls, which don't exist on macOS,
+// and correctly handle wchar_t being UTF-32 on macOS vs UTF-16 on Windows).
+inline uint32_t decodeUtf8(const std::string& s, size_t& i) {
+    unsigned char c = static_cast<unsigned char>(s[i++]);
+    if (c < 0x80) return c;
+    uint32_t cp; int extra;
+    if ((c & 0xE0) == 0xC0) { cp = c & 0x1F; extra = 1; }
+    else if ((c & 0xF0) == 0xE0) { cp = c & 0x0F; extra = 2; }
+    else if ((c & 0xF8) == 0xF0) { cp = c & 0x07; extra = 3; }
+    else return 0xFFFD;
+    for (int k = 0; k < extra; ++k) {
+        if (i >= s.size()) return 0xFFFD;
+        unsigned char cc = static_cast<unsigned char>(s[i]);
+        if ((cc & 0xC0) != 0x80) return 0xFFFD;
+        cp = (cp << 6) | (cc & 0x3F); ++i;
+    }
+    return cp;
+}
+inline void appendUtf8(std::string& out, uint32_t cp) {
+    if (cp < 0x80) { out.push_back(static_cast<char>(cp)); }
+    else if (cp < 0x800) {
+        out.push_back(static_cast<char>(0xC0 | (cp >> 6)));
+        out.push_back(static_cast<char>(0x80 | (cp & 0x3F)));
+    } else if (cp < 0x10000) {
+        out.push_back(static_cast<char>(0xE0 | (cp >> 12)));
+        out.push_back(static_cast<char>(0x80 | ((cp >> 6) & 0x3F)));
+        out.push_back(static_cast<char>(0x80 | (cp & 0x3F)));
+    } else {
+        out.push_back(static_cast<char>(0xF0 | (cp >> 18)));
+        out.push_back(static_cast<char>(0x80 | ((cp >> 12) & 0x3F)));
+        out.push_back(static_cast<char>(0x80 | ((cp >> 6) & 0x3F)));
+        out.push_back(static_cast<char>(0x80 | (cp & 0x3F)));
+    }
+}
+}  // namespace
+
 const wchar_t* kWhitespaceWide = L" ";
-const char16* kWhitespaceUTF16 = L" ";
+static const char16 kWhitespaceUTF16Storage[] = { static_cast<char16>(' '), 0 };
+const char16* kWhitespaceUTF16 = kWhitespaceUTF16Storage;
 const char* kWhitespaceASCII = " ";
 
 template<typename STR>
@@ -73,35 +113,47 @@ std::string ToUpperASCII(const std::string& str) {
 }
 
 std::wstring UTF8ToWide(const std::string& utf8) {
-    std::wstring utf16;
-    size_t n = ::MultiByteToWideChar(CP_UTF8, 0, utf8.c_str(), utf8.size(), nullptr, 0);
-    if (0 == n)
-        return L"";
-    std::vector<wchar_t> wbuf(n);
-    MultiByteToWideChar(CP_UTF8, 0, utf8.c_str(), utf8.size(), &wbuf[0], n);
-    utf16.resize(n + 5);
-    utf16.assign(&wbuf[0], n);
-    return utf16;
+    std::wstring out;
+    out.reserve(utf8.size());
+    for (size_t i = 0; i < utf8.size(); ) {
+        uint32_t cp = decodeUtf8(utf8, i);
+        if (sizeof(wchar_t) >= 4) {
+            out.push_back(static_cast<wchar_t>(cp));      // UTF-32 (macOS/Linux)
+        } else if (cp <= 0xFFFF) {
+            out.push_back(static_cast<wchar_t>(cp));       // UTF-16 (Windows)
+        } else {
+            cp -= 0x10000;
+            out.push_back(static_cast<wchar_t>(0xD800 | (cp >> 10)));
+            out.push_back(static_cast<wchar_t>(0xDC00 | (cp & 0x3FF)));
+        }
+    }
+    return out;
 }
 
 std::wstring ASCIIToWide(const std::string& ascii) {
     return UTF8ToWide(ascii);
 }
 
-std::string UTF16ToASCII(const string16& utf16) {
-    return WideToUTF8(utf16);
+// Decode a UTF-16 string16 (with surrogate pairs) to UTF-8.
+std::string WideToUTF8(const string16& utf16) {
+    std::string out;
+    out.reserve(utf16.size());
+    for (size_t i = 0; i < utf16.size(); ) {
+        uint32_t cp = static_cast<uint16_t>(utf16[i++]);
+        if (cp >= 0xD800 && cp <= 0xDBFF && i < utf16.size()) {
+            uint32_t lo = static_cast<uint16_t>(utf16[i]);
+            if (lo >= 0xDC00 && lo <= 0xDFFF) {
+                cp = 0x10000 + ((cp - 0xD800) << 10) + (lo - 0xDC00);
+                ++i;
+            }
+        }
+        appendUtf8(out, cp);
+    }
+    return out;
 }
 
-std::string WideToUTF8(const string16& utf16) {
-    std::string utf8;
-    size_t n = ::WideCharToMultiByte(CP_UTF8, 0, utf16.c_str(), utf16.size(), NULL, 0, NULL, NULL);
-    if (0 == n)
-        return "";
-    std::vector<char> buf(n + 1);
-    ::WideCharToMultiByte(CP_UTF8, 0, utf16.c_str(), -1, &buf[0], n, NULL, NULL);
-    utf8.resize(n);
-    utf8.assign(&buf[0], n);
-    return utf8;
+std::string UTF16ToASCII(const string16& utf16) {
+    return WideToUTF8(utf16);
 }
 
 std::string UTF16ToUTF8(const string16& utf16) {
@@ -109,7 +161,11 @@ std::string UTF16ToUTF8(const string16& utf16) {
 }
 
 string16 ASCIIToUTF16(const std::string& ascii) {
-  return ASCIIToWide(ascii);
+    string16 out;
+    out.reserve(ascii.size());
+    for (size_t i = 0; i < ascii.size(); ++i)
+        out.push_back(static_cast<char16>(static_cast<unsigned char>(ascii[i])));
+    return out;
 }
 
 }
