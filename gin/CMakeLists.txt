@@ -3,47 +3,45 @@
 # migration end-to-end. Built as a static lib (archive only) so it compile-
 # verifies without needing every orig_chrome/base .cc linked.
 
-# --- Verified V8-core: these compile cleanly against V8 8.7 on macOS. They are
-#     the self-contained V8 conversion/handle files and PROVE the V8 7.5->8.7 API
-#     migration (0 V8-API errors). This is what the gin target builds today.
+# --- gin against V8 8.7 + orig_chrome base: these compile cleanly on macOS.
+#     Proves the V8 7.5->8.7 API migration AND the base/CEF reconciliation.
 set(GIN_SOURCES
     arguments.cc
-    converter.cc
-    interceptor.cc
-    microtasks_scope.cc
-    per_isolate_data.cc
-    promise.cc
-    try_catch.cc
-    wrapper_info.cc
-)
-
-# --- Engine-bring-up boundary (NOT yet building on macOS): the files below fail
-#     NOT on V8, but because they pull in whole engine subsystems that aren't
-#     ported yet — CEF base (base::Bind/Callback via cef_callback.h), WebKit/WTF
-#     (COMPILER() config + blink Platform), and trace_event. Re-enable as those
-#     subsystems are brought up (Phases 9-10). Their V8-API deltas are already
-#     migrated (see V8_API_MIGRATION.md); only their dependencies block them.
-set(GIN_SOURCES_ENGINE_DEP
-    array_buffer.cc
     context_holder.cc
+    converter.cc
     debug_impl.cc
     dictionary.cc
     function_template.cc
+    interceptor.cc
     isolate_holder.cc
+    microtasks_scope.cc
     object_template_builder.cc
     per_context_data.cc
+    per_isolate_data.cc
+    promise.cc
     run_microtasks_observer.cc
     runner.cc
     shell_runner.cc
+    try_catch.cc
     v8_initializer_empty.cc
-    v8_isolate_memory_dump_provider.cc
-    v8_platform.cc
+    wrapper_info.cc
     wrappable.cc
-    modules/console.cc
-    modules/file_module_provider.cc
     modules/module_registry.cc
     modules/module_runner_delegate.cc
     modules/timer.cc
+)
+
+# --- Remaining 4 files, blocked by SUBSYSTEMS not yet brought up on macOS (NOT
+#     V8): array_buffer + memory_dump need WebKit/WTF (wtf/Assertions.h) and
+#     base/trace_event; console + file_module_provider need base string_split
+#     (JoinString/SplitString, whose 8.7-era signatures differ). Re-enable as
+#     those are brought up (Phases 9-10).
+set(GIN_SOURCES_SUBSYSTEM_DEP
+    array_buffer.cc                      # WebKit/WTF ArrayBufferContents
+    v8_isolate_memory_dump_provider.cc   # base/trace_event
+    v8_platform.cc                       # blink Platform
+    modules/console.cc                   # base::JoinString
+    modules/file_module_provider.cc      # base::SplitString
 )
 
 add_library(gin STATIC ${GIN_SOURCES})
