@@ -50,7 +50,12 @@
 // --- Scalar types (Win32 widths) --------------------------------------------
 #ifndef _WINDOWS_SCALARS_DEFINED
 #define _WINDOWS_SCALARS_DEFINED
+// On arm64 macOS <objc/objc.h> defines `typedef bool BOOL` (and sets
+// OBJC_BOOL_DEFINED). When a translation unit pulls in ObjC headers, defer to
+// that definition rather than redefining BOOL as int (which clashes).
+#ifndef OBJC_BOOL_DEFINED
 typedef int                 BOOL;
+#endif
 typedef unsigned char       BYTE;
 typedef unsigned short      WORD;
 typedef uint32_t            DWORD;

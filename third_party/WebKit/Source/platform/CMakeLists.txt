@@ -76,6 +76,8 @@ list(FILTER BLINK_HEAP EXCLUDE REGEX "UnifiedHeapController")
 # Truly deferred: graphics/gpu (Ganesh/GLES2 not brought up), Canvas2DLayerBridge
 # (WebExternalTextureMailbox::syncPoint API skew), ImageBuffer.cpp (pulls wke ->
 # windows.h), GDIPlusInit (Win-only).
+# ImageBuffer.cpp's toDataURL path uses wke::CString (full wke layer, not just the
+# windows.h shim) -> deferred with the rest of the wke embedding bring-up.
 list(FILTER BLINK_GRAPHICS EXCLUDE REGEX "/gpu/|Canvas2DLayerBridge|GDIPlusInit|/ImageBuffer\\.cpp$")
 # Calendar/date ICU (ucal/udat) + Windows locale: deferred.
 list(FILTER BLINK_TEXT EXCLUDE REGEX "LocaleICU|LocaleWin")
@@ -126,6 +128,7 @@ target_include_directories(blink_platform PUBLIC
     "${CMAKE_SOURCE_DIR}/third_party/icu/source/common"   # unicode/*.h
     "${MINIBLINK_V8_ROOT}/include"              # v8.h (bindings-adjacent headers)
     "${CMAKE_SOURCE_DIR}/third_party/khronos"   # GLES2/* (DragImage and other root files)
+    "${CMAKE_SOURCE_DIR}/win_compat"            # <windows.h> shim (ImageBuffer pulls wke)
     "${CMAKE_SOURCE_DIR}/orig_chrome")
 
 target_link_libraries(blink_platform PUBLIC wtf skia)

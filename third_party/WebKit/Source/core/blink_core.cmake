@@ -40,8 +40,6 @@ list(FILTER BLINK_CORE_SRC EXCLUDE REGEX "HTMLPlugInElement\\.cpp$|HTMLMetaEleme
 list(FILTER BLINK_CORE_SRC EXCLUDE REGEX "CustomElementNone\\.cpp$|FileInputType\\.cpp$|CanvasRenderingContextFactory\\.cpp$")
 # layout: non-mac platform themes (we keep LayoutThemeMac). LayoutText/LayoutReplaced recovered.
 list(FILTER BLINK_CORE_SRC EXCLUDE REGEX "LayoutTheme(Android|Default|Linux|Win|FontProviderWin)\\.cpp$")
-# fetch: resource subclasses with API skews (ScriptResource recovered; these 2 deferred).
-list(FILTER BLINK_CORE_SRC EXCLUDE REGEX "/CSSStyleSheetResource\\.cpp$|/ImageResource\\.cpp$")
 # paint: non-mac theme painter (we keep the mac path).
 list(FILTER BLINK_CORE_SRC EXCLUDE REGEX "ThemePainterDefault\\.cpp$")
 # workers: threading-proxy files with API skews (deferred).
@@ -53,7 +51,8 @@ target_link_libraries(blink_core PUBLIC blink_platform)
 
 target_include_directories(blink_core PUBLIC
     "${CMAKE_SOURCE_DIR}/third_party/v8shim"     # v8-debug.h compatibility shim
-    "${CMAKE_SOURCE_DIR}/third_party/khronos")   # in-tree GLES2/GLES3/EGL headers
+    "${CMAKE_SOURCE_DIR}/third_party/khronos"    # in-tree GLES2/GLES3/EGL headers
+    "${CMAKE_SOURCE_DIR}/win_compat")            # <windows.h> shim (wke API surface)
 
 target_compile_definitions(blink_core PUBLIC "V8CALL=" ENABLE_WKE=1)
 
