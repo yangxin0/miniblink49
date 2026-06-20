@@ -21,6 +21,12 @@ project(miniblink
     LANGUAGES C CXX ASM
     DESCRIPTION "miniblink — single-file Chromium-based browser widget")
 
+# Objective-C++ for the macOS platform backend (port/mac). Enabled separately so
+# non-Apple builds don't require it.
+if(APPLE)
+    enable_language(OBJCXX)
+endif()
+
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 include(Platform)
 
@@ -65,6 +71,10 @@ endif()
 if(MINIBLINK_BUILD_SKIA)
     add_subdirectory(third_party/skia)
     add_subdirectory(test/skia)   # smoke test: prove raster rendering works
+    if(APPLE)
+        add_subdirectory(port/mac)    # macOS platform backend (paint bridge first)
+        add_subdirectory(test/mac)    # smoke test: skia -> CoreGraphics bridge
+    endif()
 endif()
 if(MINIBLINK_BUILD_BLINK)
     add_subdirectory(third_party/WebKit/Source/platform)
