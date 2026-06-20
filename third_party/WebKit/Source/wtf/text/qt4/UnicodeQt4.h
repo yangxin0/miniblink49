@@ -88,12 +88,13 @@ namespace QUnicodeTables {
 }
 QT_END_NAMESPACE
 
-// ugly hack to make UChar compatible with JSChar in API/JSStringRef.h
-//#if defined(Q_OS_WIN) || COMPILER(WINSCW) || (COMPILER(RVCT) && !OS(LINUX))
+// UChar must be 16-bit. wchar_t is 16-bit on Windows but 32-bit on macOS/Linux,
+// so use uint16_t off Windows.
+#if defined(_WIN32)
 typedef wchar_t UChar;
-// #else
-// typedef uint16_t UChar;
-// #endif
+#else
+typedef uint16_t UChar;
+#endif
 
 #if !USE(QT_ICU_TEXT_BREAKING)
 typedef uint32_t UChar32;

@@ -11,9 +11,21 @@
 #define Q_DECL_EXPORT 
 #define Q_CORE_EXPORT 
 
-#define QT3_SUPPORT 
+#define QT3_SUPPORT
 
+// Qt basic integer typedefs (Qt's qglobal provides these on Windows; absent on
+// macOS/Linux). uint/ushort/ulong may already be typedef'd by <sys/types.h> to
+// the same underlying type, which C++ permits.
+typedef unsigned char uchar;
+typedef unsigned short ushort;
+typedef unsigned int uint;
+typedef unsigned long ulong;
+
+#if defined(_MSC_VER)
 #define Q_DECL_DEPRECATED __declspec(deprecated)
+#else
+#define Q_DECL_DEPRECATED __attribute__((deprecated))
+#endif
 #define Q_DECL_CONSTRUCTOR_DEPRECATED Q_DECL_DEPRECATED
 #define QT_ASCII_CAST_WARN_CONSTRUCTOR Q_DECL_CONSTRUCTOR_DEPRECATED
 

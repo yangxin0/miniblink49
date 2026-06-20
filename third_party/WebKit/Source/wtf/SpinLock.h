@@ -37,6 +37,8 @@
 // a given memory address.
 
 #include "wtf/Atomics.h"
+#include <atomic>
+#include <cstdint>
 
 namespace WTF {
 
@@ -76,29 +78,36 @@ public:
         SpinLock& m_mutex;
     };
 
+    // Portable per-thread id (avoids platform thread-id APIs): the address of a
+    // thread_local object is unique per thread.
+    static uintptr_t currentThreadId()
+    {
+        static thread_local char marker;
+        return reinterpret_cast<uintptr_t>(&marker);
+    }
+
     void lock()
     {
-        //static_assert(sizeof(m_lock) == sizeof(int), "int and m_lock are different sizes");
-        DWORD owner = ::GetCurrentThreadId();
-
-        do {
-            InterlockedCompareExchange((volatile long *)&m_owner, (long)owner, 0);
-        } while (m_owner != owner);
-
-        InterlockedIncrement(reinterpret_cast<long volatile*>(&m_refCount));
+        uintptr_t owner = currentThreadId();
+        for (;;) {
+            uintptr_t expected = 0;
+            if (m_owner.compare_exchange_weak(expected, owner))
+                break;                       // acquired a free lock
+            if (m_owner.load() == owner)
+                break;                       // already owned by this thread (recursive)
+        }
+        m_refCount.fetch_add(1);
     }
 
     void unlock()
     {
-        ASSERT(m_owner && ::GetCurrentThreadId() == m_owner);
-        InterlockedDecrement(reinterpret_cast<long volatile*>(&m_refCount));
-        if (0 == m_refCount)
-            InterlockedExchange(reinterpret_cast<long volatile*>(&m_owner), 0);
+        if (m_refCount.fetch_sub(1) == 1)    // was 1, now 0
+            m_owner.store(0);
     }
 
 private:
-    long m_refCount;
-    DWORD m_owner;
+    std::atomic<int> m_refCount;
+    std::atomic<uintptr_t> m_owner;
 };
 
 } // namespace WTF
