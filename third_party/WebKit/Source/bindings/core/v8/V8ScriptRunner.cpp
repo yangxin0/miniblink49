@@ -101,7 +101,16 @@ v8::Local<v8::Value> throwStackOverflowExceptionIfNeeded(v8::Isolate* isolate)
         return v8::Undefined(isolate);
     }
     V8PerIsolateData::from(isolate)->setIsHandlingRecursionLevelError(true);
+#if V8_MAJOR_VERSION < 8
     v8::Local<v8::Value> result = v8::Function::New(isolate, throwStackOverflowException)->Call(v8::Undefined(isolate), 0, 0);
+#else
+    // V8 8.7: Function::New takes a context + returns MaybeLocal; Call takes a context.
+    v8::Local<v8::Context> context = isolate->GetCurrentContext();
+    v8::Local<v8::Value> result;
+    v8::Local<v8::Function> overflowFn;
+    if (v8::Function::New(context, throwStackOverflowException).ToLocal(&overflowFn))
+        overflowFn->Call(context, v8::Undefined(isolate), 0, 0).ToLocal(&result);
+#endif
     V8PerIsolateData::from(isolate)->setIsHandlingRecursionLevelError(false);
     return result;
 }
@@ -222,12 +231,15 @@ v8::MaybeLocal<v8::Script> postStreamCompile(V8CacheOptions cacheOptions, Cached
     // time stamp.
     switch (cacheOptions) {
     case V8CacheOptionsParse: {
+#if V8_MAJOR_VERSION < 8
         const v8::ScriptCompiler::CachedData* newCachedData = streamer->source()->GetCachedData();
         if (!newCachedData)
             break;
         CachedMetadataHandler::CacheType cacheType = (cacheOptions == V8CacheOptionsParse) ? CachedMetadataHandler::SendToPlatform : CachedMetadataHandler::CacheLocally;
         cacheHandler->clearCachedMetadata(cacheType);
         cacheHandler->setCachedMetadata(cacheTag(CacheTagParser, cacheHandler), reinterpret_cast<const char*>(newCachedData->data), newCachedData->length, cacheType);
+#endif
+        // V8 8.7 removed the parser cache (StreamedSource::GetCachedData).
         break;
     }
 
@@ -278,8 +290,13 @@ PassOwnPtr<CompileFn> selectCompileFunction(V8CacheOptions cacheOptions, CachedM
     // The cacheOptions will guide our strategy:
     switch (cacheOptions) {
     case V8CacheOptionsParse:
+#if V8_MAJOR_VERSION < 8
         // Use parser-cache; in-memory only.
         return bind(compileAndConsumeOrProduce, cacheHandler, cacheTag(CacheTagParser, cacheHandler), v8::ScriptCompiler::kConsumeParserCache, v8::ScriptCompiler::kProduceParserCache, CachedMetadataHandler::CacheLocally);
+#else
+        // V8 8.7 removed the parser cache; compile without options.
+        return bind(compileWithoutOptions, V8CompileHistogram::Cacheable);
+#endif
         break;
 
     case V8CacheOptionsDefault:
@@ -294,7 +311,13 @@ PassOwnPtr<CompileFn> selectCompileFunction(V8CacheOptions cacheOptions, CachedM
             setCacheTimeStamp(cacheHandler);
             return bind(compileWithoutOptions, V8CompileHistogram::Cacheable);
         }
+#if V8_MAJOR_VERSION < 8
         return bind(compileAndProduceCache, cacheHandler, codeCacheTag, v8::ScriptCompiler::kProduceCodeCache, CachedMetadataHandler::SendToPlatform);
+#else
+        // V8 8.7 produces code cache via CreateCodeCache() post-compile, not a
+        // compile option; fall back to no-options compile for now.
+        return bind(compileWithoutOptions, V8CompileHistogram::Cacheable);
+#endif
         break;
     }
 
