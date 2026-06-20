@@ -48,6 +48,11 @@ if(MINIBLINK_BUILD_GIN)
     add_subdirectory(gin)
 endif()
 
+option(MINIBLINK_BUILD_WTF "Build WebKit/WTF foundation lib (macOS port WIP)" OFF)
+if(MINIBLINK_BUILD_WTF)
+    add_subdirectory(third_party/WebKit/Source/wtf)
+endif()
+
 # ---- Imported V8 monolith target -------------------------------------------
 set(_v8_lib "${MINIBLINK_V8_ROOT}/${MINIBLINK_V8_OUT}/obj/libv8_monolith.a")
 set(_v8_inc "${MINIBLINK_V8_ROOT}/include")
