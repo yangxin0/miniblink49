@@ -20,27 +20,43 @@
 #define OutputDebugStringA(s) std::fputs((s), stderr)
 #endif
 
+// A no-op stream that swallows any operator<< (so CHECK/DCHECK can be followed
+// by " << message" the way Chromium/orig_chrome code expects). LogVoidify has
+// lower precedence than << so `LogVoidify() & NullStream() << x` is void.
+#ifndef BASE_LOGGING_NULLSTREAM_DEFINED
+#define BASE_LOGGING_NULLSTREAM_DEFINED
+namespace base { namespace logging_internal {
+class NullStream {
+ public:
+  template <typename T> NullStream& operator<<(const T&) { return *this; }
+};
+class LogVoidify { public: void operator&(const NullStream&) {} };
+inline NullStream& nullStream() { static NullStream s; return s; }
+}}  // namespace base::logging_internal
+#endif
+
+// CHECK: DebugBreak on failure; supports trailing "<< message". Single
+// expression -> safe in if/else without braces.
 #ifndef CHECK
-#define CHECK(condition)  \
-  do {                    \
-    if ((!(condition))) { \
-      DebugBreak();       \
-    }                     \
-  } while (0)
+#define CHECK(condition)                                                       \
+  !(condition) ? (DebugBreak(), ::base::logging_internal::LogVoidify() &        \
+                                    ::base::logging_internal::nullStream())     \
+               : ::base::logging_internal::LogVoidify() &                       \
+                     ::base::logging_internal::nullStream()
 #endif
 
-// The DCHECK macro is equivalent to CHECK except that it only
-// generates code in debug builds.
-#ifdef DEBUG
-#  define DCHECK(condition)      CHECK(condition)
-#else
-#  ifndef DCHECK
-#    define DCHECK(condition)      ((void) 0)
-#  endif
+// DCHECK: no-op in this port (release-style), supports "<< message". It must NOT
+// evaluate the condition (the original stub was ((void)0)); some existing DCHECK
+// call sites pass expressions that don't type-check on macOS (e.g. IsStringASCII
+// of a string16) and were only ever compiled with a no-op DCHECK.
+#ifndef DCHECK
+#define DCHECK(condition)                                                      \
+  true ? (void)0                                                               \
+       : ::base::logging_internal::LogVoidify() &                              \
+             ::base::logging_internal::nullStream()
 #endif
 
-// Comparison variants of DCHECK (miniblink's logging.h omitted these; base/
-// and gin/ use them widely). Minimal forms built on DCHECK.
+// Comparison variants of DCHECK, also streamable.
 #ifndef DCHECK_EQ
 #define DCHECK_EQ(a, b) DCHECK((a) == (b))
 #define DCHECK_NE(a, b) DCHECK((a) != (b))
