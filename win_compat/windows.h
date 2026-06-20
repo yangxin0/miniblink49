@@ -118,6 +118,33 @@ typedef struct _PROCESS_INFORMATION {
     DWORD  dwProcessId, dwThreadId;
 } PROCESS_INFORMATION, *LPPROCESS_INFORMATION;
 
+// --- Threading / timing primitives (posix-backed) ----------------------------
+// The wke/net sources use Win32 critical sections, Sleep and a few helpers. Map
+// them to pthreads/unistd so the portable (non-windowing) parts build and run.
+#include <pthread.h>
+#include <unistd.h>
+#include <sched.h>
+
+typedef pthread_mutex_t CRITICAL_SECTION, *LPCRITICAL_SECTION;
+
+static inline void InitializeCriticalSection(CRITICAL_SECTION* cs) {
+    pthread_mutexattr_t a; pthread_mutexattr_init(&a);
+    pthread_mutexattr_settype(&a, PTHREAD_MUTEX_RECURSIVE);  // Win32 CS is recursive
+    pthread_mutex_init(cs, &a); pthread_mutexattr_destroy(&a);
+}
+static inline void EnterCriticalSection(CRITICAL_SECTION* cs) { pthread_mutex_lock(cs); }
+static inline void LeaveCriticalSection(CRITICAL_SECTION* cs) { pthread_mutex_unlock(cs); }
+static inline void DeleteCriticalSection(CRITICAL_SECTION* cs) { pthread_mutex_destroy(cs); }
+static inline BOOL TryEnterCriticalSection(CRITICAL_SECTION* cs) { return pthread_mutex_trylock(cs) == 0; }
+static inline void Sleep(DWORD ms) { usleep((useconds_t)ms * 1000); }
+static inline DWORD GetCurrentThreadId(void) { return (DWORD)(uintptr_t)pthread_self(); }
+
+// Interlocked atomics -> gcc/clang __sync builtins.
+static inline LONG InterlockedIncrement(volatile LONG* v) { return __sync_add_and_fetch(v, 1); }
+static inline LONG InterlockedDecrement(volatile LONG* v) { return __sync_sub_and_fetch(v, 1); }
+static inline LONG InterlockedExchangeAdd(volatile LONG* v, LONG a) { return __sync_fetch_and_add(v, a); }
+static inline LONG InterlockedCompareExchange(volatile LONG* v, LONG ex, LONG cmp) { return __sync_val_compare_and_swap(v, cmp, ex); }
+
 // --- Common constants --------------------------------------------------------
 #ifndef TRUE
 #define TRUE  1
