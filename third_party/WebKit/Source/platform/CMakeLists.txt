@@ -71,8 +71,12 @@ list(FILTER BLINK_SUBLAYERS EXCLUDE REGEX "Test\\.cpp$")
 list(FILTER BLINK_SUBLAYERS EXCLUDE REGEX "KURL_new\\.cpp$|KURL_w\\.cpp$")
 # V8 EmbedderHeapTracer API skew (final/virtual): deferred.
 list(FILTER BLINK_HEAP EXCLUDE REGEX "UnifiedHeapController")
-# GPU (Ganesh/GLES2), canvas-layer/compositor, GDI/Win: deferred.
-list(FILTER BLINK_GRAPHICS EXCLUDE REGEX "/gpu/|Canvas2DLayerBridge|Canvas2DLayerManager|GDIPlusInit|GradientGeneratedImage|GraphicsContext|ImageBuffer|ImageBufferSurface|PictureSnapshot|RecordingImageBufferSurface|UnacceleratedImageBufferSurface")
+# Most of graphics/ is skia-2D and compiles clean (GraphicsContext, the
+# *ImageBufferSurface recorders, PictureSnapshot, GradientGeneratedImage, ...).
+# Truly deferred: graphics/gpu (Ganesh/GLES2 not brought up), Canvas2DLayerBridge
+# (WebExternalTextureMailbox::syncPoint API skew), ImageBuffer.cpp (pulls wke ->
+# windows.h), GDIPlusInit (Win-only).
+list(FILTER BLINK_GRAPHICS EXCLUDE REGEX "/gpu/|Canvas2DLayerBridge|GDIPlusInit|/ImageBuffer\\.cpp$")
 # Calendar/date ICU (ucal/udat) + Windows locale: deferred.
 list(FILTER BLINK_TEXT EXCLUDE REGEX "LocaleICU|LocaleWin")
 # Needs the font platform-data backend (CoreText): deferred.
