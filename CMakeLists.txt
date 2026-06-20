@@ -81,6 +81,7 @@ if(MINIBLINK_BUILD_BLINK)
     include(third_party/WebKit/Source/core/blink_core.cmake)  # blink_core archive
     include(third_party/WebKit/Source/web/blink_web.cmake)    # blink_web embedding layer
     include(gen/blink_generated.cmake)                       # generated *Names/Features tables
+    include(gen/blink_bindings.cmake)                        # generated V8 DOM-wrapper bindings
     include(third_party/WebKit/Source/modules/blink_modules.cmake)  # web-platform feature modules
     include(net/net_portable.cmake)                          # portable net/ subset
     add_subdirectory(test/blink)  # smoke test: prove geometry links + computes
