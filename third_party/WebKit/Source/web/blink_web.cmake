@@ -18,7 +18,9 @@ list(FILTER BLINK_WEB_SRC EXCLUDE REGEX "Test\\.cpp$")
 # inspector debugger (v8::NativeWeakMap, removed in 8.7), and WebMutationEvent
 # (missing public header). WebKit.cpp (blink::initialize) and WebLocalFrameImpl
 # now compile and are included.
-list(FILTER BLINK_WEB_SRC EXCLUDE REGEX "DevTools|WebDevTools|InspectorOverlayImplNone|TextFinder\\.cpp$|WebBindings\\.cpp$|WebEmbeddedWorkerImpl\\.cpp$|WebSharedWorkerImpl\\.cpp$|WebMutationEvent\\.cpp$|WebTestingSupport\\.cpp$")
+# Use the real DevToolsEmulator + WebDevToolsAgentImpl; exclude their *None stub
+# variants (would duplicate symbols) and WebDevToolsFrontendImpl (V8 8.7 Delete skew).
+list(FILTER BLINK_WEB_SRC EXCLUDE REGEX "DevToolsEmulatorNone|WebDevToolsAgentImplNone|WebDevToolsFrontendImpl|InspectorOverlayImplNone|TextFinder\\.cpp$|WebBindings\\.cpp$|WebEmbeddedWorkerImpl\\.cpp$|WebSharedWorkerImpl\\.cpp$|WebMutationEvent\\.cpp$|WebTestingSupport\\.cpp$")
 
 add_library(blink_web STATIC ${BLINK_WEB_SRC})
 
