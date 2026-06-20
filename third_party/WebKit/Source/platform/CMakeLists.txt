@@ -1,63 +1,64 @@
-# blink platform (macOS port) — the first blink layer above WTF + skia.
+# blink platform (macOS port) — the first blink layer above WTF + skia + ICU.
 #
-# Starts with platform/geometry: IntRect/FloatRect/FloatPoint/LayoutRect/Region/
-# etc. These are the foundational geometry primitives the rest of blink builds on,
-# and depend only on WTF (already built) and skia (already built). All 15 non-test
-# geometry sources compile unmodified on macOS clang. More platform subdirs
-# (graphics, fonts, text, ...) get appended here as they are brought up.
+# Layering / verification status:
+#   * geometry + math primitives + transforms + graphics value types are
+#     LINK-VERIFIED: the blink_geometry smoke test links and runs them.
+#   * graphics / text / fonts are COMPILE-VERIFIED: every source listed compiles
+#     on macOS clang and lands in the archive, but full-binary linkability of the
+#     GPU (Ganesh/GLES2), Oilpan heap/GC, harfbuzz shaping and CoreText font
+#     backends is deferred — those subsystems are not brought up yet, so files
+#     depending on them are excluded below. As a static archive this is sound:
+#     consumers only pull the objects they reference.
+#
+# ICU: the in-tree third_party/icu is headers-only (no sources, no data). On
+# macOS we use the system libicucore, which exports UNVERSIONED symbols, so the
+# headers are told not to version-rename (U_DISABLE_RENAMING=1). blink's ICU use
+# here is the stable C API (uscript_*, u_charType, unorm_normalize, ...).
 
 set(BSRC "${CMAKE_CURRENT_SOURCE_DIR}")              # .../WebKit/Source/platform
 set(WK   "${CMAKE_SOURCE_DIR}/third_party/WebKit")
 set(WSRC "${WK}/Source")
-set(SK   "${CMAKE_SOURCE_DIR}/third_party/skia")
 
-set(BLINK_GEOMETRY_SOURCES
-    geometry/DoublePoint.cpp
-    geometry/DoubleRect.cpp
-    geometry/DoubleSize.cpp
-    geometry/FloatPoint.cpp
-    geometry/FloatPoint3D.cpp
-    geometry/FloatPolygon.cpp
-    geometry/FloatQuad.cpp
-    geometry/FloatRect.cpp
-    geometry/FloatRoundedRect.cpp
-    geometry/FloatSize.cpp
-    geometry/IntRect.cpp
-    geometry/LayoutRect.cpp
-    geometry/LayoutRectOutsets.cpp
-    geometry/Region.cpp
-    geometry/TransformState.cpp
-)
-
-# Math primitives + transforms: Length/Decimal and the 2D/3D transform operations
-# (pure math on top of geometry; no ICU/heap/GC dependencies). Plus the two
-# foundational graphics value types (Color, GraphicsTypes).
-list(APPEND BLINK_GEOMETRY_SOURCES
-    Length.cpp
-    LengthBox.cpp
-    LengthFunctions.cpp
-    Decimal.cpp
-    transforms/AffineTransform.cpp
-    transforms/InterpolatedTransformOperation.cpp
-    transforms/Matrix3DTransformOperation.cpp
-    transforms/MatrixTransformOperation.cpp
-    transforms/PerspectiveTransformOperation.cpp
-    transforms/RotateTransformOperation.cpp
-    transforms/ScaleTransformOperation.cpp
-    transforms/SkewTransformOperation.cpp
-    transforms/TransformationMatrix.cpp
-    transforms/TransformOperations.cpp
+# --- Link-verified core: geometry + primitives + transforms + value types -----
+set(BLINK_CORE_SOURCES
+    geometry/DoublePoint.cpp geometry/DoubleRect.cpp geometry/DoubleSize.cpp
+    geometry/FloatPoint.cpp geometry/FloatPoint3D.cpp geometry/FloatPolygon.cpp
+    geometry/FloatQuad.cpp geometry/FloatRect.cpp geometry/FloatRoundedRect.cpp
+    geometry/FloatSize.cpp geometry/IntRect.cpp geometry/LayoutRect.cpp
+    geometry/LayoutRectOutsets.cpp geometry/Region.cpp geometry/TransformState.cpp
+    Length.cpp LengthBox.cpp LengthFunctions.cpp Decimal.cpp
+    transforms/AffineTransform.cpp transforms/InterpolatedTransformOperation.cpp
+    transforms/Matrix3DTransformOperation.cpp transforms/MatrixTransformOperation.cpp
+    transforms/PerspectiveTransformOperation.cpp transforms/RotateTransformOperation.cpp
+    transforms/ScaleTransformOperation.cpp transforms/SkewTransformOperation.cpp
+    transforms/TransformationMatrix.cpp transforms/TransformOperations.cpp
     transforms/TranslateTransformOperation.cpp
-    graphics/Color.cpp
-    graphics/GraphicsTypes.cpp
+    graphics/Color.cpp graphics/GraphicsTypes.cpp
 )
-list(TRANSFORM BLINK_GEOMETRY_SOURCES PREPEND "${BSRC}/")
+list(TRANSFORM BLINK_CORE_SOURCES PREPEND "${BSRC}/")
+
+# --- Compile-verified: graphics / text / fonts (glob, minus deferred deps) -----
+file(GLOB BLINK_GRAPHICS "${BSRC}/graphics/*.cpp")
+file(GLOB BLINK_TEXT     "${BSRC}/text/*.cpp")
+file(GLOB BLINK_FONTS    "${BSRC}/fonts/*.cpp")
+# Unit tests (need gtest) and the value types already in the core list.
+list(FILTER BLINK_GRAPHICS EXCLUDE REGEX "Test\\.cpp$|/Color\\.cpp$|/GraphicsTypes\\.cpp$")
+list(FILTER BLINK_TEXT     EXCLUDE REGEX "Test\\.cpp$")
+list(FILTER BLINK_FONTS    EXCLUDE REGEX "Test\\.cpp$")
+# GPU (Ganesh/GLES2), Oilpan heap, GDI/Win, and a few API-skew files: deferred.
+list(FILTER BLINK_GRAPHICS EXCLUDE REGEX "BitmapImage|Canvas2DLayer|ContentLayerDelegate|GDIPlusInit|GradientGeneratedImage|GraphicsContext|GraphicsLayer|GraphicsLayerDebugInfo|/Image\\.cpp$|ImageBuffer|ImageBufferSurface|PictureSnapshot|RecordingImageBufferSurface|UnacceleratedImageBufferSurface")
+# Calendar/date ICU (ucal/udat) + Windows locale: deferred.
+list(FILTER BLINK_TEXT EXCLUDE REGEX "LocaleICU|LocaleWin|PlatformLocale")
+# Needs the font platform-data backend (CoreText): deferred.
+list(FILTER BLINK_FONTS EXCLUDE REGEX "FontCustomPlatformData")
 
 # base::debug::Alias — a tiny no-op blink references to defeat optimization. Pull
 # the single base file in directly rather than linking the whole base lib for it.
 set(BLINK_BASE_SHIM "${CMAKE_SOURCE_DIR}/orig_chrome/base/debug/alias.cc")
 
-add_library(blink_platform STATIC ${BLINK_GEOMETRY_SOURCES} ${BLINK_BASE_SHIM})
+add_library(blink_platform STATIC
+    ${BLINK_CORE_SOURCES} ${BLINK_GRAPHICS} ${BLINK_TEXT} ${BLINK_FONTS}
+    ${BLINK_BASE_SHIM})
 # alias.cc is plain Chromium base, not WTF: don't force-include WTF's config.h.
 set_source_files_properties("${BLINK_BASE_SHIM}" PROPERTIES COMPILE_OPTIONS "")
 
@@ -71,11 +72,17 @@ target_include_directories(blink_platform PUBLIC
     "${CMAKE_SOURCE_DIR}/orig_chrome")
 
 target_link_libraries(blink_platform PUBLIC wtf skia)
+if(APPLE)
+    # System ICU (unversioned symbols) + CoreText/CoreGraphics for fonts.
+    target_link_libraries(blink_platform PUBLIC
+        icucore "-framework CoreText" "-framework CoreGraphics"
+        "-framework CoreFoundation")
+endif()
 
 # blink/WTF need the config bootstrap force-included; skia needs SK_RELEASE and
 # blink uses __declspec annotations (-fdeclspec) and is built without exceptions.
 target_compile_options(blink_platform PUBLIC -include "${WSRC}/config.h")
-target_compile_definitions(blink_platform PUBLIC OFFICIAL_BUILD)
+target_compile_definitions(blink_platform PUBLIC OFFICIAL_BUILD U_DISABLE_RENAMING=1)
 set_target_properties(blink_platform PROPERTIES CXX_STANDARD 14)
 if(NOT MSVC)
     target_compile_options(blink_platform PRIVATE
