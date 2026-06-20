@@ -120,7 +120,12 @@ endif()
 # blink/WTF need the config bootstrap force-included; skia needs SK_RELEASE and
 # blink uses __declspec annotations (-fdeclspec) and is built without exceptions.
 target_compile_options(blink_platform PUBLIC -include "${WSRC}/config.h")
-target_compile_definitions(blink_platform PUBLIC OFFICIAL_BUILD U_DISABLE_RENAMING=1 INSIDE_BLINK=1)
+# ENABLE_OILPAN=1 makes blink's RefCountedWillBe*/RefPtrWillBeMember transitional
+# types resolve to garbage-collected (Member/GarbageCollectedFinalized). It is an
+# ABI-affecting flag, so it must be identical across platform and core; PUBLIC so
+# blink_core inherits it.
+target_compile_definitions(blink_platform PUBLIC
+    OFFICIAL_BUILD U_DISABLE_RENAMING=1 INSIDE_BLINK=1 ENABLE_OILPAN=1)
 set_target_properties(blink_platform PROPERTIES CXX_STANDARD 14)
 if(NOT MSVC)
     target_compile_options(blink_platform PRIVATE
