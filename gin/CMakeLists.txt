@@ -26,22 +26,20 @@ set(GIN_SOURCES
     v8_initializer_empty.cc
     wrapper_info.cc
     wrappable.cc
+    modules/console.cc
+    modules/file_module_provider.cc
     modules/module_registry.cc
     modules/module_runner_delegate.cc
     modules/timer.cc
 )
 
-# --- Remaining 4 files, blocked by SUBSYSTEMS not yet brought up on macOS (NOT
-#     V8): array_buffer + memory_dump need WebKit/WTF (wtf/Assertions.h) and
-#     base/trace_event; console + file_module_provider need base string_split
-#     (JoinString/SplitString, whose 8.7-era signatures differ). Re-enable as
-#     those are brought up (Phases 9-10).
+# --- Remaining 3 files, blocked by SUBSYSTEMS not yet brought up on macOS (NOT
+#     V8): they need WebKit/WTF, base/trace_event, and blink's Platform. Re-enable
+#     as those subsystems are brought up (Phases 9-10).
 set(GIN_SOURCES_SUBSYSTEM_DEP
     array_buffer.cc                      # WebKit/WTF ArrayBufferContents
     v8_isolate_memory_dump_provider.cc   # base/trace_event
     v8_platform.cc                       # blink Platform
-    modules/console.cc                   # base::JoinString
-    modules/file_module_provider.cc      # base::SplitString
 )
 
 add_library(gin STATIC ${GIN_SOURCES})

@@ -20,8 +20,9 @@ void AttempToLoadModule(const base::WeakPtr<Runner>& runner,
   if (!runner)
     return;
 
-  std::vector<std::string> components;
-  base::SplitString(id, '/', &components);
+  // V8/Chromium 8.7-era SplitString returns the vector (was a void out-param).
+  std::vector<std::string> components =
+      base::SplitString(id, "/", base::KEEP_WHITESPACE, base::SPLIT_WANT_ALL);
 
   base::FilePath path;
   for (size_t i = 0; i < components.size(); ++i) {

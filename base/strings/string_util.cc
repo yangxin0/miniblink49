@@ -168,6 +168,16 @@ string16 ASCIIToUTF16(const std::string& ascii) {
     return out;
 }
 
+std::string JoinString(const std::vector<std::string>& parts, char separator) {
+    std::string result;
+    for (size_t i = 0; i < parts.size(); ++i) {
+        if (i != 0)
+            result += separator;
+        result += parts[i];
+    }
+    return result;
+}
+
 // UTF-8 -> UTF-16 (string16), encoding surrogate pairs for cp > 0xFFFF.
 string16 UTF8ToUTF16(const std::string& utf8) {
     string16 out;

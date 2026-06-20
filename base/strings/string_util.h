@@ -8,6 +8,7 @@
 #define BASE_STRINGS_STRING_UTIL_H_
 
 #include <string>
+#include <vector>
 // Use the canonical, platform-conditional string16/char16 definition rather
 // than redefining it here (which broke on macOS, where wchar_t is 32-bit).
 #include "base/strings/string16.h"
@@ -104,6 +105,9 @@ std::string UTF16ToUTF8(const string16& utf16);
 string16 UTF8ToUTF16(const std::string& utf8);
 string16 WideToUTF16(const std::wstring& wide);
 string16 ASCIIToUTF16(const std::string& ascii);
+
+// Join the parts with a single-character separator.
+std::string JoinString(const std::vector<std::string>& parts, char separator);
 
 }
 
