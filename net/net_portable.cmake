@@ -15,7 +15,7 @@ set(NETSRC "${CMAKE_SOURCE_DIR}/net")
 
 file(GLOB NET_PORTABLE_SRC "${NETSRC}/*.cpp")
 list(FILTER NET_PORTABLE_SRC EXCLUDE REGEX "Test\\.cpp$")
-list(FILTER NET_PORTABLE_SRC EXCLUDE REGEX "ActivatingObjCheck|BlobResourceLoader|CurlCacheEntry|DefaultFullPath|FileSystemWin|PageNetExtraData|PathWalker|SharedMemoryReceivedDataFactory|SSLHandle|WebURLLoaderManager|WebURLLoaderWinINet")
+list(FILTER NET_PORTABLE_SRC EXCLUDE REGEX "BlobResourceLoader|CurlCacheEntry|DefaultFullPath|FileSystemWin|PageNetExtraData|PathWalker|SharedMemoryReceivedDataFactory|SSLHandle|WebURLLoaderManager|WebURLLoaderWinINet")
 
 add_library(net_portable STATIC ${NET_PORTABLE_SRC})
 target_link_libraries(net_portable PUBLIC blink_platform)

@@ -64,7 +64,7 @@ bool ActivatingObjCheck::isActivatingLocked(intptr_t loader)
 
 int ActivatingObjCheck::genId()
 {
-    InterlockedIncrement((long *)&m_newestId);
+    InterlockedIncrement((LONG *)&m_newestId);  // LONG is 32-bit; macOS long is 64-bit
     return m_newestId;
 }
 

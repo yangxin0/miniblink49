@@ -176,6 +176,20 @@ static inline void OutputDebugStringW(const wchar_t* s) {
     for (const wchar_t* p = s; *p; ++p) fputc((int)(*p & 0x7F), stderr);
 }
 
+// Wide fopen / file move used by net/ — convert the wide (ASCII) paths and defer
+// to the posix calls.
+static inline void mb_wide_to_narrow_(const wchar_t* w, char* out, size_t cap) {
+    size_t i = 0; for (; w && w[i] && i < cap - 1; ++i) out[i] = (char)w[i]; out[i] = 0;
+}
+static inline FILE* _wfopen(const wchar_t* path, const wchar_t* mode) {
+    char p[1024], m[16]; mb_wide_to_narrow_(path, p, sizeof(p)); mb_wide_to_narrow_(mode, m, sizeof(m));
+    return fopen(p, m);
+}
+static inline BOOL MoveFileExW(const wchar_t* from, const wchar_t* to, DWORD) {
+    char a[1024], b[1024]; mb_wide_to_narrow_(from, a, sizeof(a)); mb_wide_to_narrow_(to, b, sizeof(b));
+    return rename(a, b) == 0;
+}
+
 // --- Common constants --------------------------------------------------------
 #ifndef TRUE
 #define TRUE  1
