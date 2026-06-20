@@ -31,6 +31,12 @@
 #include "unicode/utf16.h"
 #endif
 
+// These are C functions implemented by the system libicucore (unversioned,
+// U_DISABLE_RENAMING); they must have C linkage so blink/harfbuzz references match.
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 int8_t u_charType(UChar32 c);
 
 /**
@@ -958,5 +964,9 @@ UChar32 u_charMirror(UChar32 c);
 int32_t u_getIntPropertyValue(UChar32 c, UProperty which);
 const char* uscript_getShortName(UScriptCode scriptCode);
 #endif // MINIBLINK_HARFBUZZ_ICU
+
+#ifdef __cplusplus
+}  // extern "C"
+#endif
 
 #endif // UCHAR_H
