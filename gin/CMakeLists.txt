@@ -33,16 +33,23 @@ set(GIN_SOURCES
     modules/timer.cc
 )
 
-# --- Remaining 3 files, blocked by SUBSYSTEMS not yet brought up on macOS (NOT
-#     V8): they need WebKit/WTF, base/trace_event, and blink's Platform. Re-enable
-#     as those subsystems are brought up (Phases 9-10).
+# array_buffer.cc uses WebKit/WTF (ArrayBufferContents); now that WTF builds, it
+# compiles — but it needs WTF's config/flags, applied per-file below.
+list(APPEND GIN_SOURCES array_buffer.cc)
+
+# --- Remaining 2 files, blocked by SUBSYSTEMS not yet brought up on macOS (NOT
+#     V8): base/trace_event and blink's Platform. Re-enable as those land.
 set(GIN_SOURCES_SUBSYSTEM_DEP
-    array_buffer.cc                      # WebKit/WTF ArrayBufferContents
     v8_isolate_memory_dump_provider.cc   # base/trace_event
     v8_platform.cc                       # blink Platform
 )
 
 add_library(gin STATIC ${GIN_SOURCES})
+
+# array_buffer.cc pulls WTF headers: needs the WTF config force-include + WTF's
+# build flags (which the other gin files don't).
+set_source_files_properties(array_buffer.cc PROPERTIES COMPILE_OPTIONS
+    "-include;${CMAKE_SOURCE_DIR}/third_party/WebKit/Source/config.h;-fdeclspec;-DOFFICIAL_BUILD")
 
 target_include_directories(gin PRIVATE
     "${CMAKE_SOURCE_DIR}"                              # gin/..., base/... (root base wins)
