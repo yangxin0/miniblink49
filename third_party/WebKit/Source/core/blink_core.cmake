@@ -41,7 +41,7 @@ list(FILTER BLINK_CORE_SRC EXCLUDE REGEX "CustomElementNone\\.cpp$|FileInputType
 # layout: non-mac platform themes (we keep LayoutThemeMac). LayoutText/LayoutReplaced recovered.
 list(FILTER BLINK_CORE_SRC EXCLUDE REGEX "LayoutTheme(Android|Default|Linux|Win|FontProviderWin)\\.cpp$")
 # fetch: resource subclasses with API skews (ScriptResource recovered; these 2 deferred).
-list(FILTER BLINK_CORE_SRC EXCLUDE REGEX "CSSStyleSheetResource\\.cpp$|ImageResource\\.cpp$")
+list(FILTER BLINK_CORE_SRC EXCLUDE REGEX "/CSSStyleSheetResource\\.cpp$|/ImageResource\\.cpp$")
 # paint: non-mac theme painter (we keep the mac path).
 list(FILTER BLINK_CORE_SRC EXCLUDE REGEX "ThemePainterDefault\\.cpp$")
 # workers: threading-proxy files with API skews (deferred).
