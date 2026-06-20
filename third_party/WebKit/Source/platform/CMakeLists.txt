@@ -45,11 +45,18 @@ file(GLOB BLINK_HEAP     "${BSRC}/heap/*.cpp")
 file(GLOB BLINK_GRAPHICS "${BSRC}/graphics/*.cpp")
 file(GLOB BLINK_TEXT     "${BSRC}/text/*.cpp")
 file(GLOB BLINK_FONTS    "${BSRC}/fonts/*.cpp")
+# More platform sublayers the link needs (all compile clean on macOS): scroll
+# (ScrollableArea/Scrollbar), network (ResourceRequest/Response), mhtml,
+# mediastream.
+file(GLOB BLINK_SUBLAYERS
+    "${BSRC}/scroll/*.cpp" "${BSRC}/network/*.cpp"
+    "${BSRC}/mhtml/*.cpp" "${BSRC}/mediastream/*.cpp")
 # Unit tests (gtest) and the value types already in the core list.
-list(FILTER BLINK_HEAP     EXCLUDE REGEX "Test\\.cpp$|RunAllTests\\.cpp$")
-list(FILTER BLINK_GRAPHICS EXCLUDE REGEX "Test\\.cpp$|/Color\\.cpp$|/GraphicsTypes\\.cpp$")
-list(FILTER BLINK_TEXT     EXCLUDE REGEX "Test\\.cpp$")
-list(FILTER BLINK_FONTS    EXCLUDE REGEX "Test\\.cpp$")
+list(FILTER BLINK_HEAP      EXCLUDE REGEX "Test\\.cpp$|RunAllTests\\.cpp$")
+list(FILTER BLINK_GRAPHICS  EXCLUDE REGEX "Test\\.cpp$|/Color\\.cpp$|/GraphicsTypes\\.cpp$")
+list(FILTER BLINK_TEXT      EXCLUDE REGEX "Test\\.cpp$")
+list(FILTER BLINK_FONTS     EXCLUDE REGEX "Test\\.cpp$")
+list(FILTER BLINK_SUBLAYERS EXCLUDE REGEX "Test\\.cpp$")
 # V8 EmbedderHeapTracer API skew (final/virtual): deferred.
 list(FILTER BLINK_HEAP EXCLUDE REGEX "UnifiedHeapController")
 # GPU (Ganesh/GLES2), canvas-layer/compositor, GDI/Win: deferred.
@@ -93,7 +100,7 @@ set(BLINK_BASE_SHIM "${CMAKE_SOURCE_DIR}/orig_chrome/base/debug/alias.cc")
 
 add_library(blink_platform STATIC
     ${BLINK_CORE_SOURCES} ${BLINK_HEAP} ${BLINK_GRAPHICS} ${BLINK_TEXT}
-    ${BLINK_FONTS} ${BLINK_INFRA_SOURCES} ${BLINK_BASE_SHIM})
+    ${BLINK_FONTS} ${BLINK_SUBLAYERS} ${BLINK_INFRA_SOURCES} ${BLINK_BASE_SHIM})
 # alias.cc is plain Chromium base, not WTF: don't force-include WTF's config.h.
 set_source_files_properties("${BLINK_BASE_SHIM}" PROPERTIES COMPILE_OPTIONS "")
 
