@@ -85,15 +85,12 @@ set(BLINK_INFRA_SOURCES
     PartitionAllocMemoryDumpProvider.cpp
     WebScheduler.cpp
     EventTracer.cpp
-    exported/Platform.cpp
-    exported/WebCommon.cpp
-    exported/WebString.cpp
-    exported/WebCString.cpp
-    exported/WebTraceLocation.cpp
-    exported/WebMemoryDumpProvider.cpp
-    exported/WebConvertableToTraceFormat.cpp
 )
 list(TRANSFORM BLINK_INFRA_SOURCES PREPEND "${BSRC}/")
+# The exported/ Web* wrappers (WebURLRequest/Response, WebData, WebURL, ...) are the
+# public-API surface blink links against: all 88 compile clean on macOS. Glob them.
+file(GLOB BLINK_EXPORTED "${BSRC}/exported/*.cpp")
+list(FILTER BLINK_EXPORTED EXCLUDE REGEX "Test\\.cpp$")
 
 # Oilpan conservative stack scanning needs an arch-specific register-save asm
 # routine (pushAllRegisters). The in-tree SaveRegisters_arm64.S is ELF-only;
@@ -112,7 +109,8 @@ set(BLINK_BASE_SHIM "${CMAKE_SOURCE_DIR}/orig_chrome/base/debug/alias.cc")
 
 add_library(blink_platform STATIC
     ${BLINK_CORE_SOURCES} ${BLINK_HEAP} ${BLINK_GRAPHICS} ${BLINK_TEXT}
-    ${BLINK_FONTS} ${BLINK_SUBLAYERS} ${BLINK_INFRA_SOURCES} ${BLINK_BASE_SHIM})
+    ${BLINK_FONTS} ${BLINK_SUBLAYERS} ${BLINK_INFRA_SOURCES} ${BLINK_EXPORTED}
+    ${BLINK_BASE_SHIM})
 # alias.cc is plain Chromium base, not WTF: don't force-include WTF's config.h.
 set_source_files_properties("${BLINK_BASE_SHIM}" PROPERTIES COMPILE_OPTIONS "")
 
