@@ -60,7 +60,11 @@ public:
 
     void setReference(v8::Isolate* isolate, const v8::Persistent<v8::Object>& parent, KeyType* key)
     {
+#if V8_MAJOR_VERSION < 8
         m_map.SetReference(key, parent);
+#else
+        (void)isolate; (void)parent; (void)key;  // removed GC hint; see ScopedPersistent
+#endif
     }
 
     bool containsKey(KeyType* key)

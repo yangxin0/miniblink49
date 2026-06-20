@@ -606,7 +606,7 @@ Vector<RefPtr<T>> toRefPtrNativeArrayUnchecked(v8::Local<v8::Value> v8Value, uin
     Vector<RefPtr<T>> result;
     result.reserveInitialCapacity(length);
     v8::Local<v8::Object> object = v8::Local<v8::Object>::Cast(v8Value);
-    v8::TryCatch block;
+    v8::TryCatch block(isolate);  // V8 8.7 requires an isolate
     for (uint32_t i = 0; i < length; ++i) {
         v8::Local<v8::Value> element;
         if (!v8Call(object->Get(isolate->GetCurrentContext(), i), element, block)) {
@@ -705,7 +705,7 @@ WillBeHeapVector<RefPtrWillBeMember<T>> toRefPtrWillBeMemberNativeArray(v8::Loca
     WillBeHeapVector<RefPtrWillBeMember<T>> result;
     result.reserveInitialCapacity(length);
     v8::Local<v8::Object> object = v8::Local<v8::Object>::Cast(v8Value);
-    v8::TryCatch block;
+    v8::TryCatch block(isolate);  // V8 8.7 requires an isolate
     for (uint32_t i = 0; i < length; ++i) {
         v8::Local<v8::Value> element;
         if (!v8Call(object->Get(isolate->GetCurrentContext(), i), element, block)) {
@@ -989,7 +989,8 @@ v8::Local<v8::Function> getBoundFunction(v8::Local<v8::Function>);
 // Attaches |environment| to |function| and returns it.
 inline v8::Local<v8::Function> createClosure(v8::FunctionCallback function, v8::Local<v8::Value> environment, v8::Isolate* isolate)
 {
-    return v8::Function::New(isolate, function, environment);
+    // V8 8.7: Function::New takes a context and returns a MaybeLocal.
+    return v8::Function::New(isolate->GetCurrentContext(), function, environment).ToLocalChecked();
 }
 
 // FIXME: This will be soon embedded in the generated code.

@@ -59,7 +59,14 @@ typedef void (*InstallConditionallyEnabledPropertiesFunction)(v8::Local<v8::Obje
 
 inline void setObjectGroup(v8::Isolate* isolate, ScriptWrappable* scriptWrappable, const v8::Persistent<v8::Object>& wrapper)
 {
+#if V8_MAJOR_VERSION < 8
     isolate->SetObjectGroupId(wrapper, v8::UniqueId(reinterpret_cast<intptr_t>(scriptWrappable)));
+#else
+    // V8 8.7 removed the object-grouping GC API (SetObjectGroupId); DOM-wrapper
+    // liveness now flows through wrapper tracing (EmbedderHeapTracer). That
+    // migration is not yet wired up, so this is a no-op for now.
+    (void)isolate; (void)scriptWrappable; (void)wrapper;
+#endif
 }
 
 // This struct provides a way to store a bunch of information that is helpful when unwrapping
@@ -115,8 +122,11 @@ struct WrapperTypeInfo {
     void configureWrapper(v8::PersistentBase<v8::Object>* wrapper) const
     {
         wrapper->SetWrapperClassId(wrapperClassId);
+#if V8_MAJOR_VERSION < 8
+        // V8 8.7 removed PersistentBase::MarkIndependent (a GC scheduling hint).
         if (lifetime == Independent)
             wrapper->MarkIndependent();
+#endif
     }
 
 #if V8_MAJOR_VERSION >= 7

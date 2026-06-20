@@ -43,6 +43,12 @@ namespace WTF {
 class TextEncoding;
 }
 
+// On macOS (USE(CF)) KURL has CFURLRef converters. Forward-declare the type so
+// the header compiles without pulling in the full CoreFoundation umbrella.
+#if USE(CF)
+typedef const struct __CFURL* CFURLRef;
+#endif
+
 using namespace WTF;
 
 namespace blink {

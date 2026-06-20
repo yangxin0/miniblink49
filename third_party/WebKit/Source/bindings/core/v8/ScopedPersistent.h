@@ -93,7 +93,13 @@ public:
 
     void setReference(const v8::Persistent<v8::Object>& parent, v8::Isolate* isolate)
     {
+#if V8_MAJOR_VERSION < 8
         isolate->SetReference(parent, m_handle);
+#else
+        // V8 8.7 removed Isolate::SetReference (an object-grouping GC hint);
+        // wrapper relationships now flow through wrapper tracing.
+        (void)parent; (void)isolate;
+#endif
     }
 
     bool operator==(const ScopedPersistent<T>& other)
