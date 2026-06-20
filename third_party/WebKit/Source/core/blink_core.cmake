@@ -17,7 +17,10 @@ set(CSRC "${CMAKE_SOURCE_DIR}/third_party/WebKit/Source/core")
 # same V8 8.7 + Oilpan migration. Glob each and drop the per-dir stragglers:
 # gtest helpers, non-mac platform themes, GPU/plugin and a couple of API-skew
 # files (handled in a later pass).
-file(GLOB BLINK_CORE_SRC
+# GLOB_RECURSE to also pick up the nested subdirs (css/resolver, layout/svg,
+# layout/line, dom/custom, paint/..., svg/graphics, ...) — ~412 files the earlier
+# non-recursive globs missed, a large slice of the link gap.
+file(GLOB_RECURSE BLINK_CORE_SRC
     "${CSRC}/dom/*.cpp"   "${CSRC}/html/*.cpp"  "${CSRC}/css/*.cpp"
     "${CSRC}/layout/*.cpp" "${CSRC}/events/*.cpp" "${CSRC}/frame/*.cpp"
     "${CSRC}/page/*.cpp"  "${CSRC}/style/*.cpp" "${CSRC}/animation/*.cpp"
@@ -31,6 +34,8 @@ file(GLOB BLINK_CORE_SRC
 list(FILTER BLINK_CORE_SRC EXCLUDE REGEX "Test\\.cpp$|TestHelper\\.cpp$")
 # html: plugin element (GPU/plugin host) + a generated-in straggler.
 list(FILTER BLINK_CORE_SRC EXCLUDE REGEX "HTMLPlugInElement\\.cpp$|HTMLMetaElement-in\\.cpp$")
+# nested-subdir stragglers (4 of ~320): API skews / platform variants.
+list(FILTER BLINK_CORE_SRC EXCLUDE REGEX "CustomElementNone\\.cpp$|FileInputType\\.cpp$|HTMLParserScheduler\\.cpp$|CanvasRenderingContextFactory\\.cpp$")
 # layout: non-mac platform themes (we keep LayoutThemeMac) + 2 API-skew files.
 list(FILTER BLINK_CORE_SRC EXCLUDE REGEX "LayoutTheme(Android|Default|Linux|Win|FontProviderWin)\\.cpp$")
 list(FILTER BLINK_CORE_SRC EXCLUDE REGEX "LayoutReplaced\\.cpp$|LayoutText\\.cpp$")
