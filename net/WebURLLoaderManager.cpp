@@ -38,8 +38,13 @@
 #define PURE = 0
 #endif
 
+#if defined(_WIN32)
 #include <shlobj.h>
 #include <shlwapi.h>
+#else
+#include <mach-o/dyld.h>   // _NSGetExecutablePath
+#include <unistd.h>        // access
+#endif
 
 #include "config.h"
 #include "net/WebURLLoaderManager.h"
@@ -242,6 +247,7 @@ WebURLLoaderManager* WebURLLoaderManager::m_sharedInstance = nullptr;
 
 static std::string getDefaultCookiesFullpath()
 {
+#if defined(_WIN32)
     std::vector<wchar_t> path;
     path.resize(MAX_PATH + 1);
     memset(&path[0], 0, sizeof(wchar_t) * (MAX_PATH + 1));
@@ -253,6 +259,18 @@ static std::string getDefaultCookiesFullpath()
     WTF::WCharToMByte(&path[0], wcslen(&path[0]), &pathStrA, CP_UTF8);
 
     return std::string(&pathStrA[0], pathStrA.size());
+#else
+    // macOS: cookies.dat next to the executable.
+    char exePath[4096];
+    uint32_t size = sizeof(exePath);
+    if (_NSGetExecutablePath(exePath, &size) != 0)
+        return std::string("cookies.dat");
+    std::string dir(exePath);
+    size_t slash = dir.find_last_of('/');
+    if (slash != std::string::npos)
+        dir.resize(slash);
+    return dir + "/cookies.dat";
+#endif
 }
 
 WebURLLoaderManager* WebURLLoaderManager::sharedInstance()
@@ -1244,8 +1262,13 @@ static bool isLocalFileNotExist(const char* urlTrim, WebURLLoaderInternal* job)
         url = url.substring(0, questionMarkPos);
 
     bool result = false;
+#if defined(_WIN32)
     Vector<UChar> buf = WTF::ensureUTF16UChar(url, true);
     result = !::PathFileExistsW(buf.data());
+#else
+    Vector<char> utf8 = WTF::ensureStringToUTF8(url, true);
+    result = (access(utf8.data(), F_OK) != 0);  // true == file does NOT exist
+#endif
     if (!result)
         return false;
 

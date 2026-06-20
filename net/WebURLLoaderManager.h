@@ -56,6 +56,7 @@ namespace net {
 class JobHead;
 class WebURLLoaderInternal;
 class WebURLLoaderManager;
+class WebURLLoaderManagerMainTask;
 class WebCookieJarImpl;
 struct BlobTempFileInfo;
 struct InitializeHandleInfo;
@@ -118,8 +119,8 @@ public:
     String handleHeaderForBlobOnMainThread(WebURLLoaderInternal* job, size_t totalSize);
 
     enum IoThreadType {
-        kIoThreadTypeRes, // Í¼Æ¬µÈ×ÊÔ´ÀàÐÍ
-        kIoThreadTypeSync, // Í¬²½×ÊÔ´
+        kIoThreadTypeRes, // Í¼Æ¬ï¿½ï¿½ï¿½ï¿½Ô´ï¿½ï¿½ï¿½ï¿½
+        kIoThreadTypeSync, // Í¬ï¿½ï¿½ï¿½ï¿½Ô´
         kIoThreadTypeOther,
     };
 

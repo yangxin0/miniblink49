@@ -171,6 +171,10 @@ static inline int MessageBoxA(HWND, const char* text, const char* caption, unsig
     fprintf(stderr, "[MessageBox] %s: %s\n", caption ? caption : "", text ? text : "");
     return 0;
 }
+static inline void OutputDebugStringW(const wchar_t* s) {
+    if (!s) return;
+    for (const wchar_t* p = s; *p; ++p) fputc((int)(*p & 0x7F), stderr);
+}
 
 // --- Common constants --------------------------------------------------------
 #ifndef TRUE
