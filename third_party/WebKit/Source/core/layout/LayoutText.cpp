@@ -1675,6 +1675,19 @@ int LayoutText::previousOffset(int current) const
 
 #if OS(POSIX)
 
+// On macOS the ICU char-type API (u_charType, U_*_MARK) and the U16_FWD_1_UNSAFE
+// macro are not pulled in transitively the way they are on the Windows build, so
+// include/define them here. Not a V8-version change; needed wherever this POSIX
+// block is actually compiled.
+#include "third_party/icu/source/common/unicode/uchar.h"
+#if !defined(U16_FWD_1_UNSAFE)
+#define U16_FWD_1_UNSAFE(s, i) { \
+    if(U16_IS_LEAD((s)[(i)++])) { \
+        ++(i); \
+    } \
+}
+#endif
+
 #define HANGUL_CHOSEONG_START (0x1100)
 #define HANGUL_CHOSEONG_END (0x115F)
 #define HANGUL_JUNGSEONG_START (0x1160)

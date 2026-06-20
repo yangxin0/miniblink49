@@ -33,7 +33,22 @@
 #include "platform/MIMETypeRegistry.h"
 #include "platform/SharedBuffer.h"
 #include "platform/network/HTTPParsers.h"
+#include "v8-version.h"
+#if V8_MAJOR_VERSION < 8
 #include "wke/wkeGlobalVar.h"
+#else
+// wke/wkeGlobalVar.h pulls in wke.h -> wkedefine.h -> <windows.h>, which is
+// unavailable on macOS. Only g_disableDownloadMask and kDisableScriptDownload
+// are needed here, so forward-declare them to avoid the windows.h dependency.
+namespace wke {
+enum DisableDownloadType {
+    kDisableImageDownload = 1 << 0,
+    kDisableScriptDownload = 1 << 1,
+    kDisableCssDownload = 1 << 2
+};
+extern int g_disableDownloadMask;
+}
+#endif
 
 namespace blink {
 

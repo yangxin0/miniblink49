@@ -35,7 +35,25 @@
 #include "platform/LengthFunctions.h"
 
 #ifndef MINIBLINK_NO_CHANGE
+#if defined(_WIN32)
 #include "wke/wkeGlobalVar.h"
+#else
+// macOS port: wke/wkeGlobalVar.h pulls in wke/wkedefine.h -> <windows.h>, which is
+// not available here. Only wke::g_wkeMediaPlayerFactory is needed below (tested for
+// non-null), so forward-declare just the typedef + global instead of the full header.
+namespace wke {
+class CWebView;
+class WkeMediaPlayer;
+class WkeMediaPlayerClient;
+}
+typedef wke::CWebView* wkeWebView;
+typedef wke::WkeMediaPlayer* wkeMediaPlayer;
+typedef wke::WkeMediaPlayerClient* wkeMediaPlayerClient;
+typedef wkeMediaPlayer(*wkeMediaPlayerFactory)(wkeWebView webView, wkeMediaPlayerClient client, void* npBrowserFuncs, void* npPluginFuncs);
+namespace wke {
+extern wkeMediaPlayerFactory g_wkeMediaPlayerFactory;
+}
+#endif
 #endif
 
 namespace blink {

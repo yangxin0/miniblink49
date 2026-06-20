@@ -104,7 +104,12 @@ static PassRefPtr<TypeBuilder::Profiler::CPUProfileNode> buildInspectorObjectFor
         .setLineNumber(node->GetLineNumber())
         .setColumnNumber(node->GetColumnNumber())
         .setHitCount(node->GetHitCount())
+#if V8_MAJOR_VERSION < 8
         .setCallUID(node->GetCallUid())
+#else
+        // GetCallUid() was removed in V8 8.x; use the unique node id instead.
+        .setCallUID(node->GetNodeId())
+#endif
         .setChildren(children.release())
         .setPositionTicks(positionTicks.release())
         .setDeoptReason(node->GetBailoutReason())

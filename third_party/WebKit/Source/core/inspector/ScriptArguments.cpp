@@ -128,7 +128,16 @@ private:
         for (uint32_t i = 0; i < length; ++i) {
             if (i)
                 m_builder.append(',');
-            if (!append(array->Get(i), IgnoreNull | IgnoreUndefined)) {
+#if V8_MAJOR_VERSION<8
+            v8::Local<v8::Value> arrayItem = array->Get(i);
+#else
+            v8::Local<v8::Value> arrayItem;
+            if (!array->Get(m_isolate->GetCurrentContext(), i).ToLocal(&arrayItem)) {
+                result = false;
+                break;
+            }
+#endif
+            if (!append(arrayItem, IgnoreNull | IgnoreUndefined)) {
                 result = false;
                 break;
             }

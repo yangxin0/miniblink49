@@ -26,6 +26,8 @@
 #include "config.h"
 #include "KURL.h"
 
+#include <v8-version.h>
+
 #include <stdio.h>
 #include <wtf/HashMap.h>
 #include <wtf/HexNumber.h>
@@ -346,12 +348,21 @@ void KURL::invalidate()
     m_fragmentEnd = 0;
 }
 
+#if V8_MAJOR_VERSION<8
 KURL::KURL(ParsedURLStringTag tag, const char* url)
 {
     this->KURL::KURL(tag, String(url));
 
     ASSERT(m_string.is8Bit());
 }
+#else
+KURL::KURL(ParsedURLStringTag tag, const char* url)
+{
+    new (this) KURL(tag, String(url));
+
+    ASSERT(m_string.is8Bit());
+}
+#endif
 
 static bool needInserFileHead(const String& url)
 {
@@ -875,7 +886,7 @@ String KURL::query() const
 String KURL::path() const
 {
     String path = decodeURLEscapeSequences(m_string.substring(m_portEnd, m_pathEnd - m_portEnd));
-    // Õâ¸öº¯Êý»á¸øv8ÓÃ£¬blinkÔÚ´¦Àí´«¸øv8µÄ×Ö·û´®µÄÊ±ºò£¬Ö»ÒªÊÇ¸´ÔÓ×Ö·û£¬¶¼ÊÇ16Î»±àÂëµÄ
+    // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½v8ï¿½Ã£ï¿½blinkï¿½Ú´ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½v8ï¿½ï¿½ï¿½Ö·ï¿½ï¿½ï¿½ï¿½ï¿½Ê±ï¿½ï¿½Ö»Òªï¿½Ç¸ï¿½ï¿½ï¿½ï¿½Ö·ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½16Î»ï¿½ï¿½ï¿½ï¿½ï¿½
     return WTF::ensureUTF16String(path);
 }
 
@@ -1096,8 +1107,8 @@ String KURL::prettyURL() const
     return String::adopt(result);
 }
 
-// ÕâÁ½º¯Êý·µ»ØµÄÒ»¶¨ÊÇUTF16£¬2×Ö½ÚµÄ×Ö·û´®£¬ÍâÃæ»¹ÊÇÐèÒªµ÷ÓÃString::utf8()¡£
-// ÒÔÇ°ÊÇÈ·¶¨·µ»Øuf8£¬ÏÖÔÚ¸Ä³É16ÊÇÒòÎªblink·µ»Ø¸øjsµÄ×Ö·û´®£¬Èç¹ûÊÇ¸´ÔÓ×Ö½Ú±ØÐëÊÇ16¡£
+// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Øµï¿½Ò»ï¿½ï¿½ï¿½ï¿½UTF16ï¿½ï¿½2ï¿½Ö½Úµï¿½ï¿½Ö·ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½æ»¹ï¿½ï¿½ï¿½ï¿½Òªï¿½ï¿½ï¿½ï¿½String::utf8()ï¿½ï¿½
+// ï¿½ï¿½Ç°ï¿½ï¿½È·ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½uf8ï¿½ï¿½ï¿½ï¿½ï¿½Ú¸Ä³ï¿½16ï¿½ï¿½ï¿½ï¿½Îªblinkï¿½ï¿½ï¿½Ø¸ï¿½jsï¿½ï¿½ï¿½Ö·ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ç¸ï¿½ï¿½ï¿½ï¿½Ö½Ú±ï¿½ï¿½ï¿½ï¿½ï¿½16ï¿½ï¿½
 String decodeURLEscapeSequences(const String& str)
 {
     return decodeURLEscapeSequences(str, UTF8Encoding());

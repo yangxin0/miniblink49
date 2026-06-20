@@ -117,7 +117,11 @@ void HTMLParserScheduler::resume()
     m_isSuspendedWithActiveTimer = false;
 
     WTF::String out = WTF::String::format("HTMLParserScheduler::resume: %p\n", this);
+#if defined(_WIN32)
     OutputDebugStringW(out.charactersWithNullTermination().data());
+#else
+    OutputDebugStringA(out.utf8().data());
+#endif
 
     Platform::current()->currentThread()->scheduler()->postLoadingTask(
         FROM_HERE, m_cancellableContinueParse.cancelAndCreate());

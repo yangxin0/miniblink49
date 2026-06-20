@@ -140,12 +140,20 @@ public:
             std::string funcNameStr;
 
             if (!scriptName.IsEmpty()) {
+#if V8_MAJOR_VERSION < 8
                 v8::String::Utf8Value scriptNameUtf8(scriptName);
+#else
+                v8::String::Utf8Value scriptNameUtf8(m_isolate, scriptName);
+#endif
                 scriptNameStr = *scriptNameUtf8;
             }
 
             if (!funcName.IsEmpty()) {
+#if V8_MAJOR_VERSION < 8
                 v8::String::Utf8Value funcNameUtf8(funcName);
+#else
+                v8::String::Utf8Value funcNameUtf8(m_isolate, funcName);
+#endif
                 funcNameStr = *funcNameUtf8;
             }
 

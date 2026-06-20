@@ -161,7 +161,11 @@ void PromiseTracker::didReceiveV8PromiseEvent(ScriptState* scriptState, v8::Loca
     promiseDetails->setStatus(promiseStatus);
 
     if (!parentPromise.IsEmpty() && parentPromise->IsObject()) {
+#if V8_MAJOR_VERSION < 8
         v8::Local<v8::Object> handle = parentPromise->ToObject(scriptState->isolate());
+#else
+        v8::Local<v8::Object> handle = parentPromise->ToObject(scriptState->context()).ToLocalChecked();
+#endif
         bool parentIsNewPromise = false;
         int parentPromiseId = promiseId(handle, &parentIsNewPromise);
         promiseDetails->setParentId(parentPromiseId);

@@ -53,7 +53,11 @@ const char stepOutV8MethodName[] = "stepOutOfFunction";
 v8::MaybeLocal<v8::Value> V8Debugger::callDebuggerMethod(const char* functionName, int argc, v8::Local<v8::Value> argv[])
 {
     v8::Local<v8::Object> debuggerScript = debuggerScriptLocal();
+#if V8_MAJOR_VERSION < 8
     v8::Local<v8::Function> function = v8::Local<v8::Function>::Cast(debuggerScript->Get(v8InternalizedString(functionName)));
+#else
+    v8::Local<v8::Function> function = v8::Local<v8::Function>::Cast(debuggerScript->Get(m_isolate->GetCurrentContext(), v8InternalizedString(functionName)).ToLocalChecked());
+#endif
     ASSERT(m_isolate->InContext());
     return V8ScriptRunner::callInternalFunction(function, debuggerScript, argc, argv, m_isolate);
 }
@@ -541,7 +545,11 @@ void V8Debugger::v8DebugEventCallback(const v8::Debug::EventDetails& eventDetail
 
 v8::Local<v8::Value> V8Debugger::callInternalGetterFunction(v8::Local<v8::Object> object, const char* functionName)
 {
+#if V8_MAJOR_VERSION < 8
     v8::Local<v8::Value> getterValue = object->Get(v8InternalizedString(functionName));
+#else
+    v8::Local<v8::Value> getterValue = object->Get(m_isolate->GetCurrentContext(), v8InternalizedString(functionName)).ToLocalChecked();
+#endif
     ASSERT(!getterValue.IsEmpty() && getterValue->IsFunction());
     return V8ScriptRunner::callInternalFunction(v8::Local<v8::Function>::Cast(getterValue), object, 0, 0, m_isolate).ToLocalChecked();
 }
@@ -630,6 +638,7 @@ void V8Debugger::handleV8PromiseEvent(ScriptDebugListener* listener, ScriptState
 
 ScriptDebugListener::ParsedScript V8Debugger::createParsedScript(v8::Local<v8::Object> object, CompileResult compileResult)
 {
+#if V8_MAJOR_VERSION < 8
     v8::Local<v8::Value> id = object->Get(v8InternalizedString("id"));
     ASSERT(!id.IsEmpty() && id->IsInt32());
 
@@ -647,6 +656,36 @@ ScriptDebugListener::ParsedScript V8Debugger::createParsedScript(v8::Local<v8::O
         .setIsInternalScript(object->Get(v8InternalizedString("isInternalScript"))->ToBoolean(m_isolate)->Value());
     parsedScript.compileResult = compileResult;
     return parsedScript;
+#else
+    v8::Local<v8::Context> context = m_isolate->GetCurrentContext();
+    auto getKey = [&](const char* key) -> v8::Local<v8::Value> {
+        return object->Get(context, v8InternalizedString(key)).ToLocalChecked();
+    };
+    auto getInt = [&](const char* key) -> int64_t {
+        return getKey(key)->ToInteger(context).ToLocalChecked()->Value();
+    };
+    auto getBool = [&](const char* key) -> bool {
+        return getKey(key)->BooleanValue(m_isolate);
+    };
+
+    v8::Local<v8::Value> id = getKey("id");
+    ASSERT(!id.IsEmpty() && id->IsInt32());
+
+    ScriptDebugListener::ParsedScript parsedScript;
+    parsedScript.scriptId = String::number(id->Int32Value(context).FromMaybe(0));
+    parsedScript.script.setURL(toCoreStringWithUndefinedOrNullCheck(getKey("name")))
+        .setSourceURL(toCoreStringWithUndefinedOrNullCheck(getKey("sourceURL")))
+        .setSourceMappingURL(toCoreStringWithUndefinedOrNullCheck(getKey("sourceMappingURL")))
+        .setSource(toCoreStringWithUndefinedOrNullCheck(getKey("source")))
+        .setStartLine(getInt("startLine"))
+        .setStartColumn(getInt("startColumn"))
+        .setEndLine(getInt("endLine"))
+        .setEndColumn(getInt("endColumn"))
+        .setIsContentScript(getBool("isContentScript"))
+        .setIsInternalScript(getBool("isInternalScript"));
+    parsedScript.compileResult = compileResult;
+    return parsedScript;
+#endif
 }
 
 static void functionCallbackImpl(const v8::FunctionCallbackInfo<v8::Value>& info) {
@@ -654,9 +693,13 @@ static void functionCallbackImpl(const v8::FunctionCallbackInfo<v8::Value>& info
     v8::Local<v8::Context> context = isolate->GetCurrentContext();
 
     v8::Local<v8::Value> param0 = info[0];
+#if V8_MAJOR_VERSION < 8
     v8::Local<v8::String> param0V8String = param0->ToString(isolate);
-
     v8::String::Utf8Value param0String(param0V8String);
+#else
+    v8::Local<v8::String> param0V8String = param0->ToString(context).ToLocalChecked();
+    v8::String::Utf8Value param0String(isolate, param0V8String);
+#endif
     const char* str = *param0String;
     OutputDebugStringA("consoleLog:");
     OutputDebugStringA(str);
@@ -678,7 +721,13 @@ static void addFunction(v8::Local<v8::Context> context, const char* name) {
     tmpl->SetCallHandler(functionCallbackImpl, data);
 
     // Retrieve the function object and set the name.
+#if V8_MAJOR_VERSION < 8
     v8::Local<v8::Function> func = tmpl->GetFunction();
+#else
+    v8::Local<v8::Function> func;
+    if (!tmpl->GetFunction(context).ToLocal(&func))
+        return;
+#endif
     if (func.IsEmpty())
         return;
 
@@ -688,7 +737,11 @@ static void addFunction(v8::Local<v8::Context> context, const char* name) {
     v8::Local<v8::String> nameV8Local = nameV8.ToLocalChecked();
     func->SetName(nameV8Local);
 
+#if V8_MAJOR_VERSION < 8
     object->Set(nameV8Local, func);
+#else
+    object->Set(context, nameV8Local, func).Check();
+#endif
 }
 
 void V8Debugger::compileDebuggerScript()
