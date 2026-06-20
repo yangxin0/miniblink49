@@ -15,7 +15,9 @@ list(FILTER BLINK_BINDINGS_INFRA EXCLUDE REGEX "/npruntime\\.cpp$|/NPV8Object\\.
 add_library(blink_bindings_infra STATIC ${BLINK_BINDINGS_INFRA})
 target_link_libraries(blink_bindings_infra PUBLIC blink_core)
 target_include_directories(blink_bindings_infra PUBLIC
-    "${CMAKE_SOURCE_DIR}/third_party/v8shim" "${CMAKE_SOURCE_DIR}/third_party/khronos")
+    "${CMAKE_SOURCE_DIR}/third_party/v8shim" "${CMAKE_SOURCE_DIR}/third_party/khronos"
+    "${CMAKE_SOURCE_DIR}/third_party/npapi"   # bindings/npruntime.h (NP* plugin glue)
+    "${CMAKE_SOURCE_DIR}/win_compat")         # <windows.h> shim (WinINet/NP cookie decls)
 target_compile_definitions(blink_bindings_infra PUBLIC "V8CALL=" ENABLE_WKE=1 BLINK_IMPLEMENTATION=1
     V8_COMPRESS_POINTERS V8_31BIT_SMIS_ON_64BIT_ARCH)
 set_target_properties(blink_bindings_infra PROPERTIES CXX_STANDARD 14)

@@ -52,7 +52,8 @@ target_link_libraries(blink_core PUBLIC blink_platform)
 target_include_directories(blink_core PUBLIC
     "${CMAKE_SOURCE_DIR}/third_party/v8shim"     # v8-debug.h compatibility shim
     "${CMAKE_SOURCE_DIR}/third_party/khronos"    # in-tree GLES2/GLES3/EGL headers
-    "${CMAKE_SOURCE_DIR}/win_compat")            # <windows.h> shim (wke API surface)
+    "${CMAKE_SOURCE_DIR}/win_compat"             # <windows.h> shim (wke API surface)
+    "${CMAKE_SOURCE_DIR}/third_party/npapi")     # bindings/npapi.h (HTMLPlugInElement)
 
 target_compile_definitions(blink_core PUBLIC "V8CALL=" ENABLE_WKE=1)
 

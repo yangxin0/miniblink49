@@ -45,15 +45,32 @@
 #ifndef CALLBACK
 #define CALLBACK
 #endif
+// Win32 API import/export decorations -> no-ops in the shim.
+#ifndef WINBASEAPI
+#define WINBASEAPI
+#endif
+#ifndef WINUSERAPI
+#define WINUSERAPI
+#endif
+#ifndef WINADVAPI
+#define WINADVAPI
+#endif
+#ifndef WINGDIAPI
+#define WINGDIAPI
+#endif
 #endif
 
 // --- Scalar types (Win32 widths) --------------------------------------------
 #ifndef _WINDOWS_SCALARS_DEFINED
 #define _WINDOWS_SCALARS_DEFINED
-// On arm64 macOS <objc/objc.h> defines `typedef bool BOOL` (and sets
-// OBJC_BOOL_DEFINED). When a translation unit pulls in ObjC headers, defer to
-// that definition rather than redefining BOOL as int (which clashes).
-#ifndef OBJC_BOOL_DEFINED
+// BOOL collides with Apple's <objc/objc.h>, which unconditionally typedefs it
+// (`bool` on arm64, `signed char` on legacy Intel) with no suppression guard.
+// Redefining it as `int` here clashes regardless of include order, so on Apple
+// platforms we pull objc.h's canonical BOOL and don't define our own; its
+// width never matters to our (non-Win32-ABI) shim code. Elsewhere use Win32 int.
+#if defined(__APPLE__)
+#include <objc/objc.h>
+#else
 typedef int                 BOOL;
 #endif
 typedef unsigned char       BYTE;

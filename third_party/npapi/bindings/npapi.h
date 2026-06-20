@@ -101,11 +101,19 @@
 #endif
 
 #if defined(XP_MACOSX)
+// CarbonCore's TextCommon.h (pulled in by ApplicationServices / Carbon) defines a
+// global `typedef UInt32 TextEncoding;` that collides with WTF::TextEncoding under
+// blink's `using namespace WTF`. Rename the Carbon symbol to CarbonTextEncoding for
+// the duration of these system-header parses so blink keeps resolving the WTF class;
+// blink never calls the Carbon TextEncoding APIs. (Windows builds use XP_WIN and
+// never reach this block, so their behavior is unchanged.)
+#define TextEncoding CarbonTextEncoding
 #include <ApplicationServices/ApplicationServices.h>
 #include <OpenGL/OpenGL.h>
 #ifndef NP_NO_CARBON
 #include <Carbon/Carbon.h>
 #endif
+#undef TextEncoding
 #endif
 
 #if defined(XP_UNIX)
