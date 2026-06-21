@@ -60,9 +60,17 @@ V8PerContextData::V8PerContextData(v8::Local<v8::Context> context)
 
     v8::Context::Scope contextScope(context);
     ASSERT(m_errorPrototype.isEmpty());
-    v8::Local<v8::Value> objectValue = context->Global()->Get(context, v8AtomicString(m_isolate, "Error")).ToLocalChecked();
-    v8::Local<v8::Value> prototypeValue = objectValue.As<v8::Object>()->Get(context, v8AtomicString(m_isolate, "prototype")).ToLocalChecked();
-    m_errorPrototype.set(m_isolate, prototypeValue);
+    // Cache Error.prototype defensively: on heavy-JS pages the macOS build can reach
+    // here with the global not yet exposing "Error" (or a pending exception), where
+    // ToLocalChecked() would abort via v8::Utils::ReportApiFailure -> blink fatal
+    // handler. Use ToLocal and skip caching rather than crashing the whole process.
+    v8::Local<v8::Value> objectValue;
+    if (context->Global()->Get(context, v8AtomicString(m_isolate, "Error")).ToLocal(&objectValue)
+        && objectValue->IsObject()) {
+        v8::Local<v8::Value> prototypeValue;
+        if (objectValue.As<v8::Object>()->Get(context, v8AtomicString(m_isolate, "prototype")).ToLocal(&prototypeValue))
+            m_errorPrototype.set(m_isolate, prototypeValue);
+    }
 
     if (isMainThread())
         InstanceCounters::incrementCounter(InstanceCounters::V8PerContextDataCounter);
