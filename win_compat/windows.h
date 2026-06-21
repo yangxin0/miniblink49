@@ -231,4 +231,45 @@ static inline BOOL MoveFileExW(const wchar_t* from, const wchar_t* to, DWORD) {
 #define MAX_PATH 260
 #endif
 
+// --- GUI message / window-class types (content/* page-host backend) ----------
+// These are referenced by the Win32 windowing path that the macOS Cocoa backend
+// replaces; declared here so the shared headers parse on macOS. The actual
+// window procedure / paint structs are never invoked on macOS (Cocoa drives it).
+typedef struct tagMSG {
+    HWND   hwnd;
+    UINT   message;
+    WPARAM wParam;
+    LPARAM lParam;
+    DWORD  time;
+    POINT  pt;
+} MSG, *LPMSG, *PMSG;
+
+typedef LRESULT (CALLBACK* WNDPROC)(HWND, UINT, WPARAM, LPARAM);
+
+typedef struct tagPAINTSTRUCT {
+    HDC  hdc;
+    BOOL fErase;
+    RECT rcPaint;
+    BOOL fRestore, fIncUpdate;
+    BYTE rgbReserved[32];
+} PAINTSTRUCT, *LPPAINTSTRUCT;
+
+typedef struct tagWNDCLASSW {
+    UINT      style;
+    WNDPROC   lpfnWndProc;
+    int       cbClsExtra, cbWndExtra;
+    HINSTANCE hInstance;
+    HICON     hIcon;
+    HCURSOR   hCursor;
+    HBRUSH    hbrBackground;
+    LPCWSTR   lpszMenuName, lpszClassName;
+} WNDCLASSW, *LPWNDCLASSW;
+typedef WNDCLASSW WNDCLASS;  // narrow/wide unified on the macOS shim
+
+typedef struct tagTRACKMOUSEEVENT {
+    DWORD cbSize, dwFlags;
+    HWND  hwndTrack;
+    DWORD dwHoverTime;
+} TRACKMOUSEEVENT, *LPTRACKMOUSEEVENT;
+
 #endif // MINIBLINK_WIN_COMPAT_WINDOWS_H_
