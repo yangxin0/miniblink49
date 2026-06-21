@@ -55,7 +55,11 @@ file(GLOB BLINK_SUBLAYERS
     "${BSRC}/scroll/*.cpp" "${BSRC}/network/*.cpp"
     "${BSRC}/mhtml/*.cpp" "${BSRC}/mediastream/*.cpp" "${BSRC}/blob/*.cpp"
     "${BSRC}/plugins/*.cpp" "${BSRC}/clipboard/*.cpp" "${BSRC}/scheduler/*.cpp"
-    "${BSRC}/image-decoders/*.cpp"   # base ImageDecoder/ImageFrame/ImagePlanes (codec subdirs deferred)
+    "${BSRC}/image-decoders/*.cpp" "${BSRC}/image-decoders/gif/*.cpp"
+    "${BSRC}/image-decoders/png/*.cpp" "${BSRC}/image-decoders/webp/*.cpp"
+    "${BSRC}/image-decoders/bmp/*.cpp" "${BSRC}/image-decoders/ico/*.cpp"
+    "${BSRC}/image-decoders/jpeg/*.cpp"          # JPEGImageDecoder excluded below (libjpeg API skew)
+    "${BSRC}/image-encoders/skia/*.cpp"          # PNG/JPEG/WEBP encoders (skia path)
     "${BSRC}/animation/*.cpp"        # TimingFunction (Steps/Linear/CubicBezier vtables)
     "${BSRC}/weborigin/*.cpp"    # KURL recovered; KURL_new/KURL_w variants excluded below
     "${BSRC}/*.cpp")             # platform-root files (JSONValues/Widget/SharedBuffer/DateComponents/...)
@@ -75,6 +79,9 @@ list(FILTER BLINK_SUBLAYERS EXCLUDE REGEX "Test\\.cpp$")
 list(FILTER BLINK_SUBLAYERS EXCLUDE REGEX "KURL_new\\.cpp$|KURL_w\\.cpp$")
 # clipboard: keep the Posix variant; the Win one needs shlwapi.h.
 list(FILTER BLINK_SUBLAYERS EXCLUDE REGEX "ClipboardUtilitiesWin\\.cpp$")
+# image codecs: JPEGImageDecoder has a libjpeg API skew (jpeg_read_* signature);
+# GDIPlus is Win-only. Keep GIF/PNG/WEBP/BMP/ICO decoders + skia encoders.
+list(FILTER BLINK_SUBLAYERS EXCLUDE REGEX "/JPEGImageDecoder\\.cpp$|/GDIPlus")
 # UnifiedHeapController now compiles: migrated to the V8 8.7 EmbedderHeapTracer API
 # (TracePrologue(TraceFlags)/TraceEpilogue(TraceSummary*)/TracedReferenceBase).
 # Most of graphics/ is skia-2D and compiles clean (GraphicsContext, the
@@ -144,11 +151,13 @@ target_include_directories(blink_platform PUBLIC
     "${MINIBLINK_V8_ROOT}/include"              # v8.h (bindings-adjacent headers)
     "${CMAKE_SOURCE_DIR}/third_party/khronos"   # GLES2/* (DragImage and other root files)
     "${CMAKE_SOURCE_DIR}/third_party/harfbuzz-ng/src"  # hb.h (fonts/shaping)
+    "${CMAKE_SOURCE_DIR}/third_party"           # libpng/png.h, libjpeg/jpeglib.h, libwebp/* (image-decoders)
     "${CMAKE_SOURCE_DIR}/third_party/v8shim"    # v8-debug.h shim (plugins/heap pull ScriptState)
     "${CMAKE_SOURCE_DIR}/win_compat"            # <windows.h> shim (ImageBuffer pulls wke)
     "${CMAKE_SOURCE_DIR}/orig_chrome")
 
-target_link_libraries(blink_platform PUBLIC wtf skia harfbuzz)
+target_link_libraries(blink_platform PUBLIC wtf skia harfbuzz
+    miniblink_png miniblink_jpeg miniblink_webp)
 if(APPLE)
     # System ICU (unversioned symbols) + CoreText/CoreGraphics for fonts.
     target_link_libraries(blink_platform PUBLIC

@@ -78,6 +78,7 @@ if(MINIBLINK_BUILD_SKIA)
 endif()
 if(MINIBLINK_BUILD_BLINK)
     include(third_party/harfbuzz-ng/harfbuzz.cmake)          # OpenType text shaper (blink_platform links it)
+    include(third_party/image_codecs.cmake)                  # libpng/libjpeg/libwebp (image-decoders/encoders)
     add_subdirectory(third_party/WebKit/Source/platform)
     include(third_party/WebKit/Source/core/blink_core.cmake)  # blink_core archive
     include(third_party/WebKit/Source/web/blink_web.cmake)    # blink_web embedding layer
