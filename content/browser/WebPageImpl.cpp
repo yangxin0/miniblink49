@@ -177,7 +177,15 @@ WebPageImpl::WebPageImpl(COLORREF bdColor)
         m_ccLayerTreeWrap = new LayerTreeWrap(this, true);
     } else
 #endif
+#if defined(_WIN32)
         m_mcLayerTreeHost = new mc::LayerTreeHost(this, this);
+#else
+        // macOS: run the compositor single-threaded (no uiThreadClient -> no
+        // CompositeThread). The multi-threaded compositor's main<->composite mutex
+        // ordering deadlocks on this port; the single-threaded memory-canvas paint
+        // path drives wkeOnPaintUpdated for the Cocoa host.
+        m_mcLayerTreeHost = new mc::LayerTreeHost(this, nullptr);
+#endif
     m_memoryCanvasForUi = nullptr;
     m_disablePaint = false;
     m_firstDrawCount = 0;

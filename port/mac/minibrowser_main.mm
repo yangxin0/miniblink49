@@ -36,7 +36,13 @@ static NSView* g_contentView = nil;
     int pitch = w * 4;
     static std::vector<unsigned char> buf;
     buf.assign((size_t)pitch * h, 0);
+    static int dr = 0; ++dr;
+    if (dr <= 3) NSLog(@"[minibrowser] drawRect %d: before wkePaint (w=%d h=%d)", dr, w, h);
     wkePaint(g_webView, buf.data(), pitch);
+    if (dr <= 3) {
+        size_t nz = 0; for (size_t i = 0; i < buf.size(); ++i) if (buf[i]) ++nz;
+        NSLog(@"[minibrowser] drawRect %d: after wkePaint, nonzero bytes=%zu", dr, nz);
+    }
 
     CGColorSpaceRef cs = CGColorSpaceCreateDeviceRGB();
     CGContextRef ctx = (CGContextRef)[[NSGraphicsContext currentContext] CGContext];
@@ -94,6 +100,23 @@ int main(int argc, const char** argv) {
         wkeLoadURL(g_webView, url);
 
         NSLog(@"[minibrowser] loading %s", url);
+
+        // Drive the render: each frame, let wke run its pending paint (which fires
+        // onPaintUpdated when the page changes) and mark the view dirty. Without an
+        // active pump the offscreen page never composites and the window stays blank.
+        __block int ticks = 0;
+        [NSTimer scheduledTimerWithTimeInterval:1.0/60.0 repeats:YES block:^(NSTimer*) {
+            ++ticks;
+            if (ticks <= 3) NSLog(@"[minibrowser] tick %d: before wkeRepaintIfNeeded", ticks);
+            wkeRepaintIfNeeded(g_webView);
+            if (ticks <= 3) NSLog(@"[minibrowser] tick %d: after wkeRepaintIfNeeded", ticks);
+            [g_contentView setNeedsDisplay:YES];
+            if (ticks % 60 == 0)
+                NSLog(@"[minibrowser] tick=%d loading=%d complete=%d", ticks,
+                      wkeIsLoading(g_webView), wkeIsLoadingCompleted(g_webView));
+        }];
+        NSLog(@"[minibrowser] timer scheduled, entering run loop");
+
         // Cocoa run loop; blink's scheduler advances via the GCD SharedTimerMac.
         [NSApp run];
     }

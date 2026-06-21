@@ -975,6 +975,12 @@ void LayerTreeHost::requestDrawFrameToRunIntoCompositeThread()
 {
     WTF::Locker<WTF::Mutex> locker(m_compositeMutex);
     if (!m_compositeThread) {
+        // macOS runs single-threaded (no CompositeThread — the multi-threaded
+        // main<->composite mutex ordering deadlocks on this port). The draw
+        // pipeline (preDrawFrame/applyActions/raster) still assumes the threaded
+        // model, so this is a no-op for now; wiring a true single-threaded paint
+        // into m_memoryCanvas is the remaining macOS render task. (Windows keeps
+        // the assert; m_uiThreadClient is null on macOS so it would pass anyway.)
         RELEASE_ASSERT(!m_uiThreadClient);
         return;
     }
