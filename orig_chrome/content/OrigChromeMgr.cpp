@@ -1,4 +1,18 @@
 ﻿
+#if !defined(_WIN32)
+// On macOS, several media headers below (media/base/video_frame.h ->
+// video_types.h -> CoreVideo/CVPixelBuffer.h -> ApplicationServices ->
+// CoreServices/CarbonCore) pull in CarbonCore's global `TextEncoding`
+// typedef. That collides with WTF::TextEncoding, which is already visible
+// here via blink's `using namespace WTF` (config.h is force-included).
+// Pre-import the framework with the Carbon symbol renamed so the later
+// transitive include becomes a no-op (include guards) and never clashes.
+// Same pattern as third_party/WebKit/Source/.../LayoutThemeMac.mm.
+#define TextEncoding CarbonTextEncoding
+#include <CoreServices/CoreServices.h>
+#undef TextEncoding
+#endif
+
 #include "content/OrigChromeMgr.h"
 
 #include "cc/blink/web_compositor_support_impl.h"
@@ -29,7 +43,9 @@
 #include "base/bind.h"
 #include "base/command_line.h"
 #include "base/message_loop/message_loop.h"
+#if defined(_WIN32)
 #include <Shlwapi.h>
+#endif
 
 
 #ifdef _WIN32
@@ -276,6 +292,7 @@ void OrigChromeMgr::createMediaThreadIfNeeded()
     if (m_mediaThread)
         return;
 
+#if defined(_WIN32)
     std::vector<WCHAR> fullpath;
     fullpath.resize(MAX_PATH + 1);
     memset(fullpath.data(), 0, sizeof(wchar_t) * (MAX_PATH + 1));
@@ -291,6 +308,13 @@ void OrigChromeMgr::createMediaThreadIfNeeded()
     m_hFfmpeg = LoadLibraryW(name.c_str());
     if (!m_hFfmpeg)
         return;
+#else
+    // The ffmpeg dynamic library is the Windows ffmpeg.dll shipped under
+    // plugins/ffmpeg; there is no equivalent module to side-load on macOS,
+    // so skip the Win32 module-path resolution and DLL load here. The media
+    // threads below are still started so the rest of the pipeline works.
+    m_hFfmpeg = nullptr;
+#endif
 
     m_mediaThread = (new base::Thread("MediaThread"));
     m_mediaThread->Start();
@@ -447,7 +471,15 @@ blink::WebAudioDevice* OrigChromeMgr::createAudioDevice(
     }
 
     int sessionId = 0;
+#if defined(_WIN32)
     if (deviceId.isNull() || !base::StringToInt(base::UTF16ToUTF8(base::StringPiece16(deviceId)), &sessionId)) {
+#else
+    // Under INSIDE_BLINK, WebString only exposes its WTF::String conversion
+    // (not base::string16), so route through WTF::String's UTF-8 encoding and
+    // parse that with base::StringToInt. Same net effect as the Windows path.
+    WTF::CString deviceIdUtf8 = WTF::String(deviceId).utf8();
+    if (deviceId.isNull() || !base::StringToInt(std::string(deviceIdUtf8.data(), deviceIdUtf8.length()), &sessionId)) {
+#endif
         if (numberOfInputChannels > 0)
             DLOG(WARNING) << "createAudioDevice(): request for audio input ignored";
 

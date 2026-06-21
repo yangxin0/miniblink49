@@ -90,6 +90,12 @@ if(MINIBLINK_BUILD_BLINK)
     include(net/net_portable.cmake)                          # portable net/ subset
     include(wke/wke_globals.cmake)                            # wke embedding-layer globals blink links against
     include(mc/mc.cmake)                                     # compositor (mc::LayerTreeHost) the page host drives
+    # NOTE: orig_chrome/content (OrigChromeMgr/LayerTreeWrap) is the OPTIONAL heavyweight
+    # "OrigChrome mode" — it pulls the FULL Chromium cc/media/gpu stack. It is only
+    # activated via wkeSetDebugConfig("initOrigChromeUiThread"); the default browser uses
+    # the lightweight mc/ compositor. So we link no-op stubs (content/web_impl_mac/
+    # OrigChromeStubs.cpp) instead of orig_chrome_content. To build the real one:
+    #   include(orig_chrome/content/orig_chrome_content.cmake)
     include(content/content_browser.cmake)                   # embedding-host page host (content::WebPageImpl + Cocoa web_impl_mac)
     add_subdirectory(test/blink)  # smoke test: prove geometry links + computes
 

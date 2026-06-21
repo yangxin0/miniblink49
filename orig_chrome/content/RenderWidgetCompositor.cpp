@@ -29,6 +29,17 @@
 #include "gpu/command_buffer/common/gpu_memory_allocation.h"
 #include "third_party/WebKit/public/web/WebSelection.h"
 
+#if !defined(_WIN32)
+// Both base/location.h and blink's WebTraceLocation.h define a FROM_HERE
+// macro. On Windows the base/location.h definition (tracked_objects::Location)
+// ends up winning; on macOS the include order leaves blink's
+// WebTraceLocation variant active, which the base task runners' PostTask
+// cannot accept. Force the base definition here so PostTask(FROM_HERE, ...)
+// resolves to tracked_objects::Location, exactly as on Windows.
+#undef FROM_HERE
+#define FROM_HERE FROM_HERE_WITH_EXPLICIT_FUNCTION(__FUNCTION__)
+#endif
+
 namespace wke {
 extern bool g_headlessEnable;
 }
@@ -149,7 +160,15 @@ void RenderWidgetCompositor::clearRootLayer()
 
 blink::WebSize RenderWidgetCompositor::deviceViewportSize() const
 {
+#if defined(_WIN32)
     return blink::WebSize(m_layerTreeHost->device_viewport_size());
+#else
+    // INSIDE_BLINK is defined for this TU, so blink::WebSize only exposes its
+    // IntSize ctor (not the gfx::Size one). Build it from width/height to
+    // bridge orig_chrome's gfx::Size into blink::WebSize.
+    gfx::Size s = m_layerTreeHost->device_viewport_size();
+    return blink::WebSize(s.width(), s.height());
+#endif
 }
 
 float RenderWidgetCompositor::deviceScaleFactor() const
@@ -178,7 +197,12 @@ void RenderWidgetCompositor::detachCompositorAnimationTimeline(blink::WebComposi
 
 void RenderWidgetCompositor::setViewportSize(const blink::WebSize& deviceViewportSize)
 {
+#if defined(_WIN32)
     m_layerTreeHost->SetViewportSize(deviceViewportSize);
+#else
+    // blink::WebSize -> orig_chrome gfx::Size (distinct type for this TU).
+    m_layerTreeHost->SetViewportSize(gfx::Size(deviceViewportSize.width, deviceViewportSize.height));
+#endif
 }
 
 blink::WebFloatPoint RenderWidgetCompositor::adjustEventPointForPinchZoom(const blink::WebFloatPoint& point) const
@@ -307,8 +331,14 @@ cc::LayerSelectionBound ConvertWebSelectionBound(const blink::WebSelection& web_
         }
     }
     cc_bound.layer_id = web_bound.layerId;
+#if defined(_WIN32)
     cc_bound.edge_top = gfx::PointF(web_bound.edgeTopInLayer);
     cc_bound.edge_bottom = gfx::PointF(web_bound.edgeBottomInLayer);
+#else
+    // blink::WebPoint (int x/y) -> gfx::PointF(float, float).
+    cc_bound.edge_top = gfx::PointF(web_bound.edgeTopInLayer.x, web_bound.edgeTopInLayer.y);
+    cc_bound.edge_bottom = gfx::PointF(web_bound.edgeBottomInLayer.x, web_bound.edgeBottomInLayer.y);
+#endif
     return cc_bound;
 }
 
@@ -367,7 +397,14 @@ static scoped_ptr<gpu_blink::WebGraphicsContext3DInProcessCommandBufferImpl> cre
 
     scoped_ptr<gpu_blink::WebGraphicsContext3DInProcessCommandBufferImpl> context;
     if (window)
+#if defined(_WIN32)
         context = gpu_blink::WebGraphicsContext3DInProcessCommandBufferImpl::CreateViewContext(attrs, true, window);
+#else
+        // gfx::AcceleratedWidget is HWND on Windows and NSView* on macOS. The
+        // HWND handle is opaque in the win_compat shim, so reinterpret it into
+        // the native widget type (same opaque-handle pattern as web_impl_win).
+        context = gpu_blink::WebGraphicsContext3DInProcessCommandBufferImpl::CreateViewContext(attrs, true, reinterpret_cast<gfx::AcceleratedWidget>(window));
+#endif
     else
         context = gpu_blink::WebGraphicsContext3DInProcessCommandBufferImpl::CreateOffscreenContext(attrs, true);
     return context.Pass();
@@ -493,7 +530,17 @@ void RenderWidgetCompositor::RequestNewOutputSurface()
     if (kGLImplTypeNone == OrigChromeMgr::getInst()->getGlImplType()) {
         scoped_ptr<SoftwareOutputSurface> outputSurface = SoftwareOutputSurface::Create(m_webPageOcBridge);
         m_softwareOutputDevice = (SoftwareOutputDevice*)outputSurface->software_device();
+#if defined(_WIN32)
         m_layerTreeHost->SetOutputSurface(std::move(outputSurface));
+#else
+        // This scoped_ptr uses C++03 move emulation (MOVE_ONLY_TYPE_FOR_CPP_03).
+        // A cross-type transfer (scoped_ptr<SoftwareOutputSurface> ->
+        // scoped_ptr<OutputSurface>) cannot be done with std::move or .Pass()
+        // under clang here (by-value param can't be init'd from the move-only
+        // prvalue). Hand off the raw pointer instead: derived* -> base*
+        // through scoped_ptr's explicit pointer ctor.
+        m_layerTreeHost->SetOutputSurface(scoped_ptr<cc::OutputSurface>(outputSurface.release()));
+#endif
 
         if (m_hWnd)
             m_softwareOutputDevice->setHWND(m_hWnd);
@@ -546,15 +593,30 @@ void RenderWidgetCompositor::RequestNewOutputSurface()
     scoped_refptr<base::SingleThreadTaskRunner> task_runner = OrigChromeMgr::getInst()->getUiLoop()->task_runner();
     scoped_ptr<cc::SurfaceDisplayOutputSurface> outputSurface(new cc::SurfaceDisplayOutputSurface(g_surfaceManager, m_idAllocator.get(), contextProvider, m_shareWorkerContextProvider));
 
+#if defined(_WIN32)
     m_displayClient = make_scoped_ptr(new cc::OnscreenDisplayClient(
         outputSurfaceStub.Pass(), g_surfaceManager,
         sharedBitmapManager, childGpuMemoryBufferManager,
         rendererSettings, task_runner));
+#else
+    // Cross-type scoped_ptr handoff (EmptyOutputSurface -> OutputSurface) via
+    // raw pointer; see note in RequestNewOutputSurface above.
+    m_displayClient = make_scoped_ptr(new cc::OnscreenDisplayClient(
+        scoped_ptr<cc::OutputSurface>(outputSurfaceStub.release()), g_surfaceManager,
+        sharedBitmapManager, childGpuMemoryBufferManager,
+        rendererSettings, task_runner));
+#endif
 
     m_displayClient->set_surface_output_surface(outputSurface.get());
     outputSurface->set_display_client(m_displayClient.get());
 
+#if defined(_WIN32)
     m_layerTreeHost->SetOutputSurface(outputSurface.Pass());
+#else
+    // Cross-type scoped_ptr handoff (SurfaceDisplayOutputSurface ->
+    // OutputSurface) via raw pointer; see note in RequestNewOutputSurface.
+    m_layerTreeHost->SetOutputSurface(scoped_ptr<cc::OutputSurface>(outputSurface.release()));
+#endif
 
     gfx::Size size = m_layerTreeHost->device_viewport_size();
     m_displayClient->display()->Resize(size);

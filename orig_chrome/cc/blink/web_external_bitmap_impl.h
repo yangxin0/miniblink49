@@ -9,6 +9,7 @@
 #include "base/memory/scoped_ptr.h"
 #include "cc/blink/cc_blink_export.h"
 #include "third_party/WebKit/public/platform/WebExternalBitmap.h"
+#include "ui/gfx/geometry/size.h"
 
 namespace cc {
 class SharedBitmap;
