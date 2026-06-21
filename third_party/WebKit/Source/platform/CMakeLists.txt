@@ -51,6 +51,8 @@ file(GLOB_RECURSE BLINK_FONTS "${BSRC}/fonts/*.cpp")  # incl. fonts/shaping (har
 # macOS CoreText font backend (ObjC++): FontCacheMac/FontPlatformDataMac/
 # FontFamilyMatcherMac. These provide FontCache::* and FontPlatformData::setupPaint.
 file(GLOB BLINK_FONTS_MAC "${BSRC}/fonts/mac/*.mm")
+# macOS locale backend (ObjC++): LocaleMac (Locale::create). text/ globs *.cpp only.
+file(GLOB BLINK_TEXT_MAC "${BSRC}/text/LocaleMac.mm")
 # More platform sublayers the link needs (all compile clean on macOS): scroll
 # (ScrollableArea/Scrollbar), network (ResourceRequest/Response), mhtml,
 # mediastream.
@@ -145,7 +147,7 @@ set_source_files_properties("${BSRC}/heap/UnifiedHeapController.cpp"
 
 add_library(blink_platform STATIC
     ${BLINK_CORE_SOURCES} ${BLINK_HEAP} ${BLINK_GRAPHICS} ${BLINK_TEXT}
-    ${BLINK_FONTS} ${BLINK_FONTS_MAC} ${BLINK_SUBLAYERS} ${BLINK_INFRA_SOURCES} ${BLINK_EXPORTED}
+    ${BLINK_FONTS} ${BLINK_FONTS_MAC} ${BLINK_TEXT_MAC} ${BLINK_SUBLAYERS} ${BLINK_INFRA_SOURCES} ${BLINK_EXPORTED}
     ${BLINK_BASE_SHIM})
 # alias.cc is plain Chromium base, not WTF: don't force-include WTF's config.h.
 set_source_files_properties("${BLINK_BASE_SHIM}" PROPERTIES COMPILE_OPTIONS "")
