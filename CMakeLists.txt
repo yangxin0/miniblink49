@@ -103,13 +103,14 @@ if(MINIBLINK_BUILD_BLINK)
         # The mini-browser: a Cocoa host that drives the wke C API. Links the full
         # engine archive set. force_load wke/wke_globals/bindings_infra so the C-API
         # entry points + blink's ENABLE_WKE hooks are all included.
-        # Link the dcheck_always_on V8 monolith, not the pure release one: the
-        # release build miscompiles the DOM-wrapper construction path
-        # (HandleApiCallHelper construct -> blink::Node::wrap) and segfaults at
-        # address 0x2 the first time page JS materializes a DOM wrapper (e.g.
-        # Array.prototype.slice over a NodeList). dcheck_always_on changes the
-        # optimizer enough to dodge that heisenbug, so real JS-driven pages run.
-        set(_v8mono "${MINIBLINK_V8_ROOT}/out/arm64.dcheck/obj/libv8_monolith.a")
+        # Release V8 monolith. The DOM-wrapper-construction "0x2 heisenbug" that
+        # previously forced a dcheck_always_on build turned out to be a symptom of
+        # the V8_REVERSE_JSARGS ABI mismatch (blink read callback args backwards,
+        # so wrapper constructors saw a corrupt receiver). With V8_REVERSE_JSARGS
+        # now defined consistently (see the v8_monolith interface below), the pure
+        # release build runs JS-driven pages cleanly (baidu + YouTube app shell),
+        # and avoids the dcheck VerifyApiCallResultType aborts entirely.
+        set(_v8mono "${MINIBLINK_V8_ROOT}/out/arm64.release/obj/libv8_monolith.a")
         add_executable(minibrowser "${CMAKE_SOURCE_DIR}/port/mac/minibrowser_main.mm")
         set_target_properties(minibrowser PROPERTIES CXX_STANDARD 14)
         target_include_directories(minibrowser PRIVATE "${CMAKE_SOURCE_DIR}" "${CMAKE_SOURCE_DIR}/wke" "${CMAKE_SOURCE_DIR}/win_compat")
