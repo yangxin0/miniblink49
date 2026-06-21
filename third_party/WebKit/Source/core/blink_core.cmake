@@ -48,6 +48,7 @@ list(FILTER BLINK_CORE_SRC EXCLUDE REGEX "ThemePainterDefault\\.cpp$")
 # v8::V8::TerminateExecution -> isolate->TerminateExecution migration; GcTimeScheduler.h
 # Windows memory-query guarded with a macOS mach task_info port).
 
+list(APPEND BLINK_CORE_SRC "${CSRC}/layout/LayoutThemeMac.mm" "${CSRC}/paint/ThemePainterMac.mm")
 add_library(blink_core STATIC ${BLINK_CORE_SRC})
 
 target_link_libraries(blink_core PUBLIC blink_platform)

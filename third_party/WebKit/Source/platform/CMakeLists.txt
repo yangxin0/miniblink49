@@ -51,7 +51,10 @@ file(GLOB_RECURSE BLINK_FONTS "${BSRC}/fonts/*.cpp")  # incl. fonts/shaping (har
 # macOS CoreText font backend (ObjC++): FontCacheMac/FontPlatformDataMac/
 # FontFamilyMatcherMac. These provide FontCache::* and FontPlatformData::setupPaint.
 file(GLOB BLINK_FONTS_MAC "${BSRC}/fonts/mac/*.mm")
-# macOS locale backend (ObjC++): LocaleMac (Locale::create). text/ globs *.cpp only.
+file(GLOB BLINK_PLATFORM_MAC "${BSRC}/mac/*.mm")
+list(FILTER BLINK_PLATFORM_MAC EXCLUDE REGEX "ScrollAnimatorMac\\.mm$")
+# macOS mac/ (theme/scroll), geometry/mac (Int*/Float* CGRect), text/mac (LocaleMac).
+file(GLOB BLINK_GEOMETRY_MAC "${BSRC}/geometry/mac/*.mm" "${BSRC}/geometry/cg/*.cpp")  # Int*/Float* <-> CG/NS
 file(GLOB BLINK_TEXT_MAC "${BSRC}/text/LocaleMac.mm")
 # More platform sublayers the link needs (all compile clean on macOS): scroll
 # (ScrollableArea/Scrollbar), network (ResourceRequest/Response), mhtml,
@@ -147,7 +150,7 @@ set_source_files_properties("${BSRC}/heap/UnifiedHeapController.cpp"
 
 add_library(blink_platform STATIC
     ${BLINK_CORE_SOURCES} ${BLINK_HEAP} ${BLINK_GRAPHICS} ${BLINK_TEXT}
-    ${BLINK_FONTS} ${BLINK_FONTS_MAC} ${BLINK_TEXT_MAC} ${BLINK_SUBLAYERS} ${BLINK_INFRA_SOURCES} ${BLINK_EXPORTED}
+    ${BLINK_FONTS} ${BLINK_FONTS_MAC} ${BLINK_PLATFORM_MAC} ${BLINK_GEOMETRY_MAC} ${BLINK_TEXT_MAC} ${BLINK_SUBLAYERS} ${BLINK_INFRA_SOURCES} ${BLINK_EXPORTED}
     ${BLINK_BASE_SHIM})
 # alias.cc is plain Chromium base, not WTF: don't force-include WTF's config.h.
 set_source_files_properties("${BLINK_BASE_SHIM}" PROPERTIES COMPILE_OPTIONS "")
@@ -163,12 +166,13 @@ target_include_directories(blink_platform PUBLIC
     "${CMAKE_SOURCE_DIR}/third_party/harfbuzz-ng/src"  # hb.h (fonts/shaping)
     "${CMAKE_SOURCE_DIR}/third_party"           # libpng/png.h, libjpeg/jpeglib.h, libwebp/* (image-decoders)
     "${CMAKE_SOURCE_DIR}/third_party/ots/include"  # opentype-sanitiser.h (OpenTypeSanitizer)
+    "${CMAKE_SOURCE_DIR}/skia/ext"
     "${CMAKE_SOURCE_DIR}/third_party/v8shim"    # v8-debug.h shim (plugins/heap pull ScriptState)
     "${CMAKE_SOURCE_DIR}/win_compat"            # <windows.h> shim (ImageBuffer pulls wke)
     "${CMAKE_SOURCE_DIR}/orig_chrome")
 
 target_link_libraries(blink_platform PUBLIC wtf skia harfbuzz
-    miniblink_png miniblink_jpeg miniblink_webp miniblink_ots)
+    miniblink_png miniblink_jpeg miniblink_webp miniblink_ots skia_ext)
 if(APPLE)
     # System ICU (unversioned symbols) + CoreText/CoreGraphics for fonts.
     target_link_libraries(blink_platform PUBLIC

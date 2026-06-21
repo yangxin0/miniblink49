@@ -39,6 +39,8 @@ void DrawToNativeContext(SkCanvas* canvas, PlatformSurface context, int x,
     platform_device->DrawToNativeContext(context, x, y, src_rect);
 }
 
+#if defined(OS_WIN)
+// PlatformDevice::DrawToNativeLayeredContext is Windows-only (layered windows).
 bool DrawToNativeLayeredContext(SkCanvas* canvas, PlatformSurface context, const PlatformRect* src_rect, const PlatformRect* client_rect)
 {
     PlatformDevice* platform_device = GetPlatformDevice(GetTopDevice(*canvas));
@@ -46,6 +48,7 @@ bool DrawToNativeLayeredContext(SkCanvas* canvas, PlatformSurface context, const
         return platform_device->DrawToNativeLayeredContext(context, src_rect, client_rect);
     return false;
 }
+#endif
 
 void MakeOpaque(SkCanvas* canvas, int x, int y, int width, int height) {
   if (width <= 0 || height <= 0)

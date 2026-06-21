@@ -19,6 +19,12 @@
  */
 
 #import "config.h"
+// Pre-import Cocoa/Carbon with CarbonCore's TextEncoding renamed so it can't clash
+// with WTF::TextEncoding when the blink headers below are parsed.
+#define TextEncoding CarbonTextEncoding
+#import <Carbon/Carbon.h>
+#import <Cocoa/Cocoa.h>
+#undef TextEncoding
 #import "core/paint/ThemePainterMac.h"
 
 #import "core/layout/LayoutMeter.h"

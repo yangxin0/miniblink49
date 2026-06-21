@@ -22,7 +22,7 @@ CGContextRef GetBitmapContext(SkBaseDevice* device) {
   return NULL;
 }
 
-CGContextRef PlatformDevice::BeginPlatformPaint() {
+PlatformSurface PlatformDevice::BeginPlatformPaint(void* /*hWnd*/) {
   return GetBitmapContext();
 }
 
