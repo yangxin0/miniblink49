@@ -31,6 +31,9 @@ target_include_directories(content_browser PUBLIC
     "${CMAKE_SOURCE_DIR}/third_party/skia/include/utils")
 target_compile_definitions(content_browser PUBLIC "V8CALL=" ENABLE_WKE=1 BLINK_IMPLEMENTATION=1
     V8_COMPRESS_POINTERS V8_31BIT_SMIS_ON_64BIT_ARCH)
+# WebThreadImpl.cpp has its own event/thread shim; opt out of win_compat's worker-
+# thread primitives (WaitForSingleObject/CloseHandle/_beginthreadex) to avoid a clash.
+target_compile_definitions(content_browser PRIVATE WIN_COMPAT_NO_THREAD_PRIMS)
 set_target_properties(content_browser PROPERTIES CXX_STANDARD 14)
 if(NOT MSVC)
     target_compile_options(content_browser PRIVATE

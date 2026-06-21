@@ -182,6 +182,12 @@ static inline LONG InterlockedExchange(volatile LONG* v, LONG val) { return __sy
 // net/websocket spins a worker thread via the CRT _beginthreadex and joins it by
 // casting the returned id to HANDLE for WaitForSingleObject + CloseHandle. Back
 // it with a heap-allocated pthread_t; the HANDLE is a pointer to that wrapper.
+//
+// Gated: content/web_impl_win/WebThreadImpl.cpp ships its own self-consistent
+// event+thread shim (CreateEvent/SetEvent/WaitForSingleObject/CloseHandle share a
+// tagged HandleBase* encoding) which would collide with these. That TU's target
+// defines WIN_COMPAT_NO_THREAD_PRIMS to opt out; the websocket TU uses these.
+#ifndef WIN_COMPAT_NO_THREAD_PRIMS
 #include <stdlib.h>
 #ifndef INFINITE
 #define INFINITE 0xFFFFFFFF
@@ -224,6 +230,7 @@ static inline BOOL CloseHandle(HANDLE handle) {
     if (handle) free(handle);
     return TRUE;
 }
+#endif // WIN_COMPAT_NO_THREAD_PRIMS
 
 // --- Dynamic loading + misc (posix-backed) -----------------------------------
 // wke's public header (wkeInitializeEx) loads the wke library via LoadLibrary/
