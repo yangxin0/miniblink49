@@ -8,7 +8,9 @@
 # files wkeWebView/wkeWebWindow that need a Cocoa backend) is the later embedding +
 # windowing bring-up; only these definitions are needed to LINK blink::initialize.
 
-add_library(wke_globals STATIC "${CMAKE_SOURCE_DIR}/wke/wkeGlobalVar.cpp")
+add_library(wke_globals STATIC
+    "${CMAKE_SOURCE_DIR}/wke/wkeGlobalVar.cpp"
+    "${CMAKE_SOURCE_DIR}/wke/wkeString.cpp")   # wke::CString (UTF-32 wchar_t ported)
 target_link_libraries(wke_globals PUBLIC blink_platform)
 target_include_directories(wke_globals PUBLIC
     "${CMAKE_SOURCE_DIR}" "${CMAKE_SOURCE_DIR}/wke"

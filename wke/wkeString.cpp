@@ -124,7 +124,24 @@ void CString::setString(const wchar_t* str, size_t len, bool nullTermination)
         len = wcslen(str);
     if (0 == len)
         return;
-    WTF::WCharToMByte(str, len, &m_str, CP_UTF8);
+#if defined(_WIN32)
+    WTF::WCharToMByte(str, len, &m_str, CP_UTF8);  // wchar_t is 16-bit (== UChar)
+#else
+    // macOS: wchar_t is 32-bit (UTF-32); convert to UTF-16 (UChar) for WCharToMByte.
+    std::vector<unsigned short> utf16;
+    utf16.reserve(len);
+    for (size_t i = 0; i < len; ++i) {
+        unsigned int c = static_cast<unsigned int>(str[i]);
+        if (c <= 0xFFFF) {
+            utf16.push_back(static_cast<unsigned short>(c));
+        } else {
+            c -= 0x10000;
+            utf16.push_back(static_cast<unsigned short>(0xD800 + (c >> 10)));
+            utf16.push_back(static_cast<unsigned short>(0xDC00 + (c & 0x3FF)));
+        }
+    }
+    WTF::WCharToMByte(reinterpret_cast<const UChar*>(utf16.data()), utf16.size(), &m_str, CP_UTF8);
+#endif
     if (nullTermination)
         m_str.push_back('\0');
 }
