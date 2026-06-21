@@ -7,6 +7,7 @@
 
 #include "third_party/WebKit/Source/platform/geometry/FloatPoint.h"
 #include "third_party/skia/include/utils/SkMatrix44.h"
+#include "mc/animation/FilterOperations.h"  // mc::FilterOperations (= FilterOperationsWrap)
 
 namespace mc {
 
