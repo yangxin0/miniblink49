@@ -77,6 +77,7 @@ if(APPLE)
         text/AtomicStringCF.cpp
         text/StringCF.cpp
         text/StringImplCF.cpp
+        text/StringImplMac.mm   # WTF::StringImpl::operator NSString* (ObjC bridge)
     )
 endif()
 

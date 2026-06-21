@@ -18,6 +18,12 @@
  */
 
 #include "config.h"
+// Pre-import full Cocoa (this file defines an ObjC category but only imported a
+// single AppKit header), with CarbonCore's TextEncoding renamed to avoid the
+// WTF::TextEncoding collision.
+#define TextEncoding CarbonTextEncoding
+#import <Cocoa/Cocoa.h>
+#undef TextEncoding
 #include "platform/RuntimeEnabledFeatures.h"
 #include "platform/mac/LocalCurrentGraphicsContext.h"
 #include "platform/mac/ThemeMac.h"

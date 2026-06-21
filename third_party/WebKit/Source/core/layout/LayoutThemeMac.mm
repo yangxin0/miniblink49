@@ -19,6 +19,14 @@
  */
 
 #import "config.h"
+// Pre-import the Cocoa/Carbon frameworks with CarbonCore's global `TextEncoding`
+// typedef renamed, so it never collides with WTF::TextEncoding (visible via
+// `using namespace WTF`) when the blink headers below are parsed. The later
+// <Carbon.h>/<Cocoa.h> imports become no-ops (include guards).
+#define TextEncoding CarbonTextEncoding
+#import <Carbon/Carbon.h>
+#import <Cocoa/Cocoa.h>
+#undef TextEncoding
 #import "core/layout/LayoutThemeMac.h"
 
 #import "core/CSSValueKeywords.h"

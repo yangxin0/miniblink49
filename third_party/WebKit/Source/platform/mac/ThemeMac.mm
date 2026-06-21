@@ -24,6 +24,13 @@
  */
 
 #import "config.h"
+// Pre-import Cocoa/Carbon with CarbonCore's `TextEncoding` typedef renamed so it
+// can't collide with WTF::TextEncoding; also pulls AppKit (NSFont/NSControl) which
+// this file uses but didn't import. Later imports become no-ops (include guards).
+#define TextEncoding CarbonTextEncoding
+#import <Carbon/Carbon.h>
+#import <Cocoa/Cocoa.h>
+#undef TextEncoding
 #import "platform/mac/ThemeMac.h"
 
 #import <Carbon/Carbon.h>
