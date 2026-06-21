@@ -36,7 +36,10 @@
 #include "third_party/WebKit/Source/core/page/Page.h"
 #include "third_party/WebKit/Source/core/page/NetworkStateNotifier.h"
 #include "gen/blink/platform/RuntimeEnabledFeatures.h"
+#if defined(_WIN32)
+// Windows-only printing implementation (mbvip/printing); not built on macOS.
 #include "printing/WkePrinting.h"
+#endif
 #include "wtf/text/WTFString.h"
 #include "wtf/text/WTFStringUtil.h"
 #include "wtf/text/Base64.h"
@@ -278,6 +281,7 @@ void WKE_CALL_TYPE wkeSetContextMenuItemShow(wkeWebView webView, wkeMenuItemId i
 
 static std::vector<char> convertCookiesPathToUtf8(const WCHAR* path)
 {
+#if defined(_WIN32)
     std::wstring pathStr(path);
     if (pathStr[pathStr.size() - 1] != L'\\' && pathStr[pathStr.size() - 1] != L'/')
         pathStr += L'\\';
@@ -292,6 +296,32 @@ static std::vector<char> convertCookiesPathToUtf8(const WCHAR* path)
     pathStrA.push_back('\0');
 
     return pathStrA;
+#else
+    // macOS: WCHAR is 16-bit (UChar) and wchar_t is 32-bit, so work directly in a
+    // UChar (UTF-16) buffer instead of std::wstring.
+    size_t len = 0;
+    while (path[len] != 0)
+        ++len;
+    Vector<UChar> pathStr;
+    pathStr.reserveCapacity(len + 16);
+    for (size_t i = 0; i < len; ++i)
+        pathStr.append(static_cast<UChar>(path[i]));
+    if (pathStr.isEmpty() || (pathStr.last() != static_cast<UChar>('\\') && pathStr.last() != static_cast<UChar>('/')))
+        pathStr.append(static_cast<UChar>('/'));
+    if (!::PathIsDirectoryW(path))
+        return std::vector<char>();
+    const char* tail = "cookies.dat";
+    for (const char* p = tail; *p; ++p)
+        pathStr.append(static_cast<UChar>(*p));
+
+    std::vector<char> pathStrA;
+    WTF::WCharToMByte(pathStr.data(), pathStr.size(), &pathStrA, CP_ACP);
+    if (0 == pathStrA.size())
+        return std::vector<char>();
+    pathStrA.push_back('\0');
+
+    return pathStrA;
+#endif
 }
 
 void wkeRunUntilIdle()
@@ -337,7 +367,7 @@ void wkePostUiTask(void* type)
 void WKE_CALL_TYPE wkeSetDebugConfig(wkeWebView webview, const char* debugString, const char* param)
 {
     if (nullptr != strstr(debugString, "paintCallbackInOtherThread")) {
-        content::g_uiThreadId = (DWORD)(param);
+        content::g_uiThreadId = (DWORD)(uintptr_t)(param);
         blink::RuntimeEnabledFeatures::setUpdataInOtherThreadEnabled(true);
         return;
     } else if (nullptr != strstr(debugString, "setUiThreadHeartbeatCallback")) {
@@ -622,7 +652,17 @@ void WKE_CALL_TYPE wkeShowDevtools(wkeWebView webView, const wchar_t* path, wkeO
 {
     WKE_CHECK_WEBVIEW_AND_THREAD_IS_VALID(webView, (void)0);
     std::vector<char> pathUtf8;
+#if defined(_WIN32)
     WTF::WCharToMByte(path, wcslen(path), &pathUtf8, CP_UTF8);
+#else
+    // macOS: wchar_t is 32-bit; narrow into UChar (UTF-16) for WCharToMByte.
+    size_t pathLen = wcslen(path);
+    Vector<UChar> u16;
+    u16.reserveCapacity(pathLen);
+    for (size_t i = 0; i < pathLen; ++i)
+        u16.append(static_cast<UChar>(path[i]));
+    WTF::WCharToMByte(u16.data(), u16.size(), &pathUtf8, CP_UTF8);
+#endif
     pathUtf8.push_back('\0');
     webView->showDevTools(&pathUtf8[0], callback, param);
 }
@@ -1035,7 +1075,15 @@ void WKE_CALL_TYPE wkeSetCookieJarFullPath(wkeWebView webView, const WCHAR* path
         return;
 
     std::vector<char> jarPathA;
-    WTF::WCharToMByte(path, wcslen(path), &jarPathA, CP_UTF8);
+#if defined(_WIN32)
+    size_t pathLen = wcslen(path);
+#else
+    // macOS: WCHAR is 16-bit (unsigned short); wcslen (wchar_t*, 32-bit) won't bind.
+    size_t pathLen = 0;
+    while (path[pathLen] != 0)
+        ++pathLen;
+#endif
+    WTF::WCharToMByte(path, pathLen, &jarPathA, CP_UTF8);
     if (0 == jarPathA.size())
         return;
     jarPathA.push_back('\0');
@@ -2124,10 +2172,17 @@ BOOL wkeUtilPrint(wkeWebView webview, wkeWebFrameHandle frameId, const wkePrintS
     if (webview->isPrinting())
         return FALSE;
 
+#if defined(_WIN32)
     webview->setPrinting(new printing::WkePrinting(webview, frameId));
     page->setIsMouseKeyMessageEnable(false);
     webview->getPrinting()->run(settings);
     return TRUE;
+#else
+    // macOS: printing::WkePrinting (mbvip/printing) is Windows-only; printing is wired
+    // through the Cocoa layer at the app level. No-op default here.
+    (void)frameId; (void)settings;
+    return FALSE;
+#endif
 }
 
 int WKE_CALL_TYPE wkeGetWebviewId(wkeWebView webView)

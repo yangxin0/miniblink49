@@ -115,7 +115,7 @@ void WKE_CALL_TYPE wkeNetSetData(wkeNetJob jobPtr, void* buf, int len)
     wke::checkThreadCallIsValid(__FUNCTION__);
     if (0 == len) {
         len = 1;
-        buf = " ";
+        buf = (void*)" ";
     }
 
     net::WebURLLoaderInternal* job = (net::WebURLLoaderInternal*)jobPtr;

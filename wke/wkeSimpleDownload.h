@@ -209,7 +209,14 @@ SimpleDownload* SimpleDownload::create(wkeWebView webView,
             page->setIsMouseKeyMessageEnable(true);
 
         std::vector<wchar_t>* fileResult = nullptr;
+#if defined(_WIN32)
         size_t pathLen = wcslen(savePath);
+#else
+        // macOS: WCHAR is 16-bit (unsigned short); wcslen (wchar_t*, 32-bit) won't bind.
+        size_t pathLen = 0;
+        while (savePath[pathLen] != 0)
+            ++pathLen;
+#endif
         if (pathLen > 0) {
             fileResult = new std::vector<wchar_t>();
             fileResult->resize(MAX_PATH * 2);
@@ -225,7 +232,7 @@ SimpleDownload* SimpleDownload::create(wkeWebView webView,
         });
 
     } else {
-        InterlockedIncrement((long *)&m_dialogCount);
+        InterlockedIncrement((LONG *)&m_dialogCount);
 
         unsigned int threadIdentifier = 0;
         HANDLE hHandle = reinterpret_cast<HANDLE>(_beginthreadex(0, 0, SimpleDownload::dialogThread, self, 0, &threadIdentifier));
@@ -333,7 +340,6 @@ unsigned int SimpleDownload::dialogThread(void* param)
 {
     SimpleDownload* self = (SimpleDownload*)param;
 
-    OPENFILENAMEW ofn = { 0 };
     std::vector<wchar_t>* fileResult = new std::vector<wchar_t>();
     fileResult->resize(4 * MAX_PATH + 1);
 
@@ -342,6 +348,10 @@ unsigned int SimpleDownload::dialogThread(void* param)
         defaultSaveName = defaultSaveName.substr(0, 150);
     wcscpy(&fileResult->at(0), defaultSaveName.c_str());
 
+#if defined(_WIN32)
+    // Win32 native "Save As" dialog. On macOS the save dialog is presented by the Cocoa
+    // layer; fileResult (seeded with the default name above) is still passed to startSave.
+    OPENFILENAMEW ofn = { 0 };
     ofn.lStructSize = sizeof(ofn);
     ofn.hwndOwner = nullptr;
     ofn.lpstrFile = &fileResult->at(0);
@@ -357,6 +367,7 @@ unsigned int SimpleDownload::dialogThread(void* param)
         delete fileResult;
         fileResult = nullptr;
     }
+#endif
 
     wkeWebView wkeWebview = self->m_wkeView;
 
@@ -372,7 +383,7 @@ unsigned int SimpleDownload::dialogThread(void* param)
         self->startSave(fileResult);
     });
 
-    InterlockedDecrement((long *)&m_dialogCount);
+    InterlockedDecrement((LONG *)&m_dialogCount);
 
     return 0;
 }

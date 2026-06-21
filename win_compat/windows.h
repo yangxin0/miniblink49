@@ -552,4 +552,379 @@ template<typename T> static inline BOOL DeleteObject(T) { return TRUE; }
 #define PostMessage PostMessageW
 #endif
 
+// =====================================================================================
+// Additional Win32 surface used by the wke public API (wke/wke2.cpp, wkeWebView.cpp,
+// wkeWebWindow.cpp, wkeSimpleDownload.h). These are standard Win32 constants and inert
+// function stubs so the shared, Win32-shaped wke source parses and the libwke archive
+// links on macOS; the real windowing / file-dialog / paint behaviour is wired through
+// the Cocoa layer (port/mac/*) at the app layer. Additive and #ifndef-guarded so the
+// Windows build (real <windows.h>) is unaffected.
+// =====================================================================================
+
+// --- More window styles ------------------------------------------------------
+#ifndef WS_POPUP
+#define WS_POPUP        0x80000000L
+#define WS_CLIPSIBLINGS 0x04000000L
+#define WS_CLIPCHILDREN 0x02000000L
+#endif
+
+// --- Window class styles -----------------------------------------------------
+#ifndef CS_HREDRAW
+#define CS_VREDRAW 0x0001
+#define CS_HREDRAW 0x0002
+#endif
+
+// --- Standard icon IDs -------------------------------------------------------
+#ifndef IDI_APPLICATION
+#define IDI_APPLICATION ((const WCHAR*)32512)
+#endif
+
+// --- More window messages ----------------------------------------------------
+#ifndef WM_CREATE
+#define WM_CREATE       0x0001
+#define WM_DESTROY      0x0002
+#define WM_QUIT         0x0012
+#define PM_REMOVE       0x0001
+#define WM_SIZE         0x0005
+#define WM_PAINT        0x000F
+#define WM_CLOSE        0x0010
+#define WM_ERASEBKGND   0x0014
+#define WM_CANCELMODE   0x001F
+#define WM_GETDLGCODE   0x0087
+#define WM_NCPAINT      0x0085
+#define WM_NCDESTROY    0x0082
+#define WM_KEYDOWN      0x0100
+#define WM_KEYUP        0x0101
+#define WM_CHAR         0x0102
+#define WM_SYSKEYDOWN   0x0104
+#define WM_SYSKEYUP     0x0105
+#define WM_SYSCHAR      0x0106
+#define WM_SETFOCUS     0x0007
+#define WM_KILLFOCUS    0x0008
+#define WM_CONTEXTMENU  0x007B
+#define WM_DROPFILES    0x0233
+// NOTE: WM_TOUCH (0x0240) is intentionally NOT defined here. content/browser/TouchStruct.h
+// defines it under #ifndef WM_TOUCH together with the touch input types/flags; defining it
+// here would suppress that block and break the content_browser build.
+#define WM_IME_STARTCOMPOSITION 0x010D
+#define WM_IME_ENDCOMPOSITION   0x010E
+#define WM_IME_COMPOSITION      0x010F
+#endif
+
+// --- Key flags / short bounds ------------------------------------------------
+#ifndef KF_REPEAT
+#define KF_REPEAT 0x4000
+#endif
+#ifndef MINSHORT
+#define MINSHORT (-32768)
+#define MAXSHORT 0x7fff
+#endif
+
+// --- DLG codes ---------------------------------------------------------------
+#ifndef DLGC_WANTARROWS
+#define DLGC_WANTARROWS  0x0001
+#define DLGC_WANTCHARS   0x0080
+#define DLGC_WANTALLKEYS 0x0004
+#endif
+
+// --- File access constants ---------------------------------------------------
+#ifndef GENERIC_READ
+#define GENERIC_READ          0x80000000L
+#define GENERIC_WRITE         0x40000000L
+#define FILE_SHARE_READ       0x00000001
+#define FILE_SHARE_WRITE      0x00000002
+#define CREATE_ALWAYS         2
+#define OPEN_EXISTING         3
+#define FILE_ATTRIBUTE_NORMAL 0x00000080
+#endif
+
+// --- GDI raster-op / device-caps constants -----------------------------------
+#ifndef SRCCOPY
+#define SRCCOPY (DWORD)0x00CC0020
+#endif
+#ifndef LOGPIXELSX
+#define LOGPIXELSX 88
+#define LOGPIXELSY 90
+#endif
+
+// --- Open/Save dialog flags --------------------------------------------------
+#ifndef OFN_OVERWRITEPROMPT
+#define OFN_OVERWRITEPROMPT 0x00000002
+#define OFN_SHOWHELP        0x00000010
+#endif
+
+// --- SYSTEMTIME + GetLocalTime (real, backed by libc localtime) --------------
+#ifndef MINIBLINK_WIN_COMPAT_SYSTEMTIME
+#define MINIBLINK_WIN_COMPAT_SYSTEMTIME
+#include <time.h>
+typedef struct _SYSTEMTIME {
+    WORD wYear, wMonth, wDayOfWeek, wDay, wHour, wMinute, wSecond, wMilliseconds;
+} SYSTEMTIME, *LPSYSTEMTIME;
+static inline void GetLocalTime(LPSYSTEMTIME st) {
+    if (!st) return;
+    time_t t = time(nullptr);
+    struct tm lt;
+    localtime_r(&t, &lt);
+    st->wYear = (WORD)(lt.tm_year + 1900);
+    st->wMonth = (WORD)(lt.tm_mon + 1);
+    st->wDayOfWeek = (WORD)lt.tm_wday;
+    st->wDay = (WORD)lt.tm_mday;
+    st->wHour = (WORD)lt.tm_hour;
+    st->wMinute = (WORD)lt.tm_min;
+    st->wSecond = (WORD)lt.tm_sec;
+    st->wMilliseconds = 0;
+}
+#endif
+
+// --- NPAPI NPEvent (macOS) ---------------------------------------------------
+// content/web_impl_win/npapi/WebPluginImpl.h declares dispatchNPEvent(NPEvent&).
+// In third_party/npapi/bindings/npapi.h, NPEvent is only typedef'd off the Carbon
+// EventRecord on macOS, which is disabled under 64-bit (NP_NO_CARBON), leaving NPEvent
+// undefined depending on include order. Define it as void* (npapi's own non-Carbon
+// fallback) so wke.cpp resolves the type. An identical `typedef void* NPEvent;`
+// redefinition is legal C++, so this is safe even where npapi.h also defines it.
+#if !defined(_WIN32)
+typedef void* NPEvent;
+#endif
+
+// --- HRESULT + common codes --------------------------------------------------
+#ifndef MINIBLINK_WIN_COMPAT_HRESULT
+#define MINIBLINK_WIN_COMPAT_HRESULT
+typedef LONG HRESULT;
+#ifndef S_OK
+#define S_OK            ((HRESULT)0L)
+#define S_FALSE         ((HRESULT)1L)
+#define E_INVALIDARG    ((HRESULT)0x80070057L)
+#define E_FAIL          ((HRESULT)0x80004005L)
+#endif
+#endif
+
+// --- BMP (DIB) headers -------------------------------------------------------
+#ifndef BI_RGB
+#define BI_RGB 0L
+#pragma pack(push, 2)
+typedef struct tagBITMAPFILEHEADER {
+    WORD  bfType;
+    DWORD bfSize;
+    WORD  bfReserved1;
+    WORD  bfReserved2;
+    DWORD bfOffBits;
+} BITMAPFILEHEADER, *PBITMAPFILEHEADER;
+#pragma pack(pop)
+typedef struct tagBITMAPINFOHEADER {
+    DWORD biSize;
+    LONG  biWidth;
+    LONG  biHeight;
+    WORD  biPlanes;
+    WORD  biBitCount;
+    DWORD biCompression;
+    DWORD biSizeImage;
+    LONG  biXPelsPerMeter;
+    LONG  biYPelsPerMeter;
+    DWORD biClrUsed;
+    DWORD biClrImportant;
+} BITMAPINFOHEADER, *PBITMAPINFOHEADER;
+#endif
+
+// --- More window styles / show commands / syscommands ------------------------
+#ifndef WS_CAPTION
+#define WS_CAPTION      0x00C00000L
+#define WS_SYSMENU      0x00080000L
+#define WS_SIZEBOX      0x00040000L
+#define WS_THICKFRAME   0x00040000L
+#define WS_BORDER       0x00800000L
+#define WS_EX_TOOLWINDOW 0x00000080L
+#endif
+#ifndef SW_HIDE
+#define SW_HIDE 0
+#define SW_SHOW 5
+#endif
+#ifndef SC_RESTORE
+#define SC_RESTORE  0xF120
+#define SC_MAXIMIZE 0xF030
+#define SC_SIZE     0xF000
+#endif
+#ifndef SWP_NOSIZE
+#define SWP_NOSIZE   0x0001
+#define SWP_NOMOVE   0x0002
+#define SWP_NOZORDER 0x0004
+#endif
+#ifndef HWND_TOPMOST
+#define HWND_TOPMOST ((HWND)-1)
+#endif
+#ifndef MB_OK
+#define MB_OK        0x00000000L
+#define MB_OKCANCEL  0x00000001L
+#define IDOK         1
+#define IDCANCEL     2
+#endif
+#ifndef CFS_POINT
+#define CFS_POINT          0x0002
+#define CFS_FORCE_POSITION 0x0020
+#define GCS_COMPSTR        0x0008
+#endif
+#ifndef SM_CXSCREEN
+#define SM_CXSCREEN 0
+#define SM_CYSCREEN 1
+#endif
+
+// --- WNDCLASSEX + CREATESTRUCTW + IME types ----------------------------------
+#ifndef MINIBLINK_WIN_COMPAT_WNDCLASSEX
+#define MINIBLINK_WIN_COMPAT_WNDCLASSEX
+typedef struct tagWNDCLASSEXW {
+    UINT      cbSize;
+    UINT      style;
+    WNDPROC   lpfnWndProc;
+    int       cbClsExtra, cbWndExtra;
+    HINSTANCE hInstance;
+    HICON     hIcon;
+    HCURSOR   hCursor;
+    HBRUSH    hbrBackground;
+    LPCWSTR   lpszMenuName, lpszClassName;
+    HICON     hIconSm;
+} WNDCLASSEXW, *LPWNDCLASSEXW;
+typedef WNDCLASSEXW WNDCLASSEX;
+typedef struct tagCREATESTRUCTW {
+    LPVOID    lpCreateParams;
+    HINSTANCE hInstance;
+    HMENU     hMenu;
+    HWND      hwndParent;
+    int       cy, cx, y, x;
+    LONG      style;
+    LPCWSTR   lpszName, lpszClass;
+    DWORD     dwExStyle;
+} CREATESTRUCTW, *LPCREATESTRUCTW;
+DECLARE_HANDLE(HIMC);
+typedef struct tagCOMPOSITIONFORM {
+    DWORD dwStyle;
+    POINT ptCurrentPos;
+    RECT  rcArea;
+} COMPOSITIONFORM, *LPCOMPOSITIONFORM;
+DECLARE_HANDLE(HDROP);
+#endif
+
+// --- Additional inert USER/GDI/file/window function stubs --------------------
+#ifndef MINIBLINK_WIN_COMPAT_WKE_STUBS
+#define MINIBLINK_WIN_COMPAT_WKE_STUBS
+// Window class / creation (inert: Cocoa hosts the real window on macOS).
+template<typename T> static inline BOOL GetClassInfoW(HINSTANCE, const T*, void*) { return FALSE; }
+static inline short RegisterClassW(const void*) { return 0; }
+static inline short RegisterClassExW(const void*) { return 0; }
+static inline short RegisterClassEx(const void*) { return 0; }
+template<typename T1, typename T2> static inline HWND CreateWindowExW(DWORD, const T1*, const T2*, DWORD, int, int, int, int, HWND, HMENU, HINSTANCE, void*) { return NULL; }
+static inline LRESULT DefWindowProcW(HWND, UINT, WPARAM, LPARAM) { return 0; }
+template<typename T> static inline HICON LoadIconW(HINSTANCE, const T*) { return NULL; }
+#define LoadIcon LoadIconW
+// Window properties (inert).
+template<typename T> static inline HANDLE GetPropW(HWND, const T*) { return NULL; }
+template<typename T> static inline BOOL SetPropW(HWND, const T*, HANDLE) { return FALSE; }
+template<typename T> static inline HANDLE RemovePropW(HWND, const T*) { return NULL; }
+// Window geometry / text / timers (inert).
+static inline BOOL MoveWindow(HWND, int, int, int, int, BOOL) { return FALSE; }
+static inline LONG GetWindowLongW(HWND, int) { return 0; }
+static inline LONG SetWindowLongW(HWND, int, LONG) { return 0; }
+#define GetWindowLong GetWindowLongW
+#define SetWindowLong SetWindowLongW
+template<typename T> static inline BOOL SetWindowTextW(HWND, const T*) { return FALSE; }
+static inline BOOL SetWindowPos(HWND, HWND, int, int, int, int, UINT) { return FALSE; }
+static inline int  GetSystemMetrics(int) { return 0; }
+static inline UINT_PTR SetTimer(HWND, UINT_PTR id, UINT, void*) { return id; }
+static inline BOOL IsZoomed(HWND) { return FALSE; }
+template<typename T1, typename T2> static inline int MessageBoxW(HWND, const T1*, const T2*, UINT) { return 0; }
+// Paint / GDI (inert: paint goes through Cocoa/Skia on macOS).
+typedef void* HGDIOBJ;
+static inline HDC  CreateCompatibleDC(HDC) { return NULL; }
+static inline HBITMAP CreateCompatibleBitmap(HDC, int, int) { return NULL; }
+static inline HGDIOBJ SelectObject(HDC, HGDIOBJ) { return NULL; }
+static inline BOOL BitBlt(HDC, int, int, int, int, HDC, int, int, DWORD) { return FALSE; }
+static inline BOOL InvalidateRect(HWND, const RECT*, BOOL) { return FALSE; }
+static inline HDC  BeginPaint(HWND, PAINTSTRUCT*) { return NULL; }
+static inline BOOL EndPaint(HWND, const PAINTSTRUCT*) { return FALSE; }
+static inline BOOL IntersectRect(RECT* dst, const RECT*, const RECT*) { if (dst) { dst->left=dst->top=dst->right=dst->bottom=0; } return FALSE; }
+// Drag & drop (inert).
+static inline void DragAcceptFiles(HWND, BOOL) {}
+static inline void DragFinish(HDROP) {}
+template<typename T> static inline UINT DragQueryFileW(HDROP, UINT, T*, UINT) { return 0; }
+static inline HRESULT RevokeDragDrop(HWND) { return 0; }
+// IME (inert).
+static inline HIMC ImmGetContext(HWND) { return NULL; }
+static inline BOOL ImmReleaseContext(HWND, HIMC) { return FALSE; }
+static inline BOOL ImmSetCompositionWindow(HIMC, COMPOSITIONFORM*) { return FALSE; }
+static inline LONG ImmGetCompositionStringW(HIMC, DWORD, void*, DWORD) { return 0; }
+// File delete (inert: real persistence handled by the Cocoa/net layer on macOS).
+template<typename T> static inline BOOL DeleteFileW(const T*) { return FALSE; }
+// COM apartment init (no-op on macOS).
+static inline HRESULT CoInitialize(void*) { return 0; }
+static inline void CoUninitialize(void) {}
+// Process termination (used by wke's fatal misuse path; abort mirrors that intent).
+static inline BOOL TerminateProcess(HANDLE, UINT code) { abort(); return TRUE; }
+// Win32 message-pump primitives (inert: the Cocoa run loop drives events on macOS).
+static inline BOOL PeekMessageW(MSG*, HWND, UINT, UINT, UINT) { return FALSE; }
+static inline BOOL TranslateMessage(const MSG*) { return FALSE; }
+static inline LRESULT DispatchMessageW(const MSG*) { return 0; }
+static inline BOOL GetMessageW(MSG*, HWND, UINT, UINT) { return FALSE; }
+#define PeekMessage PeekMessageW
+#define DispatchMessage DispatchMessageW
+#define GetMessage GetMessageW
+
+// --- Thread-local storage (real, pthread-key backed) -------------------------
+// A small fixed slot table maps a DWORD index (Win32 TLS index) to a pthread_key_t,
+// so the index stays a real 32-bit value (a heap pointer would truncate into DWORD).
+#ifndef MINIBLINK_WIN_COMPAT_TLS
+#define MINIBLINK_WIN_COMPAT_TLS
+#include <pthread.h>
+#define MB_TLS_MAX_SLOTS 256
+#define MB_TLS_INVALID   ((DWORD)0xFFFFFFFF)
+static inline pthread_key_t* mb_tls_slots(void) {
+    static pthread_key_t s_slots[MB_TLS_MAX_SLOTS];
+    return s_slots;
+}
+static inline bool* mb_tls_used(void) {
+    static bool s_used[MB_TLS_MAX_SLOTS];
+    return s_used;
+}
+static inline DWORD TlsAlloc(void) {
+    pthread_key_t* slots = mb_tls_slots();
+    bool* used = mb_tls_used();
+    for (DWORD i = 0; i < MB_TLS_MAX_SLOTS; ++i) {
+        if (!used[i]) {
+            if (pthread_key_create(&slots[i], nullptr) != 0)
+                return MB_TLS_INVALID;
+            used[i] = true;
+            return i;
+        }
+    }
+    return MB_TLS_INVALID;
+}
+static inline BOOL TlsSetValue(DWORD index, LPVOID value) {
+    if (index >= MB_TLS_MAX_SLOTS || !mb_tls_used()[index]) return FALSE;
+    return pthread_setspecific(mb_tls_slots()[index], value) == 0;
+}
+static inline LPVOID TlsGetValue(DWORD index) {
+    if (index >= MB_TLS_MAX_SLOTS || !mb_tls_used()[index]) return nullptr;
+    return pthread_getspecific(mb_tls_slots()[index]);
+}
+static inline BOOL TlsFree(DWORD index) {
+    if (index >= MB_TLS_MAX_SLOTS || !mb_tls_used()[index]) return FALSE;
+    BOOL ok = pthread_key_delete(mb_tls_slots()[index]) == 0;
+    mb_tls_used()[index] = false;
+    return ok;
+}
+#endif
+// File I/O (inert: real file persistence is handled by the Cocoa layer on macOS).
+template<typename T> static inline HANDLE CreateFileW(const T*, DWORD, DWORD, void*, DWORD, DWORD, HANDLE) { return INVALID_HANDLE_VALUE; }
+static inline BOOL  WriteFile(HANDLE, const void*, DWORD, DWORD* written, void*) { if (written) *written = 0; return FALSE; }
+static inline BOOL  ReadFile(HANDLE, void*, DWORD, DWORD* read, void*) { if (read) *read = 0; return FALSE; }
+static inline DWORD GetFileSize(HANDLE, DWORD* high) { if (high) *high = 0; return 0; }
+// GDI device context (inert: paint goes through Cocoa/Skia on macOS).
+static inline HDC  GetDC(HWND) { return NULL; }
+static inline int  ReleaseDC(HWND, HDC) { return 0; }
+static inline int  GetDeviceCaps(HDC, int) { return 96; }  // default 96 DPI
+// Path / module helpers (inert).
+template<typename T> static inline DWORD GetModuleFileNameW(HMODULE, T*, DWORD) { return 0; }
+template<typename T> static inline BOOL  PathRemoveFileSpecW(T*) { return FALSE; }
+template<typename T> static inline DWORD GetCurrentDirectoryW(DWORD, T*) { return 0; }
+template<typename T> static inline DWORD GetCurrentDirectory(DWORD n, T* b) { return GetCurrentDirectoryW(n, b); }
+#endif
+
 #endif // MINIBLINK_WIN_COMPAT_WINDOWS_H_

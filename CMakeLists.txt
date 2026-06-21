@@ -97,6 +97,7 @@ if(MINIBLINK_BUILD_BLINK)
     # OrigChromeStubs.cpp) instead of orig_chrome_content. To build the real one:
     #   include(orig_chrome/content/orig_chrome_content.cmake)
     include(content/content_browser.cmake)                   # embedding-host page host (content::WebPageImpl + Cocoa web_impl_mac)
+    include(wke/wke.cmake)                                    # wke public C API (libwke surface)
     add_subdirectory(test/blink)  # smoke test: prove geometry links + computes
 
     if(APPLE)

@@ -120,7 +120,13 @@ static std::wstring getSaveName(std::string contentDisposition, std::string url)
         return result;
     result = getSaveNameFromUrl(url);
 
+#if defined(_WIN32)
     std::string resultUtf8 = base::UTF16ToUTF8(result.c_str());
+#else
+    // macOS: wchar_t is 32-bit, so std::wstring won't bind to string16 (UTF-16) directly.
+    // Convert wstring -> UTF-16 -> UTF-8 using the width-aware base helpers.
+    std::string resultUtf8 = base::UTF16ToUTF8(base::WideToUTF16(result));
+#endif
 
     const utf8* str = wkeUtilDecodeURLEscape(resultUtf8.c_str());
     std::string strUtf8(str);

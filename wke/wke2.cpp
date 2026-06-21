@@ -279,7 +279,7 @@ const char kPageSetupScriptFormat[] = "setup(%s);";
 static int getWindowDPI(HWND hWnd)
 {
     HDC screenDC = ::GetDC(hWnd);
-    int dpiX = ::GetDeviceCaps(screenDC, LOGPIXELSX);//96ÊÇ100%¡¢120ÊÇ125%
+    int dpiX = ::GetDeviceCaps(screenDC, LOGPIXELSX);//96ï¿½ï¿½100%ï¿½ï¿½120ï¿½ï¿½125%
     ::ReleaseDC(nullptr, screenDC);
 
     return dpiX;
@@ -524,9 +524,9 @@ const wkePdfDatas* printToPdf(wkeWebView webView, blink::WebFrame* frame, const 
     if (!frame)
         return nullptr;
 
-    int windowDPI = 72; // chromiumÊÇÓÃdesired_dpi=72Ó²±àÂë£¬¶ø²»ÊÇgetWindowDPI(webView->windowHandle());
+    int windowDPI = 72; // chromiumï¿½ï¿½ï¿½ï¿½desired_dpi=72Ó²ï¿½ï¿½ï¿½ë£¬ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½getWindowDPI(webView->windowHandle());
     int dpi = params->dpi;
-    int srcWidth = convertUnit(params->width, dpi, kPointsPerInch); // ×ª»»³Épt£¬µ«ÓÉÓÚDPIÊÇ72£¬ËùÒÔÒ²¿ÉÒÔËµÊÇpx
+    int srcWidth = convertUnit(params->width, dpi, kPointsPerInch); // ×ªï¿½ï¿½ï¿½ï¿½ptï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½DPIï¿½ï¿½72ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ò²ï¿½ï¿½ï¿½ï¿½Ëµï¿½ï¿½px
     int srcHeight = convertUnit(params->height, dpi, kPointsPerInch);
 
     int marginTop = convertUnit(params->marginTop, dpi, kPointsPerInch);
@@ -635,12 +635,12 @@ const wkeMemBuf* printToBitmap(wkeWebView webView, const wkeScreenshotSettings* 
 
     BITMAPFILEHEADER fileHeader = {
         0x4d42,
-        sizeof(BITMAPFILEHEADER) + sizeof(BITMAPINFOHEADER) + size,
+        (DWORD)(sizeof(BITMAPFILEHEADER) + sizeof(BITMAPINFOHEADER) + size),
         0, 0,
-        sizeof(BITMAPFILEHEADER) + sizeof(BITMAPINFOHEADER)
+        (DWORD)(sizeof(BITMAPFILEHEADER) + sizeof(BITMAPINFOHEADER))
     };
 
-    BITMAPINFOHEADER bmiHeader = { sizeof(BITMAPINFOHEADER), width, -height, 1, 32, BI_RGB, };
+    BITMAPINFOHEADER bmiHeader = { (DWORD)sizeof(BITMAPINFOHEADER), width, -height, 1, 32, BI_RGB, };
 
     std::vector<char> bmpData;
     bmpData.resize(size);
@@ -729,10 +729,10 @@ void screenshot(wkeWebView webView, const wkeScreenshotSettings* settings, wkeOn
 
         size_t size = sizeof(BITMAPFILEHEADER) + sizeof(BITMAPINFOHEADER) + bitmap.getSize();
 
-        BITMAPFILEHEADER fileHeader = { 0x4d42, sizeof(BITMAPFILEHEADER) + sizeof(BITMAPINFOHEADER) + size,
-            0, 0, sizeof(BITMAPFILEHEADER) + sizeof(BITMAPINFOHEADER) };
+        BITMAPFILEHEADER fileHeader = { 0x4d42, (DWORD)(sizeof(BITMAPFILEHEADER) + sizeof(BITMAPINFOHEADER) + size),
+            0, 0, (DWORD)(sizeof(BITMAPFILEHEADER) + sizeof(BITMAPINFOHEADER)) };
 
-        BITMAPINFOHEADER bmiHeader = { sizeof(BITMAPINFOHEADER), width, -viewportSize.height(), 1, 32, BI_RGB, };
+        BITMAPINFOHEADER bmiHeader = { (DWORD)sizeof(BITMAPINFOHEADER), width, -viewportSize.height(), 1, 32, BI_RGB, };
 
         std::vector<char> bmpData;
         bmpData.resize(size);
@@ -834,7 +834,7 @@ void WKE_CALL_TYPE wkeEnableHighDPISupport()
     content::BlinkPlatformImpl* platform = (content::BlinkPlatformImpl*)blink::Platform::current();
 
     HDC screenDC = ::GetDC(nullptr);
-    int dpiX = ::GetDeviceCaps(screenDC, LOGPIXELSX); // 96?ÊÇ100%¡¢120?ÊÇ125%
+    int dpiX = ::GetDeviceCaps(screenDC, LOGPIXELSX); // 96?ï¿½ï¿½100%ï¿½ï¿½120?ï¿½ï¿½125%
     platform->setZoom(dpiX / 96.0);
     ::ReleaseDC(nullptr, screenDC);
 

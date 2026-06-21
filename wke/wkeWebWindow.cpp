@@ -100,6 +100,13 @@ void CWebWindow::onDocumentReady(wkeDocumentReadyCallback callback, void* callba
 
 bool CWebWindow::_createWindow(const wkeWindowCreateInfo* info)
 {
+#if !defined(_WIN32)
+    // macOS: the real host window is an NSWindow/NSView created by the Cocoa layer
+    // (port/mac/web_view_mac.mm CreateWebWindow). Here we only keep the portable view
+    // bookkeeping (size) so the CWebWindow object is usable; no Win32 HWND is created.
+    CWebView::resize(info->width, info->height);
+    return true;
+#else
     if (IsWindow(m_hWnd))
         return true;
 
@@ -164,6 +171,7 @@ bool CWebWindow::_createWindow(const wkeWindowCreateInfo* info)
 
     CWebView::resize(info->width, info->height);
     return TRUE;
+#endif // defined(_WIN32)
 }
 
 void CWebWindow::_destroyWindow()
@@ -173,7 +181,7 @@ void CWebWindow::_destroyWindow()
     m_state = kWkeWebWindowDestroing;
 
     ::KillTimer(m_hWnd, (UINT_PTR)this);
-    ::DestroyWindow(m_hWnd); // ÕâÀï»áÖØÈëµ½±¾º¯Êý
+    ::DestroyWindow(m_hWnd); // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ëµ½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 }
 
 void CWebWindow::_initCallbacks()
@@ -576,7 +584,7 @@ LRESULT CWebWindow::_windowProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM l
         ::ImmReleaseContext(hwnd, hIMC);
     }
         return 0;
-    case WM_IME_COMPOSITION: { // Ì¨Íå°æwindows£¬Èç¹û²»ÏìÓ¦ÕâÏûÏ¢£¬ÊäÈë·¨»áÃ»ÓÐÔ¤ÀÀµÄ×ÖÌå
+    case WM_IME_COMPOSITION: { // Ì¨ï¿½ï¿½ï¿½windowsï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ó¦ï¿½ï¿½ï¿½ï¿½Ï¢ï¿½ï¿½ï¿½ï¿½ï¿½ë·¨ï¿½ï¿½Ã»ï¿½ï¿½Ô¤ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
         std::vector<WCHAR> buffer;
         HIMC hIMC = ::ImmGetContext(hwnd);
         buffer.resize(ImmGetCompositionStringW(hIMC, GCS_COMPSTR, NULL, 0) + 2);
@@ -587,7 +595,7 @@ LRESULT CWebWindow::_windowProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM l
         //OutputDebugStringW(buffer.c_str());
         break;
     }
-    case WM_GETDLGCODE: // Ê¹µÃMB¿Ø¼þ×÷Îª¶Ô»°¿ò×Ó´°¿ÚÊ±¿É½ÓÊÕµ½¼üÅÌÏûÏ¢
+    case WM_GETDLGCODE: // Ê¹ï¿½ï¿½MBï¿½Ø¼ï¿½ï¿½ï¿½Îªï¿½Ô»ï¿½ï¿½ï¿½ï¿½Ó´ï¿½ï¿½ï¿½Ê±ï¿½É½ï¿½ï¿½Õµï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ï¢
         return DLGC_WANTARROWS | DLGC_WANTALLKEYS | DLGC_WANTCHARS;
     }
 

@@ -25,7 +25,10 @@
 #include "net/cookies/WebCookieJarCurlImpl.h"
 #include "content/browser/TouchStruct.h"
 
+#if defined(_WIN32)
+// Windows-only PDF printing plugin (mbvip/printing); not built on macOS and unused here.
 #include "printing/PdfViewerPluginFunc.h"
+#endif
 
 #undef  PURE
 #define PURE = 0;
@@ -62,8 +65,11 @@ CWebView::CWebView(COLORREF color)
     _initMemoryDC();
 
     m_settings.size = 0;
-    //m_webPage->wkeHandler().isWke = true;   
+    //m_webPage->wkeHandler().isWke = true;
+#if defined(_WIN32)
+    // Windows-only built-in PDF viewer NPAPI plugin (mbvip/printing); not built on macOS.
     wkeAddNpapiPlugin(this, printing::PdfViewerPluginNPInitialize, printing::PdfViewerPluginNPGetEntryPoints, printing::PdfViewerPluginNPShutdown);
+#endif
 }
 
 CWebView::~CWebView()
@@ -203,7 +209,14 @@ static bool trimPathBody(const utf8* inUrl, int length, bool isFile, std::vector
 //         ::PathRemoveFileSpecW(filenameBuffer.data());
         ::GetCurrentDirectory(MAX_PATH, filenameBuffer.data());
 
+#if defined(_WIN32)
         int pathLength = wcslen(filenameBuffer.data());
+#else
+        // macOS: WCHAR is 16-bit (unsigned short), so wcslen (wchar_t*, 32-bit) won't bind.
+        int pathLength = 0;
+        while (filenameBuffer[pathLength] != 0)
+            ++pathLength;
+#endif
         if (pathLength <= 1 || pathLength > MAX_PATH)
             return false;
 
@@ -257,7 +270,7 @@ void CWebView::_loadURL(const utf8* inUrl, bool isFile)
     if (!trimPath(inUrl, isFile, &inUrlBuf))
         return;
 
-    //cexer ±ØÐëµ÷ÓÃString::fromUTF8ÏÔÊ¾¹¹ÔìµÚ¶þ¸ö²ÎÊý£¬·ñÔòString::String»á°ÑinUrlµ±×÷latin1´¦Àí¡£
+    //cexer ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½String::fromUTF8ï¿½ï¿½Ê¾ï¿½ï¿½ï¿½ï¿½Ú¶ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½String::Stringï¿½ï¿½ï¿½inUrlï¿½ï¿½ï¿½ï¿½latin1ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
     blink::KURL url(blink::ParsedURLString, &inUrlBuf[0]);
     if (!url.isValid())
         url.setProtocol("http:");
@@ -347,7 +360,17 @@ void CWebView::loadFile(const utf8* filename)
         return;
 
     String filenameUTF8(filename, length);
+#if defined(_WIN32)
     loadFile(ensureUTF16UChar(filenameUTF8, true).data());
+#else
+    // macOS: wchar_t is 32-bit; widen the UTF-16 (UChar) data into a wchar_t buffer.
+    Vector<UChar> u16 = ensureUTF16UChar(filenameUTF8, true);
+    Vector<wchar_t> wbuf;
+    wbuf.reserveCapacity(u16.size());
+    for (size_t i = 0; i < u16.size(); ++i)
+        wbuf.append(static_cast<wchar_t>(u16[i]));
+    loadFile(wbuf.data());
+#endif
 }
 
 void CWebView::loadFile(const wchar_t* filename)
@@ -358,7 +381,16 @@ void CWebView::loadFile(const wchar_t* filename)
     if (length < 4)
         return;
 
+#if defined(_WIN32)
     String filenameA(filename, length);
+#else
+    // macOS: wchar_t is 32-bit; narrow into UChar (UTF-16) for the WTF::String ctor.
+    Vector<UChar> u16;
+    u16.reserveCapacity(length);
+    for (size_t i = 0; i < length; ++i)
+        u16.append(static_cast<UChar>(filename[i]));
+    String filenameA(u16.data(), u16.size());
+#endif
     _loadURL(WTF::ensureStringToUTF8(filenameA, true).data(), true);
 }
 
@@ -878,7 +910,7 @@ bool CWebView::fireKeyPressEvent(unsigned int charCode, unsigned int flags, bool
 //     if (flags & WKE_EXTENDED)
 //         lParam |= ((KF_EXTENDED) >> 16);
 
-    if (systemKey) // Õâ¸ösystemKeyÒÔÇ°Ã»ÓÐ£¬ÏÖÔÚÎªÁËÖ§³ÖflashÖÐÎÄ£¬¸ÄÓÃ×öÇø·ÖWM_IME_CHARÏûÏ¢
+    if (systemKey) // ï¿½ï¿½ï¿½systemKeyï¿½ï¿½Ç°Ã»ï¿½Ð£ï¿½ï¿½ï¿½ï¿½ï¿½Îªï¿½ï¿½Ö§ï¿½ï¿½flashï¿½ï¿½ï¿½Ä£ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½WM_IME_CHARï¿½ï¿½Ï¢
         m_webPage->fireKeyPressEvent(m_webPage->getHWND(), WM_IME_CHAR, wParam, lParam);
     else
         m_webPage->fireKeyPressEvent(m_webPage->getHWND(), WM_CHAR, wParam, lParam);
@@ -1137,6 +1169,7 @@ void CWebView::onPromptBox(wkePromptBoxCallback callback, void* callbackParam)
     m_webPage->wkeHandler().promptBoxCallbackParam = callbackParam;
 }
 
+#if defined(_WIN32)
 static LRESULT CALLBACK hideWindowWndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
     return DefWindowProc(hWnd, message, wParam, lParam);
@@ -1173,9 +1206,11 @@ static HWND createHideWnd()
 
     return s_hWnd;
 }
+#endif // defined(_WIN32)
 
 void WKE_CALL_TYPE defaultRunAlertBox(wkeWebView webView, void* param, const wkeString msg)
-{   
+{
+#if defined(_WIN32)
     HWND hWnd = createHideWnd();
     ::SetWindowPos(hWnd, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE);
     ::SetForegroundWindow(hWnd);
@@ -1202,12 +1237,22 @@ void WKE_CALL_TYPE defaultRunAlertBox(wkeWebView webView, void* param, const wke
 
     hWnd = wkeGetHostHWND(webView);
     ::SetFocus(hWnd);
+#else
+    // macOS: native alert is presented by the Cocoa layer (port/mac/*); no-op default here.
+    (void)webView; (void)param; (void)msg;
+#endif
 }
 
 bool WKE_CALL_TYPE defaultRunConfirmBox(wkeWebView webView, void* param, const wkeString msg)
 {
+#if defined(_WIN32)
     int result = MessageBoxW(NULL, wkeGetStringW(msg), L"wke", MB_OKCANCEL);
     return result == IDOK;
+#else
+    // macOS: native confirm is presented by the Cocoa layer; default to cancel/false.
+    (void)webView; (void)param; (void)msg;
+    return false;
+#endif
 }
 
 bool WKE_CALL_TYPE defaultRunPromptBox(wkeWebView webView, void* param, const wkeString msg, const wkeString defaultResult, wkeString result)

@@ -424,7 +424,14 @@ int WKE_CALL_TYPE jsToInt(jsExecState es, jsValue v)
         v8::Isolate* isolate = wkeValue->isolate;
         v8::HandleScope handleScope(isolate);
         v8::Local<v8::Value> value = v8::Local<v8::Value>::New(wkeValue->isolate, wkeValue->value);
+#if V8_MAJOR_VERSION < 8
         return value->ToInt32(isolate)->Value();
+#else
+        v8::Local<v8::Int32> int32Value;
+        if (!value->ToInt32(isolate->GetCurrentContext()).ToLocal(&int32Value))
+            return 0;
+        return int32Value->Value();
+#endif
     } else if (WkeJsValue::wkeJsValueInt == wkeValue->type) {
         return wkeValue->intVal;
     } else if (WkeJsValue::wkeJsValueDouble == wkeValue->type) {
@@ -499,7 +506,17 @@ const wchar_t* WKE_CALL_TYPE jsToTempStringW(jsExecState es, jsValue v)
     if (0 == utf16.size())
         return L"";
 
+#if defined(_WIN32)
+    // On Windows wchar_t is 16-bit (== UChar), so the buffer is layout-compatible.
     return wke::createTempWCharString(utf16.data(), utf16.size());
+#else
+    // macOS: wchar_t is 32-bit; widen the UTF-16 (UChar) data into a wchar_t buffer.
+    Vector<wchar_t> wbuf;
+    wbuf.reserveCapacity(utf16.size());
+    for (size_t i = 0; i < utf16.size(); ++i)
+        wbuf.append(static_cast<wchar_t>(utf16[i]));
+    return wke::createTempWCharString(wbuf.data(), wbuf.size());
+#endif
 }
 
 const utf8* WKE_CALL_TYPE jsToTempString(jsExecState es, jsValue v)
@@ -528,7 +545,13 @@ const utf8* WKE_CALL_TYPE jsToTempString(jsExecState es, jsValue v)
 //         if (!value->IsString())
 //             return "";
 
+#if V8_MAJOR_VERSION < 8
         v8::Local<v8::String> stringValue = value->ToString(isolate);
+#else
+        v8::Local<v8::String> stringValue;
+        if (!value->ToString(context).ToLocal(&stringValue))
+            return "";
+#endif
         String stringWTF = blink::v8StringToWebCoreString<String>(stringValue, blink::DoNotExternalize);
 
         sharedStringBuffer = WTF::ensureStringToUTF8(stringWTF, false);
@@ -801,7 +824,17 @@ jsValue WKE_CALL_TYPE jsEval(jsExecState es, const utf8* str)
 {
     String s = String::fromUTF8(str);
     Vector<UChar> buf = WTF::ensureUTF16UChar(s, true);
+#if defined(_WIN32)
+    // On Windows wchar_t is 16-bit (== UChar), so the buffer is layout-compatible.
     return jsEvalW(es, buf.data());
+#else
+    // macOS: wchar_t is 32-bit; widen the UTF-16 (UChar) data into a wchar_t buffer.
+    Vector<wchar_t> wbuf;
+    wbuf.reserveCapacity(buf.size());
+    for (size_t i = 0; i < buf.size(); ++i)
+        wbuf.append(static_cast<wchar_t>(buf[i]));
+    return jsEvalW(es, wbuf.data());
+#endif
 }
 
 jsValue WKE_CALL_TYPE jsEvalW(jsExecState es, const wchar_t* str)
@@ -1008,7 +1041,13 @@ jsValue WKE_CALL_TYPE jsThrowException(jsExecState es, const utf8* exception)
     RELEASE_ASSERT(!es->context.IsEmpty());
 
     v8::Isolate* isolate = es->isolate;
+#if V8_MAJOR_VERSION < 8
     isolate->ThrowException(v8::Exception::Error(v8::String::NewFromUtf8(isolate, exception)));
+#else
+    v8::Local<v8::String> exceptionStr;
+    if (v8::String::NewFromUtf8(isolate, exception, v8::NewStringType::kNormal, -1).ToLocal(&exceptionStr))
+        isolate->ThrowException(v8::Exception::Error(exceptionStr));
+#endif
     return jsUndefined();
 }
 
@@ -1028,7 +1067,13 @@ jsValue WKE_CALL_TYPE jsGet(jsExecState es, jsValue object, const char* prop)
     if (value.IsEmpty() || !value->IsObject())
         return jsUndefined();
 
+#if V8_MAJOR_VERSION < 8
     v8::Local<v8::Object> obj = value->ToObject(isolate);
+#else
+    v8::Local<v8::Object> obj;
+    if (!value->ToObject(context).ToLocal(&obj))
+        return jsUndefined();
+#endif
     v8::TryCatch tryCatch(isolate);
     tryCatch.SetVerbose(true);
 
@@ -1062,7 +1107,13 @@ void WKE_CALL_TYPE jsSet(jsExecState es, jsValue object, const char* prop, jsVal
     if (valueLocal.IsEmpty())
         return;
     
+#if V8_MAJOR_VERSION < 8
     v8::Local<v8::Object> obj = objectLocal->ToObject(isolate);
+#else
+    v8::Local<v8::Object> obj;
+    if (!objectLocal->ToObject(context).ToLocal(&obj))
+        return;
+#endif
     v8::TryCatch tryCatch(isolate);
     tryCatch.SetVerbose(true);
 
@@ -1099,7 +1150,13 @@ void WKE_CALL_TYPE jsDeleteObjectProp(jsExecState es, jsValue object, const char
     if (objectLocal.IsEmpty() || !objectLocal->IsObject())
         return;
 
+#if V8_MAJOR_VERSION < 8
     v8::Local<v8::Object> obj = objectLocal->ToObject(isolate);
+#else
+    v8::Local<v8::Object> obj;
+    if (!objectLocal->ToObject(context).ToLocal(&obj))
+        return;
+#endif
     v8::MaybeLocal<v8::String> propV8 = v8::String::NewFromUtf8(isolate, prop, v8::NewStringType::kNormal, -1);
     if (propV8.IsEmpty())
         return;
@@ -1196,16 +1253,31 @@ jsKeys* WKE_CALL_TYPE jsGetKeys(jsExecState es, jsValue object)
     v8::Context::Scope contextScope(context);
 
     v8::Local<v8::Value> value = getV8Value(object, context);
+#if V8_MAJOR_VERSION < 8
     v8::Local<v8::Object> obj = value->ToObject(isolate);
+#else
+    v8::Local<v8::Object> obj;
+    if (!value->ToObject(context).ToLocal(&obj))
+        return nullptr;
+#endif
     v8::Local<v8::Array> arrKeys = obj->GetPropertyNames(context).FromMaybe(v8::Local<v8::Array>());
 
     if (0 == arrKeys->Length())
         return nullptr;
     jsKeys* result = wke::createTempJsKeys(arrKeys->Length());
-    
+
     for (uint32_t i = 0; i < result->length; ++i) {
+#if V8_MAJOR_VERSION < 8
         v8::Local<v8::Value> value = arrKeys->Get(v8::Integer::New(isolate, i));
         v8::Local<v8::String> str = value->ToString(isolate);
+#else
+        v8::Local<v8::Value> value = arrKeys->Get(context, v8::Integer::New(isolate, i)).FromMaybe(v8::Local<v8::Value>());
+        if (value.IsEmpty())
+            continue;
+        v8::Local<v8::String> str;
+        if (!value->ToString(context).ToLocal(&str))
+            continue;
+#endif
         v8::String::Utf8Value strUtf8(isolate, str);
 
         if (0 == strUtf8.length())
@@ -1508,7 +1580,13 @@ public:
         wke::AutoDisableFreeV8TempObejct autoDisableFreeV8TempObejct;
         getterSetter->setter(execState, getterSetter->setterParam);
 
+#if V8_MAJOR_VERSION < 8
         info.GetReturnValue().SetUndefined();
+#else
+        // V8 8.7: a setter's PropertyCallbackInfo<void> has a ReturnValue<void>, on which
+        // SetUndefined() is ill-formed (static_assert: T must derive from Primitive).
+        // Setters don't return a value, so this is simply a no-op here.
+#endif
     }
 
     static NativeGetterSetterWrap* createWrapAndAddToGlobalObjForRelease(v8::Isolate* isolate, v8::Local<v8::Object>& globalObj)
@@ -1657,7 +1735,13 @@ static jsValue WKE_CALL_TYPE wkeJsBindFunctionWrap(jsExecState es, void* param)
 
 void WKE_CALL_TYPE jsBindFunction(const char* name, jsNativeFunction fn, unsigned int argCount)
 {
+#if V8_MAJOR_VERSION < 8
     wkeJsBindFunction(name, wkeJsBindFunctionWrap, fn, argCount);
+#else
+    // A function pointer does not implicitly convert to void* under conforming clang;
+    // MSVC accepts it as an extension. Cast explicitly on the macOS/V8 8.7 path.
+    wkeJsBindFunction(name, wkeJsBindFunctionWrap, reinterpret_cast<void*>(fn), argCount);
+#endif
 }
 
 static void wkeJsBindSetterGetter(const char* name, wkeJsNativeFunction fn, void* param, unsigned int funcType)
@@ -1691,13 +1775,23 @@ static void wkeJsBindSetterGetter(const char* name, wkeJsNativeFunction fn, void
 void WKE_CALL_TYPE jsBindGetter(const char* name, jsNativeFunction fn)
 {
     wke::checkThreadCallIsValid(__FUNCTION__);
+#if V8_MAJOR_VERSION < 8
     wkeJsBindSetterGetter(name, wkeJsBindFunctionWrap, fn, JS_GETTER);
+#else
+    // A function pointer does not implicitly convert to void* under conforming clang.
+    wkeJsBindSetterGetter(name, wkeJsBindFunctionWrap, reinterpret_cast<void*>(fn), JS_GETTER);
+#endif
 }
 
 void WKE_CALL_TYPE jsBindSetter(const char* name, jsNativeFunction fn)
 {
     wke::checkThreadCallIsValid(__FUNCTION__);
+#if V8_MAJOR_VERSION < 8
     wkeJsBindSetterGetter(name, wkeJsBindFunctionWrap, fn, JS_SETTER);
+#else
+    // A function pointer does not implicitly convert to void* under conforming clang.
+    wkeJsBindSetterGetter(name, wkeJsBindFunctionWrap, reinterpret_cast<void*>(fn), JS_SETTER);
+#endif
 }
 
 void WKE_CALL_TYPE wkeJsBindFunction(const char* name, wkeJsNativeFunction fn, void* param, unsigned int argCount)
@@ -1839,7 +1933,11 @@ jsValue WKE_CALL_TYPE jsObject(jsExecState es, jsData* data)
     wrap->set(data);
 
     v8::Local<v8::External> external = v8::External::New(isolate, wrap);
+#if V8_MAJOR_VERSION < 8
     objTemplate->SetNamedPropertyHandler(namedPropertyGetterCallback, namedPropertySetterCallback, nullptr, nullptr, nullptr, external);
+#else
+    objTemplate->SetHandler(v8::NamedPropertyHandlerConfiguration(namedPropertyGetterCallback, namedPropertySetterCallback, nullptr, nullptr, nullptr, external));
+#endif
     
     WkeJsValue* wkeJsValue = nullptr;
     v8::Local<v8::Object> objInst = objTemplate->NewInstance(context).ToLocalChecked();
@@ -1927,7 +2025,13 @@ jsData* WKE_CALL_TYPE jsGetData(jsExecState es, jsValue value)
         if (!valueV8->IsObject())
             return nullptr;
 
+#if V8_MAJOR_VERSION < 8
         v8::Local<v8::Object> obj = valueV8->ToObject(isolate);
+#else
+        v8::Local<v8::Object> obj;
+        if (!valueV8->ToObject(context).ToLocal(&obj))
+            return nullptr;
+#endif
         external = blink::V8HiddenValue::getHiddenValue(isolate, obj, v8::String::NewFromUtf8(isolate, "wkeJsData", v8::NewStringType::kNormal, -1).ToLocalChecked());
         if (external.IsEmpty() || !external->IsExternal())
             return nullptr;
@@ -2158,8 +2262,14 @@ void onReleaseGlobalObject(content::WebFrameClientImpl* client, blink::WebLocalF
 
             v8::Local<v8::Value> value = v8::Local<v8::Value>::New(wkeJsValue->isolate, wkeJsValue->value);
             if (value.IsEmpty() && value->IsObject()) {
+#if V8_MAJOR_VERSION < 8
                 v8::Local<v8::Object> obj = value->ToObject(isolate);
                 blink::V8HiddenValue::deleteHiddenValue(isolate, obj, v8::String::NewFromUtf8(isolate, "wkeJsData", v8::NewStringType::kNormal, -1).ToLocalChecked());
+#else
+                v8::Local<v8::Object> obj;
+                if (value->ToObject(context).ToLocal(&obj))
+                    blink::V8HiddenValue::deleteHiddenValue(isolate, obj, v8::String::NewFromUtf8(isolate, "wkeJsData", v8::NewStringType::kNormal, -1).ToLocalChecked());
+#endif
             }
 
             wkeJsValue->value.Reset();
@@ -2248,13 +2358,21 @@ jsValue v8ValueToJsValue(v8::Local<v8::Context> context, v8::Local<v8::Value> v8
         //return wke::createJsValueString(context, "Object");
         return createJsValueByLocalValue(context->GetIsolate(), context, v8Value);
     } else if (v8Value->IsInt32()) {
+#if V8_MAJOR_VERSION < 8
         v8::Local<v8::Int32> v8Number = v8Value->ToInt32(context->GetIsolate());
+#else
+        v8::Local<v8::Int32> v8Number = v8Value->ToInt32(context).FromMaybe(v8::Local<v8::Int32>());
+#endif
         return jsInt(v8Number->Value());
     } else if (v8Value->IsUint32()) {
         v8::Local<v8::Uint32> v8Number = v8Value->ToUint32(context).FromMaybe(v8::Local<v8::Uint32>());
         return jsInt(v8Number->Value());
     } else if (v8Value->IsNumber()) {
+#if V8_MAJOR_VERSION < 8
         v8::Local<v8::Number> v8Number = v8Value->ToNumber(context->GetIsolate());
+#else
+        v8::Local<v8::Number> v8Number = v8Value->ToNumber(context).FromMaybe(v8::Local<v8::Number>());
+#endif
         return jsDouble(v8Number->Value());
     }
 
@@ -2299,8 +2417,18 @@ void recordJsExceptionInfo(const v8::TryCatch& tryCatch)
     g_jsExceptionInfo->sourceLine = strDupWithLengthLimit(*sourceLineUtf8, sourceLineUtf8.length());
 
     if (!message->GetScriptResourceName().IsEmpty()) {
+#if V8_MAJOR_VERSION < 8
         v8::String::Utf8Value scriptResourceNameUtf8(isolate, message->GetScriptResourceName()->ToString(isolate));
         g_jsExceptionInfo->scriptResourceName = strDupWithLengthLimit(*scriptResourceNameUtf8, scriptResourceNameUtf8.length());
+#else
+        // V8 8.7: Value::ToString takes a Local<Context> and returns MaybeLocal<String>.
+        v8::Local<v8::String> scriptResourceNameStr;
+        if (message->GetScriptResourceName()->ToString(isolate->GetCurrentContext()).ToLocal(&scriptResourceNameStr)) {
+            v8::String::Utf8Value scriptResourceNameUtf8(isolate, scriptResourceNameStr);
+            g_jsExceptionInfo->scriptResourceName = strDupWithLengthLimit(*scriptResourceNameUtf8, scriptResourceNameUtf8.length());
+        } else
+            g_jsExceptionInfo->scriptResourceName = mallocEmpty();
+#endif
     } else
         g_jsExceptionInfo->scriptResourceName = mallocEmpty();
 
