@@ -5,7 +5,7 @@
 
 set(WKED "${CMAKE_SOURCE_DIR}/wke")
 file(GLOB WKE_SRC "${WKED}/*.cpp")
-list(FILTER WKE_SRC EXCLUDE REGEX "/(wkeGlobalVar|wkeString)\\.cpp$")  # in wke_globals
+list(FILTER WKE_SRC EXCLUDE REGEX "/(wkeGlobalVar|wkeString|CurlVsetoptForwardMac)\\.cpp$")  # in wke_globals
 
 add_library(wke STATIC ${WKE_SRC})
 target_link_libraries(wke PUBLIC content_browser mc net_portable)
