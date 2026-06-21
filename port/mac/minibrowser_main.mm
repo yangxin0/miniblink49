@@ -169,6 +169,66 @@ static void onPaintUpdated(wkeWebView, void*, const HDC, int x, int y, int cx, i
     });
 }
 
+// ---- Modernization shims (low-disk: no engine rebuild) ----------------------
+// A current Chrome UA so sites serve their standard path instead of an
+// "unsupported browser" page. (V8 8.7 already provides modern JS; the gap is the
+// blink-53 web-platform layer, which the polyfills below partly bridge.)
+static const char* kModernUA =
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
+    "(KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36";
+
+// JS polyfills injected into every frame BEFORE its page scripts run (via
+// wkeOnDidCreateScriptContext). Guarded so they never clobber a native impl.
+// These cover the most-checked web-platform APIs blink-53 lacks; expand as needed.
+static const char* kPolyfillJS = R"JS(
+(function(){
+  'use strict';
+  if (!window.requestIdleCallback) {
+    window.requestIdleCallback = function(cb){ return setTimeout(function(){
+      cb({didTimeout:false, timeRemaining:function(){return 50;}}); }, 1); };
+    window.cancelIdleCallback = function(id){ clearTimeout(id); };
+  }
+  if (!window.IntersectionObserver) {
+    var IO = function(cb){ this._cb = cb; };
+    IO.prototype.observe = function(el){ var s=this; setTimeout(function(){
+      try { s._cb([{target:el, isIntersecting:true, intersectionRatio:1,
+        boundingClientRect:el.getBoundingClientRect(),
+        intersectionRect:el.getBoundingClientRect(), rootBounds:null, time:Date.now()}], s);
+      } catch(e){} }, 0); };
+    IO.prototype.unobserve=function(){}; IO.prototype.disconnect=function(){};
+    IO.prototype.takeRecords=function(){return [];};
+    window.IntersectionObserver = IO;
+    window.IntersectionObserverEntry = function(){};
+  }
+  if (!window.ResizeObserver) {
+    var RO = function(cb){ this._cb = cb; };
+    RO.prototype.observe = function(el){ var s=this; setTimeout(function(){
+      try { s._cb([{target:el, contentRect:el.getBoundingClientRect()}], s); } catch(e){} }, 0); };
+    RO.prototype.unobserve=function(){}; RO.prototype.disconnect=function(){};
+    window.ResizeObserver = RO;
+  }
+  if (!window.customElements) {
+    var reg = {}, waits = {};
+    window.customElements = {
+      define: function(name, ctor){ reg[name]=ctor; if(waits[name]){waits[name].forEach(function(r){r();}); delete waits[name];} },
+      get: function(name){ return reg[name]; },
+      whenDefined: function(name){ return reg[name] ? Promise.resolve()
+        : new Promise(function(res){ (waits[name]=waits[name]||[]).push(res); }); },
+      upgrade: function(){}
+    };
+  }
+  if (!window.queueMicrotask) {
+    window.queueMicrotask = function(cb){ Promise.resolve().then(cb); };
+  }
+})();
+)JS";
+
+// Inject the polyfills as soon as a frame's V8 context exists (before page JS).
+static void onDidCreateScriptContext(wkeWebView webView, void* /*param*/,
+    wkeWebFrameHandle frameId, void* /*context*/, int /*extGroup*/, int /*worldId*/) {
+    wkeRunJsByFrame(webView, frameId, kPolyfillJS, false);
+}
+
 @interface MbAppDelegate : NSObject <NSApplicationDelegate>
 @end
 @implementation MbAppDelegate
@@ -205,6 +265,10 @@ int main(int argc, const char** argv) {
         g_webView = wkeCreateWebView();
         wkeResize(g_webView, W, H);
         wkeOnPaintUpdated(g_webView, onPaintUpdated, nullptr);
+        // Low-disk modernization: spoof a modern Chrome UA + inject web-platform
+        // polyfills into every frame before its scripts run.
+        wkeSetUserAgent(g_webView, kModernUA);
+        wkeOnDidCreateScriptContext(g_webView, onDidCreateScriptContext, nullptr);
         wkeLoadURL(g_webView, url);
 
         NSLog(@"[minibrowser] loading %s", url);
