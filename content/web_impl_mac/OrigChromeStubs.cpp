@@ -38,6 +38,21 @@ blink::WebCompositorSupport* OrigChromeMgr::createWebCompositorSupport() { retur
 blink::WebMediaPlayer* OrigChromeMgr::createWebMediaPlayer(
     blink::WebLocalFrame*, const blink::WebURL&, blink::WebMediaPlayerClient*) { return nullptr; }
 
+// OrigChrome thread bring-up: only invoked from wkeSetDebugConfig(
+// "initOrigChromeUiThread"/"initOrigChromeBlinkThread"). In the default
+// lightweight path these are never reached (getInst() is null), so no-op stubs
+// suffice to satisfy the link. Mirrors the rest of this file.
+void OrigChromeMgr::initUiThread() {}
+void OrigChromeMgr::initBlinkThread() {}
+void OrigChromeMgr::setGLImplType(GLImplType) {}
+
+// Heartbeat callback the UI thread fires each spin. Declared (typedef + extern)
+// inline in wke/wke.cpp and assigned via wkeSetUiThreadHeartbeatCallback; with
+// no OrigChrome UI thread running on macOS it is only ever stored, never fired.
+// Define it here so the assignment in wke.cpp links.
+typedef void(WINAPI* PfnUiThreadHeartbeatCallback)();
+PfnUiThreadHeartbeatCallback g_uiThreadHeartbeatCallback = nullptr;
+
 // --- LayerTreeWrap (constructed only when getInst() != null, i.e. never here) --
 LayerTreeWrap::LayerTreeWrap(WebPageOcBridge*, bool) {}
 LayerTreeWrap::~LayerTreeWrap() {}

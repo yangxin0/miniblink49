@@ -79,6 +79,12 @@ public:
     }
     int NumberOfWorkerThreads(void) override;
     std::shared_ptr<v8::TaskRunner> GetForegroundTaskRunner(v8::Isolate*) override;
+#if V8_MAJOR_VERSION >= 8
+    // PostJob became a pure virtual in V8 8.x; delegate to the wrapped default
+    // platform. Declared only for V8 8+ so the V8 7.x ABI is unchanged.
+    std::unique_ptr<v8::JobHandle> PostJob(
+        v8::TaskPriority priority, std::unique_ptr<v8::JobTask> job_task) override;
+#endif
 #else
     // CallOn/DelayedOnForegroundThread + CallOnBackgroundThread were removed from
     // v8::Platform in V8 7+ (replaced by task runners). Pre-7 only.

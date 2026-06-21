@@ -119,6 +119,10 @@ V8Platform* V8Platform::Get() {
     return g_v8_platform;
 }
 
+#if V8_MAJOR_VERSION < 7
+// Win32 background-worker queue, used only by the pre-V8-7 CallOnBackgroundThread
+// path. On V8 7+ worker scheduling is delegated to DefaultPlatformWrap, so this
+// Win32-only block (CRITICAL_SECTION / threads) is excluded.
 struct WorkThreadItem {
     WorkThreadItem()
     {
@@ -160,10 +164,11 @@ static DWORD NTAPI v8WorkThreadProc(void* param)
         if (item)
             item->task->Run();
         delete item;
-        
+
         ::Sleep(16);
     }
 }
+#endif // V8_MAJOR_VERSION < 7
 
 V8Platform::V8Platform()
 {
@@ -217,6 +222,10 @@ void V8Platform::CallOnBackgroundThread(v8::Task* task, v8::Platform::ExpectedRu
 
 #endif
 
+#if V8_MAJOR_VERSION < 7
+// Foreground-thread task posting: removed from v8::Platform in V8 7+ (replaced by
+// per-isolate TaskRunners via GetForegroundTaskRunner). Pre-7 only; the header
+// only declares these in its V8<7 branch.
 void V8Platform::CallOnForegroundThread(v8::Isolate* isolate, v8::Task* task)
 {
     blink::V8PerIsolateData* data = blink::V8PerIsolateData::from(isolate);
@@ -228,6 +237,7 @@ void V8Platform::CallDelayedOnForegroundThread(v8::Isolate* isolate, v8::Task* t
     blink::V8PerIsolateData* data = blink::V8PerIsolateData::from(isolate);
     data->getThread()->postDelayedTask(FROM_HERE, new V8TaskToWebThreadTask(task), (long long)(delay_in_seconds * 1000));
 }
+#endif // V8_MAJOR_VERSION < 7
 
 double V8Platform::MonotonicallyIncreasingTime()
 {
@@ -257,6 +267,15 @@ int V8Platform::NumberOfWorkerThreads()
 {
     return m_defaultPlatformWrap->NumberOfWorkerThreads();
 }
+
+#if V8_MAJOR_VERSION >= 8
+std::unique_ptr<v8::JobHandle> V8Platform::PostJob(
+    v8::TaskPriority priority, std::unique_ptr<v8::JobTask> job_task)
+{
+    // Delegate parallel-job scheduling to the wrapped V8 default platform.
+    return m_defaultPlatformWrap->PostJob(priority, std::move(job_task));
+}
+#endif
 
 std::shared_ptr<v8::TaskRunner> V8Platform::GetForegroundTaskRunner(v8::Isolate* isolate)
 {

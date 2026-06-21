@@ -8,6 +8,8 @@ add_library(skia_ext STATIC
     "${SKE}/platform_canvas.cc"
     "${SKE}/skia_utils_mac.mm"
     "${SKE}/bitmap_platform_device_mac.cc"
+    "${SKE}/analysis_canvas.cc"            # skia::AnalysisCanvas (solid-color analysis)
+    "${SKE}/sk_document_pdf_stub_mac.cpp"  # SkDocument PDF link stub (printing deferred)
     "${CMAKE_SOURCE_DIR}/base/mac/scoped_nsobject.mm")   # ScopedNSProtocolTraitsRelease
 target_link_libraries(skia_ext PUBLIC skia)
 target_include_directories(skia_ext PUBLIC "${CMAKE_SOURCE_DIR}" "${SKE}")

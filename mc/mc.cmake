@@ -4,6 +4,9 @@
 
 set(MCD "${CMAKE_SOURCE_DIR}/mc")
 file(GLOB_RECURSE MC_SRC "${MCD}/*.cpp")
+# LayerSorter ships as a .cc (not .cpp), so the *.cpp glob misses it; add it
+# explicitly to supply mc::LayerSorter (ctor/dtor/Sort) at link time.
+list(APPEND MC_SRC "${MCD}/trees/LayerSorter.cc")
 
 add_library(mc STATIC ${MC_SRC})
 target_link_libraries(mc PUBLIC blink_web)

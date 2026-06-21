@@ -10,7 +10,8 @@
 
 add_library(wke_globals STATIC
     "${CMAKE_SOURCE_DIR}/wke/wkeGlobalVar.cpp"
-    "${CMAKE_SOURCE_DIR}/wke/wkeString.cpp")   # wke::CString (UTF-32 wchar_t ported)
+    "${CMAKE_SOURCE_DIR}/wke/wkeString.cpp"    # wke::CString (UTF-32 wchar_t ported)
+    "${CMAKE_SOURCE_DIR}/wke/CurlVsetoptForwardMac.cpp")  # Curl_vsetopt -> system curl_easy_setopt
 target_link_libraries(wke_globals PUBLIC blink_platform)
 target_include_directories(wke_globals PUBLIC
     "${CMAKE_SOURCE_DIR}" "${CMAKE_SOURCE_DIR}/wke"

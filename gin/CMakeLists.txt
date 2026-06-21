@@ -37,6 +37,13 @@ set(GIN_SOURCES
 # compiles — but it needs WTF's config/flags, applied per-file below.
 list(APPEND GIN_SOURCES array_buffer.cc)
 
+# v8_platform.cc: gin's v8::Platform impl. Needed for V8::InitializePlatform
+# (v8_initializer_empty.cc). Worker-thread scheduling is delegated to V8 8.7's
+# NewDefaultPlatform via the third_party/v8shim DefaultPlatformWrap shim; the
+# foreground task runner rides on blink's V8PerIsolateData. Needs WTF config +
+# blink Platform headers, applied per-file below.
+list(APPEND GIN_SOURCES v8_platform.cc)
+
 # --- Remaining 2 files, blocked by SUBSYSTEMS not yet brought up on macOS (NOT
 #     V8): base/trace_event and blink's Platform. Re-enable as those land.
 set(GIN_SOURCES_SUBSYSTEM_DEP
@@ -48,8 +55,19 @@ add_library(gin STATIC ${GIN_SOURCES})
 
 # array_buffer.cc pulls WTF headers: needs the WTF config force-include + WTF's
 # build flags (which the other gin files don't).
+# -fno-rtti: gin::ArrayBufferAllocator subclasses v8::ArrayBuffer::Allocator. With
+# RTTI on, the derived typeinfo references the base typeinfo, which the V8 monolith
+# (built -fno-rtti) does not export -> undefined "typeinfo for
+# v8::ArrayBuffer::Allocator". Building this TU -fno-rtti drops the typeinfo chain.
 set_source_files_properties(array_buffer.cc PROPERTIES COMPILE_OPTIONS
-    "-include;${CMAKE_SOURCE_DIR}/third_party/WebKit/Source/config.h;-fdeclspec;-DOFFICIAL_BUILD")
+    "-include;${CMAKE_SOURCE_DIR}/third_party/WebKit/Source/config.h;-fdeclspec;-DOFFICIAL_BUILD;-fno-rtti")
+
+# v8_platform.cc pulls blink Platform/WebThread + WTF headers; same config as
+# array_buffer.cc (WTF config force-include + flags). FROM_HERE is only defined by
+# WebTraceLocation.h under INSIDE_BLINK (a blink-impl-only macro); v8_task_runner.h
+# uses it inline, so define INSIDE_BLINK for this TU to get the blink FROM_HERE.
+set_source_files_properties(v8_platform.cc PROPERTIES COMPILE_OPTIONS
+    "-include;${CMAKE_SOURCE_DIR}/third_party/WebKit/Source/config.h;-fdeclspec;-DOFFICIAL_BUILD;-DINSIDE_BLINK")
 
 target_include_directories(gin PRIVATE
     "${CMAKE_SOURCE_DIR}"                              # gin/..., base/... (root base wins)
@@ -57,7 +75,10 @@ target_include_directories(gin PRIVATE
     "${CMAKE_SOURCE_DIR}/electron"                    # cef/include/...
     "${CMAKE_SOURCE_DIR}/electron/cef"                # CEF-internal "include/..."
     "${CMAKE_SOURCE_DIR}/third_party/WebKit/Source"   # wtf/...
-    "${MINIBLINK_V8_ROOT}/include"                     # <v8.h>
+    "${CMAKE_SOURCE_DIR}/third_party/WebKit"          # public/platform/... (blink Platform/WebThread)
+    "${CMAKE_SOURCE_DIR}/gen/blink"                   # generated blink core/ headers (InspectorTypeBuilder.h)
+    "${CMAKE_SOURCE_DIR}/third_party/v8shim"          # v8_7_5/.../default_platform_wrap.h shim
+    "${MINIBLINK_V8_ROOT}/include"                     # <v8.h>, libplatform/libplatform.h
     "${MINIBLINK_V8_ROOT}/.."                          # "v8/include/v8.h" style
 )
 

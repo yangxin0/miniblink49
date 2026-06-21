@@ -55,6 +55,16 @@ else()
     list(APPEND BASE_SOURCES
         "${CMAKE_SOURCE_DIR}/orig_chrome/base/rand_util_posix.cc"
         "${CMAKE_SOURCE_DIR}/orig_chrome/base/strings/string16.cc"
+        "${CMAKE_SOURCE_DIR}/orig_chrome/base/lazy_instance.cc"           # NeedsLazyInstance/CompleteLazyInstance
+        "${CMAKE_SOURCE_DIR}/orig_chrome/base/at_exit.cc"                 # AtExitManager (lazy_instance dep)
+        port_posix/read_from_fd_posix.cc   # base::ReadFromFD (posix read loop)
+        port_posix/utf16_to_utf8_stringpiece.cc  # UTF16ToUTF8(StringPiece16) overload
+        port_posix/platform_thread_yield_posix.cc # PlatformThread::YieldCurrentThread (lazy_instance dep)
+        "${CMAKE_SOURCE_DIR}/orig_chrome/base/synchronization/lock.cc"               # base::Lock (content::WaitableEvent kernel)
+        "${CMAKE_SOURCE_DIR}/orig_chrome/base/synchronization/lock_impl_posix.cc"    # base::internal::LockImpl (pthread mutex)
+        "${CMAKE_SOURCE_DIR}/orig_chrome/base/synchronization/condition_variable_posix.cc" # base::ConditionVariable (pthread cond)
+        "${CMAKE_SOURCE_DIR}/orig_chrome/base/memory/ref_counted.cc"  # RefCountedThreadSafeBase (scoped_refptr kernel)
+        "${CMAKE_SOURCE_DIR}/orig_chrome/base/callback_internal.cc"   # base::internal::CallbackBase
         time/time_mac_miniblink.cc   # self-contained mach Time impl (avoids the
                                      # base/mac/scoped_mach_port header cascade)
     )

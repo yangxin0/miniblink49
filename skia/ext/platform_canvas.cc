@@ -48,6 +48,21 @@ bool DrawToNativeLayeredContext(SkCanvas* canvas, PlatformSurface context, const
         return platform_device->DrawToNativeLayeredContext(context, src_rect, client_rect);
     return false;
 }
+#else
+// macOS/POSIX: layered windows are a Win32 concept and PlatformDevice has no
+// DrawToNativeLayeredContext virtual here. The transparent-background paint path
+// in mc/ calls this; provide a link-satisfying no-op (returns false) until a
+// real CoreGraphics transparent-window composite is implemented. Keep the
+// signature in terms of PlatformSurface/PlatformRect (CGContextRef/CGRect on
+// mac) so it matches the platform_canvas.h declaration and the call sites.
+bool DrawToNativeLayeredContext(SkCanvas* canvas, PlatformSurface context, const PlatformRect* src_rect, const PlatformRect* client_rect)
+{
+    (void)canvas;
+    (void)context;
+    (void)src_rect;
+    (void)client_rect;
+    return false;
+}
 #endif
 
 void MakeOpaque(SkCanvas* canvas, int x, int y, int width, int height) {
