@@ -35,14 +35,18 @@
 #include "net/websocket/SocketStreamHandleClient.h"
 #include "net/websocket/SocketStreamError.h"
 #include "net/ActivatingObjCheck.h"
-#include "net/CheckNetOnline.h"
+#if defined(_WIN32)
+#include "net/CheckNetOnline.h" // Win32 COM (INetworkListManager) connectivity probe
+#endif
 #include "third_party/WebKit/Source/platform/Logging.h"
 #include "third_party/WebKit/Source/platform/weborigin/KURL.h"
 #include "third_party/WebKit/Source/wtf/MainThread.h"
 #include "wke/wkeGlobalVar.h"
 #include "base/thread.h"
-#include <process.h>
+#if defined(_WIN32)
+#include <process.h> // _beginthreadex (provided by the win_compat shim on macOS)
 #include <Netlistmgr.h>
+#endif
 
 using namespace blink;
 
@@ -288,7 +292,13 @@ void SocketStreamHandle::threadFunction()
     curl_easy_setopt(curlHandle, CURLOPT_URL, url.utf8().data());
 
     curl_easy_setopt(curlHandle, CURLOPT_PORT, port);
+#if defined(_WIN32)
     curl_easy_setopt(curlHandle, CURLOPT_CONNECT_ONLY);
+#else
+    // macOS curl's curl_easy_setopt is a variadic macro that requires the value
+    // argument; CONNECT_ONLY takes a long (1 = connect only, no transfer).
+    curl_easy_setopt(curlHandle, CURLOPT_CONNECT_ONLY, 1L);
+#endif
     curl_easy_setopt(curlHandle, CURLOPT_TIMEOUT_MS, 500);
 
     static const int kAllowedProtocols = CURLPROTO_FILE | CURLPROTO_FTP | CURLPROTO_FTPS | CURLPROTO_HTTP | CURLPROTO_HTTPS;
@@ -319,8 +329,10 @@ void SocketStreamHandle::threadFunction()
         return;
     }
 
+#if defined(_WIN32)
     IUnknown* pUnknown = nullptr;
     INetworkListManager* pNetworkListManager = getNetworkList(&pUnknown);
+#endif
 
     ref();
 
@@ -341,7 +353,13 @@ void SocketStreamHandle::threadFunction()
             ++retryCount;
         }
 
+#if defined(_WIN32)
         int checkNetwork = checkIsNetwork(pNetworkListManager);
+#else
+        // macOS: no INetworkListManager; rely on the retry counter only
+        // (treat the connection as online, matching the Win32 -1 "skip" return).
+        int checkNetwork = -1;
+#endif
         if (retryCount > 3 || FALSE == checkNetwork) {
             ref();
             WTF::internal::callOnMainThread(s_mainThreadFail, this);
@@ -351,10 +369,12 @@ void SocketStreamHandle::threadFunction()
 
     curl_easy_cleanup(curlHandle);
 
+#if defined(_WIN32)
     if (pNetworkListManager)
         pNetworkListManager->Release();
     if (pUnknown)
         pUnknown->Release();
+#endif
 }
 
 void SocketStreamHandle::startThread()
@@ -394,7 +414,14 @@ void SocketStreamHandle::stopThread()
     if (!m_workerThread)
         return;
 
+#if defined(_WIN32)
     InterlockedExchange(reinterpret_cast<long volatile*>(&m_stopThread), 1);
+#else
+    // macOS: 'long' is 64-bit, so it does not alias the win_compat 32-bit LONG
+    // that InterlockedExchange expects. m_stopThread is itself a 'long'; set it
+    // atomically with the matching-width compiler builtin instead.
+    __sync_lock_test_and_set(&m_stopThread, 1L);
+#endif
     waitForThreadCompletion(m_workerThread);
     m_workerThread = 0;
     deref();

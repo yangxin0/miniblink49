@@ -6,7 +6,9 @@
 #include "net/StorageMgr.h"
 #include "net/WebStorageNamespaceImpl.h"
 #include "net/DefaultFullPath.h"
+#if defined(_WIN32)
 #include <Shlwapi.h>
+#endif
 
 namespace net {
     

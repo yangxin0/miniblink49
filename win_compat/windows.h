@@ -178,6 +178,53 @@ static inline LONG InterlockedExchangeAdd(volatile LONG* v, LONG a) { return __s
 static inline LONG InterlockedCompareExchange(volatile LONG* v, LONG ex, LONG cmp) { return __sync_val_compare_and_swap(v, cmp, ex); }
 static inline LONG InterlockedExchange(volatile LONG* v, LONG val) { return __sync_lock_test_and_set(v, val); }
 
+// --- Worker threads (_beginthreadex + WaitForSingleObject/CloseHandle) --------
+// net/websocket spins a worker thread via the CRT _beginthreadex and joins it by
+// casting the returned id to HANDLE for WaitForSingleObject + CloseHandle. Back
+// it with a heap-allocated pthread_t; the HANDLE is a pointer to that wrapper.
+#include <stdlib.h>
+#ifndef INFINITE
+#define INFINITE 0xFFFFFFFF
+#endif
+#ifndef WAIT_OBJECT_0
+#define WAIT_OBJECT_0 0
+#endif
+
+typedef struct mb_thread_handle_ { pthread_t tid; } mb_thread_handle_t;
+
+// Trampoline: Win32 thread procs are 'unsigned __stdcall(void*)'; pthread wants
+// 'void*(void*)'. We stash both in a small heap record.
+typedef struct mb_thread_start_ { unsigned (*proc)(void*); void* arg; } mb_thread_start_t;
+static inline void* mb_thread_trampoline_(void* p) {
+    mb_thread_start_t s = *(mb_thread_start_t*)p;
+    free(p);
+    s.proc(s.arg);
+    return 0;
+}
+static inline uintptr_t _beginthreadex(void* /*security*/, unsigned /*stacksize*/,
+    unsigned (*start)(void*), void* arglist, unsigned /*initflag*/, unsigned* thrdaddr) {
+    mb_thread_handle_t* h = (mb_thread_handle_t*)malloc(sizeof(mb_thread_handle_t));
+    if (!h) return 0;
+    mb_thread_start_t* s = (mb_thread_start_t*)malloc(sizeof(mb_thread_start_t));
+    if (!s) { free(h); return 0; }
+    s->proc = start; s->arg = arglist;
+    if (pthread_create(&h->tid, 0, mb_thread_trampoline_, s) != 0) {
+        free(s); free(h); return 0;
+    }
+    if (thrdaddr) *thrdaddr = 0;
+    return (uintptr_t)h;
+}
+static inline DWORD WaitForSingleObject(HANDLE handle, DWORD /*ms*/) {
+    mb_thread_handle_t* h = (mb_thread_handle_t*)handle;
+    if (!h) return (DWORD)-1;
+    pthread_join(h->tid, 0);
+    return WAIT_OBJECT_0;
+}
+static inline BOOL CloseHandle(HANDLE handle) {
+    if (handle) free(handle);
+    return TRUE;
+}
+
 // --- Dynamic loading + misc (posix-backed) -----------------------------------
 // wke's public header (wkeInitializeEx) loads the wke library via LoadLibrary/
 // GetProcAddress. Map to dlopen/dlsym (HMODULE is the dl handle).
@@ -227,6 +274,9 @@ static inline BOOL MoveFileExW(const wchar_t* from, const wchar_t* to, DWORD) {
     char a[1024], b[1024]; mb_wide_to_narrow_(from, a, sizeof(a)); mb_wide_to_narrow_(to, b, sizeof(b));
     return rename(a, b) == 0;
 }
+#ifndef MOVEFILE_REPLACE_EXISTING
+#define MOVEFILE_REPLACE_EXISTING 0x00000001
+#endif
 
 // --- Common constants --------------------------------------------------------
 #ifndef TRUE

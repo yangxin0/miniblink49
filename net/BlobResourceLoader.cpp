@@ -367,7 +367,19 @@ void BlobResourceLoader::doStart()
             flattenElement = new FlattenHTTPBodyElement();
             flattenElement->type = FlattenHTTPBodyElement::Type::TypeFile;
             Vector<UChar> filePathBuf = WTF::ensureUTF16UChar(filePath, true);
+#if defined(_WIN32)
             flattenElement->filePath = filePathBuf.data();
+#else
+            // macOS: wchar_t is 32-bit, so 16-bit UChar data cannot be
+            // assigned to std::wstring directly. Widen up to the NUL that
+            // ensureUTF16UChar appended (matching the Win32 wchar_t* path).
+            {
+                std::wstring widePath;
+                for (size_t ci = 0; ci < filePathBuf.size() && filePathBuf[ci]; ++ci)
+                    widePath.push_back((wchar_t)filePathBuf[ci]);
+                flattenElement->filePath = widePath;
+            }
+#endif
             flattenElement->fileStart = item->offset;
             flattenElement->fileLength = item->length;
             flattenElements.append(flattenElement);
@@ -380,7 +392,15 @@ void BlobResourceLoader::doStart()
             flattenElement->data.append(item->data.data() + (size_t)offset, (size_t)length);
             flattenElements.append(flattenElement);
         } else if (blink::WebBlobData::Item::TypeBlob == item->type) {
+#if defined(_WIN32)
             FlattenHTTPBodyElementStream::flatten(item->blobUUID, &m_totalRemainingSize, &flattenElements, item->offset, item->length, true, 1);
+#else
+            // macOS: curl_off_t is 'long', distinct from 'long long'. Use a
+            // curl_off_t temporary and copy the result back into the member.
+            curl_off_t flattenSize = (curl_off_t)m_totalRemainingSize;
+            FlattenHTTPBodyElementStream::flatten(item->blobUUID, &flattenSize, &flattenElements, item->offset, item->length, true, 1);
+            m_totalRemainingSize = (long long)flattenSize;
+#endif
         }
     }
     notifyResponse();

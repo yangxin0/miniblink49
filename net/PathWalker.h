@@ -23,8 +23,24 @@
  * THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <Windows.h>
 #include <wtf/Noncopyable.h>
+
+#if defined(_WIN32)
+#include <Windows.h>
+#else
+// macOS: no Win32 directory-enumeration API. Provide a posix-backed
+// equivalent that mirrors the WIN32_FIND_DATAW fields PathWalker exposes.
+#include <dirent.h>
+#include <wtf/text/WTFString.h>
+#ifndef FILE_ATTRIBUTE_DIRECTORY
+#define FILE_ATTRIBUTE_DIRECTORY 0x00000010
+#endif
+struct PathWalkerFindDataPosix {
+    unsigned long dwFileAttributes;
+    WTF::Vector<UChar> cFileNameBuf; // UTF-16, NUL-terminated
+    const UChar* cFileName;
+};
+#endif
 
 namespace WTF {
     class String;
@@ -38,6 +54,7 @@ public:
     PathWalker(const WTF::String& directory, const WTF::String& pattern);
     ~PathWalker();
 
+#if defined(_WIN32)
     bool isValid() const { return m_handle != INVALID_HANDLE_VALUE; }
     const WIN32_FIND_DATAW& data() const { return m_data; }
 
@@ -46,6 +63,20 @@ public:
 private:
     HANDLE m_handle;
     WIN32_FIND_DATAW m_data;
+#else
+    bool isValid() const { return m_dir != nullptr; }
+    const PathWalkerFindDataPosix& data() const { return m_data; }
+
+    bool step();
+
+private:
+    void fill(struct dirent* entry);
+
+    DIR* m_dir;
+    WTF::String m_directory;
+    WTF::String m_pattern;
+    PathWalkerFindDataPosix m_data;
+#endif
 };
 
 } // namespace WebCore

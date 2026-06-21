@@ -27,8 +27,15 @@
 #include "PathWalker.h"
 
 #include <wtf/text/WTFString.h>
+#if !defined(_WIN32)
+#include <wtf/text/CString.h>
+#include <wtf/text/WTFStringUtil.h>
+#include <string.h>
+#endif
 
 namespace net {
+
+#if defined(_WIN32)
 
 PathWalker::PathWalker(const String& directory, const String& pattern)
 {
@@ -47,5 +54,60 @@ bool PathWalker::step()
 {
     return ::FindNextFileW(m_handle, &m_data);
 }
+
+#else
+
+// macOS: posix opendir/readdir-based implementation. The "pattern" is matched
+// loosely; FileSystemWin.cpp (the only consumer) is Windows-only and excluded
+// from this build, so this exists to keep PathWalker compiling/portable.
+PathWalker::PathWalker(const String& directory, const String& pattern)
+    : m_dir(nullptr)
+    , m_directory(directory)
+    , m_pattern(pattern)
+{
+    CString dirUtf8 = directory.utf8();
+    m_dir = ::opendir(dirUtf8.data());
+    if (!m_dir)
+        return;
+
+    // Position on the first matching entry.
+    if (!step())
+        ; // leave m_data empty; isValid() stays true while m_dir is open
+}
+
+PathWalker::~PathWalker()
+{
+    if (m_dir)
+        ::closedir(m_dir);
+}
+
+void PathWalker::fill(struct dirent* entry)
+{
+    m_data.dwFileAttributes = 0;
+    if (entry->d_type == DT_DIR)
+        m_data.dwFileAttributes |= FILE_ATTRIBUTE_DIRECTORY;
+
+    String name = String::fromUTF8(entry->d_name);
+    m_data.cFileNameBuf = WTF::ensureUTF16UChar(name, true);
+    m_data.cFileName = m_data.cFileNameBuf.data();
+}
+
+bool PathWalker::step()
+{
+    if (!m_dir)
+        return false;
+
+    struct dirent* entry = nullptr;
+    while ((entry = ::readdir(m_dir)) != nullptr) {
+        // Skip "." and ".." to mirror typical FindFirstFile pattern usage.
+        if (0 == strcmp(entry->d_name, ".") || 0 == strcmp(entry->d_name, ".."))
+            continue;
+        fill(entry);
+        return true;
+    }
+    return false;
+}
+
+#endif
 
 } // namespace WebCore

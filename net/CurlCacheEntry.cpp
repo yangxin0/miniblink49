@@ -142,7 +142,7 @@ bool getRequestContentRange(const WebURLLoaderInternal& job, int64* firstBytePos
     if (contentRange.size() < 7)
         return false;
 
-    contentRange[5] = ' '; // Ä£·Â³öresponseÊ±ºòµÄÑù×Ó
+    contentRange[5] = ' '; // Ä£ï¿½Â³ï¿½responseÊ±ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
     bool lastPosIsInfinite = contentRange[contentRange.size() - 1] == '-';
     if (lastPosIsInfinite)
         contentRange += "99999999998/99999999999";
@@ -172,7 +172,7 @@ bool CurlCacheEntry::isRequstInRange(const WebURLLoaderInternal& job) const
         if (begin <= firstBytePosition && firstBytePosition <= end) {
             if (lastBytePosition < 0) {
                 if (m_instanceSize != -1) {
-                    // ¼ì²éÊÇ·ñËùÓÐ¶¼ÌîÁË
+                    // ï¿½ï¿½ï¿½ï¿½Ç·ï¿½ï¿½ï¿½ï¿½Ð¶ï¿½ï¿½ï¿½ï¿½ï¿½
                     return end == m_instanceSize - 1;
                 } else
                     return true;
@@ -296,7 +296,7 @@ bool CurlCacheEntry::onPartialContentResponse(WebURLResponse& response)
         Vector<char> buf;
 
         int writeOffset = fileSize;
-        int remainSize = offset - fileSize; // Ã¿´ÎÐ´ÈëµÄÊ£Óà´óÐ¡
+        int remainSize = offset - fileSize; // Ã¿ï¿½ï¿½Ð´ï¿½ï¿½ï¿½Ê£ï¿½ï¿½ï¿½Ð¡
         for (; remainSize > 0; ) {
             int writeSize = kBufSize;
             if (remainSize < kBufSize)
@@ -335,7 +335,20 @@ void CurlCacheEntry::onCachedDataFinish()
 
     Vector<UChar> contentFilename = WTF::ensureUTF16UChar(m_contentFilename, true);
     Vector<UChar> contentTempFilename = WTF::ensureUTF16UChar(m_contentTempFilename, true);
+#if defined(_WIN32)
     ::MoveFileEx(contentTempFilename.data(), contentFilename.data(), MOVEFILE_REPLACE_EXISTING);
+#else
+    // macOS: wchar_t is 32-bit; widen the 16-bit UChar paths before calling
+    // the win_compat MoveFileExW shim (which expects wchar_t*).
+    {
+        std::wstring fromPath, toPath;
+        for (size_t ci = 0; ci < contentTempFilename.size() && contentTempFilename[ci]; ++ci)
+            fromPath.push_back((wchar_t)contentTempFilename[ci]);
+        for (size_t ci = 0; ci < contentFilename.size() && contentFilename[ci]; ++ci)
+            toPath.push_back((wchar_t)contentFilename[ci]);
+        ::MoveFileExW(fromPath.c_str(), toPath.c_str(), MOVEFILE_REPLACE_EXISTING);
+    }
+#endif
 }
 
 bool CurlCacheEntry::saveCachedData(WebURLLoaderInternal& job, const char* data, size_t size)

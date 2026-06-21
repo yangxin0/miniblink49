@@ -19,14 +19,8 @@ file(GLOB CB_IMPL_MAC  "${C}/web_impl_mac/*.mm" "${C}/web_impl_mac/*.cpp")
 # clipboard (NSPasteboard sibling instead), and dead WinINet client.
 list(FILTER CB_IMPL_WIN EXCLUDE REGEX "/(WebURLLoaderImpl|WebCookieJarINetImpl|WebClipboardImpl|w3client)\\.cpp$")
 
-# net cookie jar + curl URL-loader + websocket that the page host calls into.
-set(CB_NET
-    "${CMAKE_SOURCE_DIR}/net/cookies/WebCookieJarCurlImpl.cpp"
-    "${CMAKE_SOURCE_DIR}/net/websocket/WebSocketChannelImpl.cpp"
-    "${CMAKE_SOURCE_DIR}/net/WebURLLoaderManager.cpp"
-    "${CMAKE_SOURCE_DIR}/net/WebURLLoaderManagerUtil.cpp")
-
-add_library(content_browser STATIC ${CB_BROWSER} ${CB_IMPL_WIN} ${CB_IMPL_MAC} ${CB_NET})
+# (net cookie/loader/websocket now live in the full net_portable archive.)
+add_library(content_browser STATIC ${CB_BROWSER} ${CB_IMPL_WIN} ${CB_IMPL_MAC})
 target_link_libraries(content_browser PUBLIC blink_web net_portable wke_globals)
 target_include_directories(content_browser PUBLIC
     "${CMAKE_SOURCE_DIR}" "${CMAKE_SOURCE_DIR}/content" "${CMAKE_SOURCE_DIR}/wke"
