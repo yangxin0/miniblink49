@@ -31,6 +31,7 @@
  */
 
 #include "config.h"
+#include <windows.h>  // OutputDebugStringW (win_compat shim on macOS) for the stub log
 #include "platform/fonts/FontCustomPlatformData.h"
 
 #include "platform/LayoutTestSupport.h"

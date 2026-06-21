@@ -104,7 +104,9 @@ list(FILTER BLINK_TEXT EXCLUDE REGEX "LocaleICU|LocaleWin")
 # macOS uses the CoreText FontCacheMac, not FontCacheSkia/FontCacheSkiaWin.
 # FontCustomPlatformData (web @font-face sanitization) needs the ots library + a
 # <windows.h> include for its debug log -> deferred (4 symbols, not essential).
-list(FILTER BLINK_FONTS EXCLUDE REGEX "FontCacheSkia|FontCustomPlatformData|OpenTypeSanitizer|/win/|/android/|/linux/")
+# FontCustomPlatformData kept (its create() is a stub returning null; doesn't call
+# the ots library). OpenTypeSanitizer still deferred (calls ots::Process -> ots lib).
+list(FILTER BLINK_FONTS EXCLUDE REGEX "FontCacheSkia|OpenTypeSanitizer|/win/|/android/|/linux/")
 
 # --- Platform infrastructure: the Platform interface, exported Web* wrappers,
 #     and support objects the heap (and the rest of blink) need at link time. ---
