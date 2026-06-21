@@ -154,7 +154,13 @@ if(EXISTS "${_v8_lib}")
         IMPORTED_LOCATION "${_v8_lib}"
         INTERFACE_INCLUDE_DIRECTORIES "${_v8_inc}"
         # Must match the ABI the monolith was built with (pointer compression).
-        INTERFACE_COMPILE_DEFINITIONS "V8_COMPRESS_POINTERS;V8_31BIT_SMIS_ON_64BIT_ARCH")
+        # V8_REVERSE_JSARGS MUST match the monolith (BUILD.gn adds -DV8_REVERSE_JSARGS,
+        # but it is a gn build define, NOT in v8config.h). Without it, blink's
+        # FunctionCallbackInfo::operator[] reads args in the wrong direction
+        # (values_ - i instead of values_ + i): info[0] happens to be right but
+        # info[1] returns the receiver/Holder, so every multi-arg DOM constructor
+        # (new URL/Event/MouseEvent...) reads garbage and segfaults.
+        INTERFACE_COMPILE_DEFINITIONS "V8_COMPRESS_POINTERS;V8_31BIT_SMIS_ON_64BIT_ARCH;V8_REVERSE_JSARGS")
     set(MINIBLINK_HAVE_V8 TRUE)
 
     # Smoke test: prove the engine links + runs JavaScript through CMake.

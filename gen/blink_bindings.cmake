@@ -28,7 +28,7 @@ target_link_libraries(blink_bindings PUBLIC blink_core)
 target_include_directories(blink_bindings PUBLIC
     "${CMAKE_SOURCE_DIR}/third_party/v8shim" "${CMAKE_SOURCE_DIR}/third_party/khronos")
 target_compile_definitions(blink_bindings PUBLIC "V8CALL=" ENABLE_WKE=1 BLINK_IMPLEMENTATION=1
-    V8_COMPRESS_POINTERS V8_31BIT_SMIS_ON_64BIT_ARCH)
+    V8_COMPRESS_POINTERS V8_31BIT_SMIS_ON_64BIT_ARCH V8_REVERSE_JSARGS)
 set_target_properties(blink_bindings PROPERTIES CXX_STANDARD 14)
 if(NOT MSVC)
     target_compile_options(blink_bindings PRIVATE

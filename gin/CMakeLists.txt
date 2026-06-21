@@ -84,7 +84,8 @@ target_include_directories(gin PRIVATE
 
 # Must match the V8 monolith ABI (pointer compression).
 target_compile_definitions(gin PRIVATE
-    V8_COMPRESS_POINTERS
+    V8_COMPRESS_POINTERS V8_REVERSE_JSARGS
+
     V8_31BIT_SMIS_ON_64BIT_ARCH
     "V8CALL="
 )

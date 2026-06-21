@@ -36,7 +36,7 @@ target_include_directories(content_browser PUBLIC
 # orig_chrome/base. Appended last so root base/ wins for everything else.
 target_include_directories(content_browser PRIVATE "${CMAKE_SOURCE_DIR}/orig_chrome")
 target_compile_definitions(content_browser PUBLIC "V8CALL=" ENABLE_WKE=1 BLINK_IMPLEMENTATION=1
-    V8_COMPRESS_POINTERS V8_31BIT_SMIS_ON_64BIT_ARCH)
+    V8_COMPRESS_POINTERS V8_31BIT_SMIS_ON_64BIT_ARCH V8_REVERSE_JSARGS)
 # WebThreadImpl.cpp has its own event/thread shim; opt out of win_compat's worker-
 # thread primitives (WaitForSingleObject/CloseHandle/_beginthreadex) to avoid a clash.
 target_compile_definitions(content_browser PRIVATE WIN_COMPAT_NO_THREAD_PRIMS)

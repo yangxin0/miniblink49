@@ -29,7 +29,7 @@ target_include_directories(blink_modules PUBLIC
 target_compile_definitions(blink_modules PUBLIC "V8CALL=" ENABLE_WKE=1 BLINK_IMPLEMENTATION=1
     # Must match the V8 monolith ABI (pointer compression) — these files include
     # v8.h but don't link v8_monolith, so they don't inherit its defs.
-    V8_COMPRESS_POINTERS V8_31BIT_SMIS_ON_64BIT_ARCH)
+    V8_COMPRESS_POINTERS V8_31BIT_SMIS_ON_64BIT_ARCH V8_REVERSE_JSARGS)
 set_target_properties(blink_modules PROPERTIES CXX_STANDARD 14)
 if(NOT MSVC)
     target_compile_options(blink_modules PRIVATE

@@ -18,7 +18,7 @@ target_include_directories(wke PUBLIC
     "${CMAKE_SOURCE_DIR}/third_party/skia/include/config"
     "${CMAKE_SOURCE_DIR}/third_party/skia/include/utils")
 target_compile_definitions(wke PUBLIC "V8CALL=" ENABLE_WKE=1 BLINK_IMPLEMENTATION=1
-    V8_COMPRESS_POINTERS V8_31BIT_SMIS_ON_64BIT_ARCH)
+    V8_COMPRESS_POINTERS V8_31BIT_SMIS_ON_64BIT_ARCH V8_REVERSE_JSARGS)
 set_target_properties(wke PROPERTIES CXX_STANDARD 14)
 if(NOT MSVC)
     target_compile_options(wke PRIVATE

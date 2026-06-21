@@ -35,7 +35,7 @@ target_include_directories(net_portable PUBLIC
     "${CMAKE_SOURCE_DIR}/third_party/v8shim" "${CMAKE_SOURCE_DIR}/third_party/khronos"
     "${CMAKE_SOURCE_DIR}/third_party/skia/include/core" "${CMAKE_SOURCE_DIR}/third_party/skia/include/config")
 target_compile_definitions(net_portable PUBLIC "V8CALL=" ENABLE_WKE=1 BLINK_IMPLEMENTATION=1
-    V8_COMPRESS_POINTERS V8_31BIT_SMIS_ON_64BIT_ARCH)
+    V8_COMPRESS_POINTERS V8_31BIT_SMIS_ON_64BIT_ARCH V8_REVERSE_JSARGS)
 # net uses Win32 types but relies on Windows PCH inclusion; force-include the shim.
 # SHELL: keeps the "-include <path>" pair together — CMake otherwise de-duplicates
 # the bare "-include" token against the inherited "-include config.h", orphaning

@@ -201,7 +201,7 @@ target_compile_definitions(blink_platform PUBLIC
     # archive that links blink_platform (core/generated/bindings/modules/web)
     # inherits it — v8::Local/Persistent sizes depend on it, so all blink code
     # and the monolith must agree or the final link is ABI-corrupt.
-    V8_COMPRESS_POINTERS V8_31BIT_SMIS_ON_64BIT_ARCH)
+    V8_COMPRESS_POINTERS V8_31BIT_SMIS_ON_64BIT_ARCH V8_REVERSE_JSARGS)
 set_target_properties(blink_platform PROPERTIES CXX_STANDARD 14)
 if(NOT MSVC)
     target_compile_options(blink_platform PRIVATE
