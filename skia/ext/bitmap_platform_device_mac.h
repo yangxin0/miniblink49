@@ -52,7 +52,7 @@ class SK_API BitmapPlatformDevice : public SkBitmapDevice, public PlatformDevice
 
   // PlatformDevice overrides
   virtual CGContextRef GetBitmapContext() OVERRIDE;
-  virtual void DrawToNativeContext(CGContextRef context, int x, int y,
+  virtual bool DrawToNativeContext(CGContextRef context, int x, int y,
                                    const CGRect* src_rect) OVERRIDE;
 
   // SkBaseDevice overrides
@@ -63,8 +63,7 @@ class SK_API BitmapPlatformDevice : public SkBitmapDevice, public PlatformDevice
   BitmapPlatformDevice(CGContextRef context,
                        const SkBitmap& bitmap);
 
-  virtual SkBaseDevice* onCreateDevice(const SkImageInfo& info,
-                                       Usage usage) OVERRIDE;
+  virtual SkBaseDevice* onCreateDevice(const CreateInfo&, const SkPaint*) OVERRIDE;
 
  private:
   void ReleaseBitmapContext();

@@ -7,8 +7,6 @@
 #import <ApplicationServices/ApplicationServices.h>
 #include <time.h>
 
-#include "base/mac/mac_util.h"
-#include "base/memory/ref_counted.h"
 #include "skia/ext/bitmap_platform_device.h"
 #include "skia/ext/platform_canvas.h"
 #include "skia/ext/skia_utils_mac.h"
@@ -25,20 +23,26 @@ static CGContextRef CGContextForData(void* data, int width, int height) {
 #define HAS_ARGB_SHIFTS(a, r, g, b) \
             (SK_A32_SHIFT == (a) && SK_R32_SHIFT == (r) \
              && SK_G32_SHIFT == (g) && SK_B32_SHIFT == (b))
-#if defined(SK_CPU_LENDIAN) && HAS_ARGB_SHIFTS(24, 16, 8, 0)
-  // Allocate a bitmap context with 4 components per pixel (BGRA).  Apple
-  // recommends these flags for improved CG performance.
-
   // CGBitmapContextCreate returns NULL if width/height are 0. However, our
   // callers expect to get a canvas back (which they later resize/reallocate)
   // so we pin the dimensions here.
   width = SkMax32(1, width);
   height = SkMax32(1, height);
+  // base::mac::GetSystemColorSpace() (mac_util) is not in-tree; the device RGB
+  // space is equivalent here (leaks one ref per device; acceptable).
+  CGColorSpaceRef color_space = CGColorSpaceCreateDeviceRGB();
+#if defined(SK_CPU_LENDIAN) && HAS_ARGB_SHIFTS(24, 16, 8, 0)
+  // BGRA: Apple's recommended flags.
   CGContextRef context =
-      CGBitmapContextCreate(data, width, height, 8, width * 4,
-                            base::mac::GetSystemColorSpace(),
+      CGBitmapContextCreate(data, width, height, 8, width * 4, color_space,
                             kCGImageAlphaPremultipliedFirst |
                                 kCGBitmapByteOrder32Host);
+#elif HAS_ARGB_SHIFTS(24, 0, 8, 16)
+  // RGBA (this in-tree skia's N32 order): alpha-last, 32-bit big-endian.
+  CGContextRef context =
+      CGBitmapContextCreate(data, width, height, 8, width * 4, color_space,
+                            kCGImageAlphaPremultipliedLast |
+                                kCGBitmapByteOrder32Big);
 #else
 #error We require that Skia's and CoreGraphics's recommended \
        image memory layout match.
@@ -110,7 +114,8 @@ BitmapPlatformDevice* BitmapPlatformDevice::Create(CGContextRef context,
     data = CGBitmapContextGetData(context);
     bitmap.setPixels(data);
   } else {
-    if (!bitmap.allocPixels())
+    bitmap.allocPixels();
+    if (bitmap.isNull())
       return NULL;
     data = bitmap.getPixels();
   }
@@ -145,7 +150,7 @@ BitmapPlatformDevice* BitmapPlatformDevice::CreateAndClear(int width,
                                                            bool is_opaque) {
   BitmapPlatformDevice* device = Create(NULL, width, height, is_opaque);
   if (!is_opaque)
-    device->clear(0);
+    device->accessBitmap(true).eraseColor(0);
   return device;
 }
 
@@ -206,7 +211,7 @@ void BitmapPlatformDevice::setMatrixClip(const SkMatrix& transform,
   SetMatrixClip(transform, region);
 }
 
-void BitmapPlatformDevice::DrawToNativeContext(CGContextRef context, int x,
+bool BitmapPlatformDevice::DrawToNativeContext(CGContextRef context, int x,
                                                int y, const CGRect* src_rect) {
   bool created_dc = false;
   if (!bitmap_context_) {
@@ -235,11 +240,12 @@ void BitmapPlatformDevice::DrawToNativeContext(CGContextRef context, int x,
 
   if (created_dc)
     ReleaseBitmapContext();
+  return true;
 }
 
-SkBaseDevice* BitmapPlatformDevice::onCreateDevice(const SkImageInfo& info,
-                                                   Usage /*usage*/) {
-  SkASSERT(info.colorType() == kPMColor_SkColorType);
+SkBaseDevice* BitmapPlatformDevice::onCreateDevice(const CreateInfo& cinfo,
+                                                   const SkPaint* /*paint*/) {
+  const SkImageInfo& info = cinfo.fInfo;
   return BitmapPlatformDevice::CreateAndClear(info.width(), info.height(),
                                                 info.isOpaque());
 }
@@ -271,7 +277,8 @@ bool PlatformBitmap::Allocate(int width, int height, bool is_opaque) {
   if (RasterDeviceTooBigToAllocate(width, height))
     return false;
     
-  if (!bitmap_.allocN32Pixels(width, height, is_opaque))
+  bitmap_.allocN32Pixels(width, height, is_opaque);
+  if (bitmap_.isNull())
     return false;
 
   if (!is_opaque)
