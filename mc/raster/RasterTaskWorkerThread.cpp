@@ -17,7 +17,7 @@
 */
 
 #include "config.h"
-#include "core/html/parser/RasterTaskWorkerThread.h"
+#include "mc/raster/RasterTaskWorkerThread.h"
 
 #include "platform/Task.h"
 #include "platform/ThreadSafeFunctional.h"

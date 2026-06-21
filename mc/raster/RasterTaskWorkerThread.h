@@ -53,8 +53,8 @@ public:
 private:
     RasterTaskWorkerThread();
     ~RasterTaskWorkerThread();
-    void RasterTaskWorkerThread();
-    void RasterTaskWorkerThread();
+    void setupHTMLParserThread();
+    void cleanupHTMLParserThread();
 
     OwnPtr<WebThreadSupportingGC> m_thread;
 };

@@ -2,7 +2,16 @@
 #include "mc/trees/LayerTreeHost.h"
 
 #include "SkCanvas.h"
+#if defined(_WIN32)
+// bitmap_platform_device_win.h is the Win32-only skia device; its
+// DrawToNativeContext/DrawToNativeLayeredContext override Win32-specific
+// virtuals that don't exist on the macOS skia device (bitmap_platform_device_mac).
 #include "skia/ext/bitmap_platform_device_win.h"
+#else
+// macOS skia uses CGRect/CGContextRef (PlatformRect/PlatformSurface); pull in
+// CoreGraphics so CGRect is a complete type and CGRectMake is available.
+#include <CoreGraphics/CoreGraphics.h>
+#endif
 #include "skia/ext/platform_canvas.h"
 
 #include "mc/blink/WebLayerImpl.h"
@@ -306,9 +315,9 @@ void LayerTreeHost::setWebGestureCurveTarget(blink::WebGestureCurveTarget* webGe
     m_webGestureCurveTarget = webGestureCurveTarget;
 }
 
-// void LayerTreeHost::setNeedsCommit() // ÔÝÊ±±»·ÏÆú£¬ÓÉsetLayerTreeDirty´úÌæ
+// void LayerTreeHost::setNeedsCommit() // ï¿½ï¿½Ê±ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½setLayerTreeDirtyï¿½ï¿½ï¿½ï¿½
 // {
-//     // ÓÉ¹âÕ¤»¯Ïß³ÌÀ´ÌáÆðÔàÇøÓò£¬ËùÒÔÕâÀïÖ±½ÓÖ¸¶¨ÐèÒª¿ªÊ¼ÏÂÒ»Ö¡£¬¹âÉ¾»¯Íê±ÏºóÓÉ¹âÕ¤»¯Ïß³ÌÍ¨¹ýrequestRepaint·¢ÆðÖØ»æ
+//     // ï¿½É¹ï¿½Õ¤ï¿½ï¿½ï¿½ß³ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ö±ï¿½ï¿½Ö¸ï¿½ï¿½ï¿½ï¿½Òªï¿½ï¿½Ê¼ï¿½ï¿½Ò»Ö¡ï¿½ï¿½ï¿½ï¿½É¾ï¿½ï¿½ï¿½ï¿½Ïºï¿½ï¿½É¹ï¿½Õ¤ï¿½ï¿½ï¿½ß³ï¿½Í¨ï¿½ï¿½requestRepaintï¿½ï¿½ï¿½ï¿½ï¿½Ø»ï¿½
 //     m_hostClient->scheduleAnimation();
 // }
 
@@ -479,7 +488,12 @@ void printTrans(const SkMatrix44& transform, int deep)
     }
     
     String outString = String::format("LayerTreeHost::printTrans:%d, %f \n", deep, total);
+#if defined(_WIN32)
     OutputDebugStringW(outString.charactersWithNullTermination().data());
+#else
+    // On non-Windows UChar (16-bit) is not wchar_t (32-bit); use the 8-bit path.
+    OutputDebugStringA(outString.utf8().data());
+#endif
 }
 
 bool LayerTreeHost::drawToCanvas(SkCanvas* canvas, const SkRect& dirtyRect)
@@ -909,7 +923,7 @@ bool LayerTreeHost::getHasTransparentBackground() const
 
 void LayerTreeHost::registerForAnimations(blink::WebLayer* layer)
 {
-    // ²»ÄÜÔÚÕâÀïÉèÖÃLayerTreeHost£¬ÒòÎªpopup ÀàÐÍµÄ»á°ÑÐÂ´°¿ÚµÄlayerµ÷ÓÃ±¾½Ó¿Úµ½ÀÏµÄhostÀ´¡£
+    // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½LayerTreeHostï¿½ï¿½ï¿½ï¿½Îªpopup ï¿½ï¿½ï¿½ÍµÄ»ï¿½ï¿½ï¿½Â´ï¿½ï¿½Úµï¿½layerï¿½ï¿½ï¿½Ã±ï¿½ï¿½Ó¿Úµï¿½ï¿½Ïµï¿½hostï¿½ï¿½ï¿½ï¿½
 //     mc_blink::WebLayerImpl* layerImpl = (mc_blink::WebLayerImpl*)layer;
 //     layerImpl->setLayerTreeHost(this);
 }
@@ -979,7 +993,7 @@ void LayerTreeHost::requestApplyActionsToRunIntoCompositeThread(bool needCheck)
         RELEASE_ASSERT(!m_uiThreadClient);
         return;
     }
-    if (0 != m_requestApplyActionsCount && !needCheck) // Èç¹ûneedCheck==true£¬Ôò±íÊ¾ÊÇÍË³öÁ÷³Ì£¬±ØÐëÖ´ÐÐÒ»´ÎonApply
+    if (0 != m_requestApplyActionsCount && !needCheck) // ï¿½ï¿½ï¿½needCheck==trueï¿½ï¿½ï¿½ï¿½ï¿½Ê¾ï¿½ï¿½ï¿½Ë³ï¿½ï¿½ï¿½ï¿½Ì£ï¿½ï¿½ï¿½ï¿½ï¿½Ö´ï¿½ï¿½Ò»ï¿½ï¿½onApply
         return;
 
     atomicIncrement(&m_requestApplyActionsCount);
@@ -1064,12 +1078,28 @@ void LayerTreeHost::firePaintEvent(HDC hdc, const RECT& paintRect)
 
     WTF::Locker<WTF::Mutex> locker(m_compositeMutex);
 
+#if defined(_WIN32)
     if (!m_hasTransparentBackground)
         skia::DrawToNativeContext(m_memoryCanvas, hdc, paintRect.left, paintRect.top, &paintRect);
     else {
         RECT rc = blink::intRectToWinRect(m_clientRect);
         skia::DrawToNativeLayeredContext(m_memoryCanvas, hdc, &paintRect, &rc);
     }
+#else
+    // On macOS skia uses PlatformSurface (CGContextRef) instead of HDC and
+    // PlatformRect (CGRect) instead of RECT. The opaque HDC handle actually
+    // carries a CGContextRef here, so reinterpret it back; convert the Win32
+    // RECTs to CGRects for the draw calls.
+    CGRect paintCGRect = CGRectMake(paintRect.left, paintRect.top,
+        paintRect.right - paintRect.left, paintRect.bottom - paintRect.top);
+    if (!m_hasTransparentBackground)
+        skia::DrawToNativeContext(m_memoryCanvas, reinterpret_cast<skia::PlatformSurface>(hdc), paintRect.left, paintRect.top, &paintCGRect);
+    else {
+        RECT rc = blink::intRectToWinRect(m_clientRect);
+        CGRect clientCGRect = CGRectMake(rc.left, rc.top, rc.right - rc.left, rc.bottom - rc.top);
+        skia::DrawToNativeLayeredContext(m_memoryCanvas, reinterpret_cast<skia::PlatformSurface>(hdc), &paintCGRect, &clientCGRect);
+    }
+#endif
 }
 
 void LayerTreeHost::drawFrameInCompositeThread()
@@ -1082,7 +1112,7 @@ void LayerTreeHost::drawFrameInCompositeThread()
 
     double lastCompositeTime = WTF::monotonicallyIncreasingTime();
     double detTime = lastCompositeTime - m_lastCompositeTime;
-    if (detTime < m_drawMinInterval && !m_isDestroying) { // Èç¹ûË¢ÐÂÆµÂÊÌ«¿ì£¬»º»ºÔÙ»­
+    if (detTime < m_drawMinInterval && !m_isDestroying) { // ï¿½ï¿½ï¿½Ë¢ï¿½ï¿½Æµï¿½ï¿½Ì«ï¿½ì£¬ï¿½ï¿½ï¿½ï¿½ï¿½Ù»ï¿½
         requestDrawFrameToRunIntoCompositeThread();
         atomicDecrement(&m_drawFrameFinishCount);
         return;
@@ -1095,7 +1125,7 @@ void LayerTreeHost::drawFrameInCompositeThread()
 //     OutputDebugStringA(output.utf8().data());
 //     s_time = t1;
 
-    bool frameReady = preDrawFrame(); // ÕâÀïÒ²»á·¢ÆðCommit
+    bool frameReady = preDrawFrame(); // ï¿½ï¿½ï¿½ï¿½Ò²ï¿½á·¢ï¿½ï¿½Commit
     if (!frameReady) {
         ASSERT(!m_isDestroying);
         requestDrawFrameToRunIntoCompositeThread();
@@ -1261,7 +1291,7 @@ void LayerTreeHost::paintToMemoryCanvasInCompositeThread(const SkRect& r)
         clearCanvas(m_memoryCanvas, paintRect, m_hasTransparentBackground);
 
     double t1 = WTF::currentTimeMS();
-    bool needNotifUi = drawToCanvas(m_memoryCanvas, paintRect); // »æÖÆÔà¾ØÐÎ
+    bool needNotifUi = drawToCanvas(m_memoryCanvas, paintRect); // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 
 //     static double s_time = 0;
 //     double t2 = WTF::currentTimeMS();

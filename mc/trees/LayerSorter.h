@@ -13,7 +13,12 @@
 #include "third_party/WebKit/Source/platform/geometry/FloatPoint.h"
 #include "third_party/WebKit/Source/platform/geometry/FloatPoint3D.h"
 
-#if defined(COMPILER_GCC)
+// This std::hash specialization was only needed by GCC's old base::hash_map.
+// mc uses WTF::HashMap<GraphEdge*, ...> instead, so the specialization is dead
+// code. MSVC (Windows) skips it because COMPILER_GCC is undefined there; clang
+// (macOS) defines COMPILER_GCC but libc++ rejects this unqualified
+// specialization, so skip it for clang too and keep the Windows behaviour.
+#if defined(COMPILER_GCC) && !defined(__clang__)
 namespace mc { struct GraphEdge; }
 
 namespace BASE_HASH_NAMESPACE {
