@@ -64,13 +64,12 @@ bool V8HiddenValue::deleteHiddenValue(v8::Isolate* isolate, v8::Local<v8::Object
 {
 #if V8_MAJOR_VERSION > 4
     v8::Local<v8::Context> context = isolate->GetCurrentContext();
-//     if (context.IsEmpty())
-//         context = isolate->GetEnteredOrMicrotaskContext();
-//     if (context.IsEmpty())
-//         context = isolate->GetIncumbentContext();
-//     if (context.IsEmpty())
-//         return false;
-
+    // Match getHiddenValue/setHiddenValue: a V8AbstractEventListener can be
+    // destroyed (e.g. from Document::finishedParsing event dispatch) with no
+    // entered context, leaving GetCurrentContext() empty. SetPrivate() would then
+    // call context->GetIsolate() on a null context and crash (deref at 0x4).
+    if (context.IsEmpty())
+        return false;
     return v8CallBoolean(object->SetPrivate(context, v8::Private::ForApi(isolate, key), v8::Undefined(isolate)));
 #else
     return object->DeleteHiddenValue(key);
