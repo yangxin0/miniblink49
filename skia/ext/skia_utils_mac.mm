@@ -27,7 +27,9 @@ SkBitmap NSImageOrNSImageRepToSkBitmapWithColorSpace(
   DCHECK((image != 0) ^ (image_rep != 0));
 
   SkBitmap bitmap;
-  if (!bitmap.allocN32Pixels(size.width, size.height, is_opaque))
+  // This skia's allocN32Pixels returns void (crashes on OOM); check isNull().
+  bitmap.allocN32Pixels(size.width, size.height, is_opaque);
+  if (bitmap.isNull())
     return bitmap;  // Return |bitmap| which should respond true to isNull().
 
 
@@ -47,6 +49,18 @@ SkBitmap NSImageOrNSImageRepToSkBitmapWithColorSpace(
       size.width * 4,
       color_space,
       kCGImageAlphaPremultipliedFirst | kCGBitmapByteOrder32Host));
+#elif HAS_ARGB_SHIFTS(24, 0, 8, 16)
+  // This in-tree skia builds N32 as RGBA (R=0,G=8,B=16,A=24), not BGRA. The
+  // matching CoreGraphics layout is alpha-last + 32-bit big-endian byte order
+  // (byte0=R), as verified by the port/mac skia->CGImage bridge.
+  base::ScopedCFTypeRef<CGContextRef> context(CGBitmapContextCreate(
+      data,
+      size.width,
+      size.height,
+      8,
+      size.width * 4,
+      color_space,
+      kCGImageAlphaPremultipliedLast | kCGBitmapByteOrder32Big));
 #else
 #error We require that Skia's and CoreGraphics's recommended \
        image memory layout match.
@@ -393,7 +407,8 @@ CGContextRef SkiaBitLocker::cgContext() {
       return 0;
     bitmap_.lockPixels();
   } else {
-    if (!bitmap_.allocN32Pixels(clip_bounds.width(), clip_bounds.height()))
+    bitmap_.allocN32Pixels(clip_bounds.width(), clip_bounds.height());
+    if (bitmap_.isNull())
       return 0;
     bitmap_.eraseColor(0);
   }
