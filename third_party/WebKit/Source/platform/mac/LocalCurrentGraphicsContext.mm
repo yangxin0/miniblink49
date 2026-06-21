@@ -49,9 +49,10 @@ LocalCurrentGraphicsContext::LocalCurrentGraphicsContext(SkCanvas* canvas, float
                                                          const IntRect& dirtyRect)
     : m_didSetGraphicsContext(false)
     , m_inflatedDirtyRect(ThemeMac::inflateRectForAA(dirtyRect))
-    , m_skiaBitLocker(canvas,
-                      m_inflatedDirtyRect,
-                      deviceScaleFactor)
+    // This skia copy's SkiaBitLocker only has the 1-arg ctor; the dirty-rect/scale
+    // form was a later optimization (lock just the dirty region). Locking the whole
+    // canvas is functionally equivalent here.
+    , m_skiaBitLocker(canvas)
 {
     m_savedCanvas = canvas;
     canvas->save();
