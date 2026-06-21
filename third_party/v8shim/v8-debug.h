@@ -34,6 +34,12 @@ public:
     // No separate "debug context" in 8.7; an empty handle keeps the common
     // "context != GetDebugContext(isolate)" check correct.
     static Local<Context> GetDebugContext(Isolate*) { return Local<Context>(); }
+
+    // V8 8.7 removed v8::Debug::GetInternalProperties (it moved to the internal
+    // debug/inspector interface). The inspector's InjectedScriptHost reads these to
+    // surface object internals in devtools; return empty until the inspector debug
+    // bridge is brought up (devtools simply shows no extra internal properties).
+    static MaybeLocal<Array> GetInternalProperties(Isolate*, Local<Value>) { return MaybeLocal<Array>(); }
 };
 
 } // namespace v8
