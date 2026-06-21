@@ -48,8 +48,16 @@ if(MB_OS_WINDOWS)
         win/windows_version.cc
     )
 else()
-    # POSIX/macOS platform implementations are added incrementally below as the
-    # build surfaces missing symbols. (none wired yet — discovery pass)
+    # POSIX/macOS platform implementations. Root base/ is the trimmed Win32-only
+    # tree; these mac/posix companions come from orig_chrome/base (same Chromium
+    # base headers) to satisfy Time::Now/Explode (mach), RandBytes/RandUint64
+    # (/dev/urandom), and the string16 (char16) helpers + instantiation.
+    list(APPEND BASE_SOURCES
+        "${CMAKE_SOURCE_DIR}/orig_chrome/base/rand_util_posix.cc"
+        "${CMAKE_SOURCE_DIR}/orig_chrome/base/strings/string16.cc"
+        time/time_mac_miniblink.cc   # self-contained mach Time impl (avoids the
+                                     # base/mac/scoped_mach_port header cascade)
+    )
 endif()
 
 add_library(base STATIC ${BASE_SOURCES})
@@ -58,6 +66,10 @@ target_include_directories(base PUBLIC
     "${CMAKE_SOURCE_DIR}/electron"               # CEF headers: cef/include/...
     "${CMAKE_SOURCE_DIR}/third_party/WebKit/Source"  # WTF headers: wtf/...
 )
+# Fallback for headers the trimmed root base/ lacks but the posix/mac companions
+# need (utf_string_conversions.h, mac/mach_logging.h, files/file_util.h). Root base/
+# is searched first, so only the genuinely-missing headers resolve from orig_chrome.
+target_include_directories(base PRIVATE "${CMAKE_SOURCE_DIR}/orig_chrome")
 if(APPLE)
     # macOS filesystem paths are UTF-8: take FilePath's native-UTF8 code paths
     # (avoids SysNativeMBToWide/locale conversions).
