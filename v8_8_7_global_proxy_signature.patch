@@ -1,0 +1,29 @@
+diff --git a/src/builtins/builtins-api.cc b/src/builtins/builtins-api.cc
+index 6eb6f87..8049053 100644
+--- a/src/builtins/builtins-api.cc
++++ b/src/builtins/builtins-api.cc
+@@ -36,11 +36,23 @@ JSReceiver GetCompatibleReceiver(Isolate* isolate, FunctionTemplateInfo info,
+   if (signature.IsTemplateFor(js_obj_receiver)) return receiver;
+ 
+   // The JSGlobalProxy might have a hidden prototype.
++  //
++  // miniblink/blink-53 port note: blink-53 uses a "split window" where the real
++  // DOMWindow wrapper (the Window FunctionTemplate instance that satisfies the
++  // signature) is reachable only several hops up the global proxy's prototype
++  // chain: globalProxy -> innerGlobal(shadow) -> windowWrapper -> Window.proto.
++  // Older V8 (which blink-53 was written against) walked the ENTIRE prototype
++  // chain here to find a compatible holder. Upstream V8 8.7 only checks the
++  // single immediate prototype (the shadow inner-global, which is NOT a Window
++  // template instance), so every `window.*` DOM method call fails the receiver
++  // check and throws "Illegal invocation" -- which breaks jQuery and virtually
++  // every real site. Restore the full-chain walk for the global proxy case.
+   if (V8_UNLIKELY(js_obj_receiver.IsJSGlobalProxy())) {
+     HeapObject prototype = js_obj_receiver.map().prototype();
+-    if (!prototype.IsNull(isolate)) {
++    while (!prototype.IsNull(isolate) && prototype.IsJSObject()) {
+       JSObject js_obj_prototype = JSObject::cast(prototype);
+       if (signature.IsTemplateFor(js_obj_prototype)) return js_obj_prototype;
++      prototype = js_obj_prototype.map().prototype();
+     }
+   }
+   return JSReceiver();

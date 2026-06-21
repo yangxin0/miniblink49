@@ -68,6 +68,9 @@ done
 git apply --check "$REPO_DIR/v8_8_7_macos.patch" 2>/dev/null && git apply "$REPO_DIR/v8_8_7_macos.patch" || true
 ( cd build && git apply --check "$REPO_DIR/v8_8_7_build_dir.patch" 2>/dev/null && git apply "$REPO_DIR/v8_8_7_build_dir.patch" || true )
 git apply --check "$REPO_DIR/v8_8_7_dcheck_kmax.patch" 2>/dev/null && git apply "$REPO_DIR/v8_8_7_dcheck_kmax.patch" || true
+# Restore old-V8 full-prototype-chain holder lookup for the global proxy so
+# blink-53's split-window window.* methods don't throw "Illegal invocation".
+git apply --check "$REPO_DIR/v8_8_7_global_proxy_signature.patch" 2>/dev/null && git apply "$REPO_DIR/v8_8_7_global_proxy_signature.patch" || true
 ( cd third_party/zlib && git apply --check "$REPO_DIR/v8_8_7_zlib.patch" 2>/dev/null && git apply "$REPO_DIR/v8_8_7_zlib.patch" || true )
 
 # ---- Configure + build -----------------------------------------------------
