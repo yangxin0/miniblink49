@@ -198,7 +198,15 @@ bool UnifiedHeapController::IsRootForNonTracingGCInternal(const v8::TracedGlobal
         return true;
 
     const v8::TracedGlobal<v8::Object>& traced = handle.As<v8::Object>();
-    v8::Local<v8::Object> wrapper = traced.Get(v8::Isolate::GetCurrent());
+    // Materializing a Local from the traced global requires an active
+    // HandleScope. This callback runs inside a V8 scavenge GC
+    // (GlobalHandles::IdentifyWeakUnmodifiedObjects) where blink-53 leaves no
+    // HandleScope on the stack, so on V8 8.7 HandleScope::CreateHandle hit
+    // v8::Utils::ReportApiFailure and aborted the whole browser during GC.
+    // Establish a scope here before creating any Local.
+    v8::Isolate* isolate = v8::Isolate::GetCurrent();
+    v8::HandleScope handleScope(isolate);
+    v8::Local<v8::Object> wrapper = traced.Get(isolate);
 
     const WrapperTypeInfo* type = toWrapperTypeInfo(wrapper);
     if (!type)

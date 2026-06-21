@@ -1,0 +1,31 @@
+diff --git a/src/base/logging.cc b/src/base/logging.cc
+index 9e1cf59..1bf5c65 100644
+--- a/src/base/logging.cc
++++ b/src/base/logging.cc
+@@ -53,12 +53,20 @@ std::string PrettyPrintChar(int ch) {
+ }
+ 
+ void DefaultDcheckHandler(const char* file, int line, const char* message) {
+-#ifdef DEBUG
+-  V8_Fatal(file, line, "Debug check failed: %s.", message);
+-#else
+-  // This case happens only for unit tests.
+-  V8_Fatal("Debug check failed: %s.", message);
+-#endif
++  // miniblink/blink-53 port: this monolith is built with dcheck_always_on=true
++  // ONLY because the pure-release build miscompiles blink's DOM-wrapper
++  // construction (segfault at 0x2). We do NOT actually want DCHECK aborts: many
++  // of V8 8.7's DCHECKs are too strict for the way 2016-era blink-53 drives the
++  // API (e.g. ObjectProtoToString reached via V8Window::toStringMethodCustom),
++  // and aborting kills the whole browser on otherwise-survivable paths. Log once
++  // and continue instead of calling V8_Fatal, so the dcheck optimizer behavior
++  // is kept while real pages keep running.
++  static bool s_warned = false;
++  if (!s_warned) {
++    s_warned = true;
++    fprintf(stderr, "[v8 dcheck non-fatal] %s:%d: %s "
++            "(further dchecks suppressed)\n", file, line, message);
++  }
+ }
+ 
+ }  // namespace

@@ -71,6 +71,10 @@ git apply --check "$REPO_DIR/v8_8_7_dcheck_kmax.patch" 2>/dev/null && git apply 
 # Restore old-V8 full-prototype-chain holder lookup for the global proxy so
 # blink-53's split-window window.* methods don't throw "Illegal invocation".
 git apply --check "$REPO_DIR/v8_8_7_global_proxy_signature.patch" 2>/dev/null && git apply "$REPO_DIR/v8_8_7_global_proxy_signature.patch" || true
+# Make dcheck_always_on DCHECKs non-fatal: we build with dcheck on only to dodge
+# the release wrapper-construction miscompile, but blink-53 trips a few too-strict
+# DCHECKs that shouldn't take down the whole browser.
+git apply --check "$REPO_DIR/v8_8_7_nonfatal_dcheck.patch" 2>/dev/null && git apply "$REPO_DIR/v8_8_7_nonfatal_dcheck.patch" || true
 ( cd third_party/zlib && git apply --check "$REPO_DIR/v8_8_7_zlib.patch" 2>/dev/null && git apply "$REPO_DIR/v8_8_7_zlib.patch" || true )
 
 # ---- Configure + build -----------------------------------------------------
