@@ -67,6 +67,7 @@ done
 # ---- Apply source/tooling patches (idempotent) -----------------------------
 git apply --check "$REPO_DIR/v8_8_7_macos.patch" 2>/dev/null && git apply "$REPO_DIR/v8_8_7_macos.patch" || true
 ( cd build && git apply --check "$REPO_DIR/v8_8_7_build_dir.patch" 2>/dev/null && git apply "$REPO_DIR/v8_8_7_build_dir.patch" || true )
+git apply --check "$REPO_DIR/v8_8_7_dcheck_kmax.patch" 2>/dev/null && git apply "$REPO_DIR/v8_8_7_dcheck_kmax.patch" || true
 ( cd third_party/zlib && git apply --check "$REPO_DIR/v8_8_7_zlib.patch" 2>/dev/null && git apply "$REPO_DIR/v8_8_7_zlib.patch" || true )
 
 # ---- Configure + build -----------------------------------------------------
@@ -88,6 +89,7 @@ clang_base_path = "/Library/Developer/CommandLineTools/usr"
 clang_use_chrome_plugins = false
 symbol_level = 1
 v8_enable_sandbox = false
+dcheck_always_on = true  # avoids a release-optimizer heisenbug in DOM-wrapper construct (baidu)
 EOF
 
 gn gen "$OUT"
