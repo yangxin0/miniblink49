@@ -122,6 +122,12 @@ endif()
 # the single base file in directly rather than linking the whole base lib for it.
 set(BLINK_BASE_SHIM "${CMAKE_SOURCE_DIR}/orig_chrome/base/debug/alias.cc")
 
+# UnifiedHeapController subclasses v8::EmbedderHeapTracer; with RTTI on, its typeinfo
+# references the base typeinfo, absent from the -fno-rtti V8 monolith. It is never
+# dynamic_cast, so build it -fno-rtti to drop the reference.
+set_source_files_properties("${BSRC}/heap/UnifiedHeapController.cpp"
+    PROPERTIES COMPILE_OPTIONS "-fno-rtti")
+
 add_library(blink_platform STATIC
     ${BLINK_CORE_SOURCES} ${BLINK_HEAP} ${BLINK_GRAPHICS} ${BLINK_TEXT}
     ${BLINK_FONTS} ${BLINK_SUBLAYERS} ${BLINK_INFRA_SOURCES} ${BLINK_EXPORTED}

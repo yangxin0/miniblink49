@@ -19,6 +19,14 @@ list(FILTER BLINK_BINDINGS_INFRA EXCLUDE REGEX "/V8InjectedScriptHost\\.cpp$")
 
 add_library(blink_bindings_infra STATIC ${BLINK_BINDINGS_INFRA}
     "${CMAKE_SOURCE_DIR}/third_party/v8shim/v8shim.cpp")  # v8::g_patchForCreateDataProperty
+
+# These files subclass abstract V8 classes (ArrayBuffer::Allocator in V8Initializer,
+# ScriptCompiler::ExternalSourceStream in ScriptStreamer); with RTTI on, the subclass
+# typeinfo references the base typeinfo, which the -fno-rtti V8 monolith doesn't export.
+# The subclasses are never dynamic_cast, so build them -fno-rtti to drop the reference.
+set_source_files_properties(
+    "${BIV8}/V8Initializer.cpp" "${BIV8}/ScriptStreamer.cpp"
+    PROPERTIES COMPILE_OPTIONS "-fno-rtti")
 target_link_libraries(blink_bindings_infra PUBLIC blink_core)
 target_include_directories(blink_bindings_infra PUBLIC
     "${CMAKE_SOURCE_DIR}/third_party/v8shim" "${CMAKE_SOURCE_DIR}/third_party/khronos"
