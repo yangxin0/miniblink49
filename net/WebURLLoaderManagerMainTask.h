@@ -19,6 +19,22 @@ void WKE_CALL_TYPE wkeDeleteWillSendRequestInfo(wkeWebView webWindow, wkeWillSen
 
 namespace net {
 
+#if !defined(_WIN32)
+// macOS: wkeCreateStringW expects const wchar_t* (32-bit), but our buffers hold
+// UChar (UTF-16, 16-bit). Widen the UTF-16 data into a wchar_t buffer so the
+// existing wkeCreateStringW path (which already handles 32-bit wchar_t on macOS)
+// can be reused. On Windows wchar_t == UChar (16-bit), so callers pass UChar
+// directly and this helper is not needed.
+static inline wkeString wkeCreateStringFromUChar(const UChar* data, size_t len)
+{
+    std::vector<wchar_t> wide;
+    wide.reserve(len);
+    for (size_t i = 0; i < len; ++i)
+        wide.push_back((wchar_t)data[i]);
+    return wkeCreateStringW(wide.empty() ? L"" : wide.data(), wide.size());
+}
+#endif
+
 struct URLError {
     std::string domain;
     int reason;
@@ -764,12 +780,22 @@ static void distpatchWkeWillSendRequest(WebURLLoaderInternal* job, const KURL* n
     wkeTempCallbackInfo* info = wkeGetTempCallbackInfo(page->wkeWebView());
     info->size = sizeof(wkeTempCallbackInfo);
     info->willSendRequestInfo = new wkeWillSendRequestInfo();
+#if defined(_WIN32)
     info->willSendRequestInfo->url = wkeCreateStringW(url.data(), url.size());
     info->willSendRequestInfo->newUrl = newURL ? wkeCreateStringW(newUrl.data(), newUrl.size()) : nullptr;
+#else
+    info->willSendRequestInfo->url = wkeCreateStringFromUChar(url.data(), url.size());
+    info->willSendRequestInfo->newUrl = newURL ? wkeCreateStringFromUChar(newUrl.data(), newUrl.size()) : nullptr;
+#endif
     info->willSendRequestInfo->resourceType = webURLRequestToResourceType(*job->firstRequest());
     info->willSendRequestInfo->httpResponseCode = httpCode;
+#if defined(_WIN32)
     info->willSendRequestInfo->method = wkeCreateStringW(method.data(), method.size());
     info->willSendRequestInfo->referrer = wkeCreateStringW(referrer.data(), referrer.size());
+#else
+    info->willSendRequestInfo->method = wkeCreateStringFromUChar(method.data(), method.size());
+    info->willSendRequestInfo->referrer = wkeCreateStringFromUChar(referrer.data(), referrer.size());
+#endif
     info->willSendRequestInfo->headers = nullptr;
 
     page->wkeHandler().otherLoadCallback(page->wkeWebView(), page->wkeHandler().otherLoadCallbackParam,
@@ -1004,7 +1030,13 @@ void WebURLLoaderManagerMainTask::handleDidSendData(MainTaskArgs* args, WebURLLo
 
     unsigned long long sentData = size * nmemb;
 
+#if defined(_WIN32)
     InterlockedExchangeAdd(reinterpret_cast<long volatile*>(&job->m_sentDataBytes), static_cast<long>(sentData));
+#else
+    // macOS LP64: m_sentDataBytes is a 64-bit 'unsigned long', so the 32-bit
+    // LONG-based shim would truncate. Add atomically at full width instead.
+    __sync_fetch_and_add(&job->m_sentDataBytes, static_cast<unsigned long>(sentData));
+#endif
     WebURLLoaderManager::sharedInstance()->handleDidSentData(job, job->m_sentDataBytes, job->m_totalBytesToBeSent);
 }
 

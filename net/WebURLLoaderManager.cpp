@@ -502,7 +502,13 @@ static void handleExternalProtocol(const KURL& url)
             continue;
         return;
     }
+#if defined(_WIN32)
     ShellExecuteA(NULL, NULL, url.getUTF8String().utf8().data(), NULL, NULL, SW_SHOWNORMAL);
+#else
+    // macOS: no Win32 ShellExecute. These are Windows-only external protocols
+    // (tencent/xunlei) whose handler apps do not exist on macOS, so no-op.
+    (void)url;
+#endif
 }
 
 void WebURLLoaderManager::handleDidFail(WebURLLoaderInternal* job, const blink::WebURLError& error)
@@ -618,7 +624,13 @@ void WebURLLoaderManager::handleDidReceiveResponse(WebURLLoaderInternal* job)
 // called with data after all headers have been processed via headerCallbackOnIoThread
 static size_t writeCallbackOnIoThread(void* ptr, size_t size, size_t nmemb, void* data)
 {
+#if defined(_WIN32)
     int jobId = (int)data;
+#else
+    // macOS LP64: void* is 64-bit. The jobId was stored as an int in this
+    // pointer-sized curl slot, so round-trip it through intptr_t.
+    int jobId = (int)(intptr_t)data;
+#endif
     AutoLockJob autoLockJob(WebURLLoaderManager::sharedInstance(), jobId);
     WebURLLoaderInternal* job = autoLockJob.lock();
     if (!job || job->isCancelled())
@@ -664,7 +676,12 @@ static bool checkIsProxyHead(WebURLLoaderInternal* job, char* ptr, size_t size)
 
 static size_t headerCallbackOnIoThread(char* ptr, size_t size, size_t nmemb, void* data)
 {
+#if defined(_WIN32)
     int jobId = (int)data;
+#else
+    // macOS LP64: round-trip the int jobId through intptr_t (see writeCallback).
+    int jobId = (int)(intptr_t)data;
+#endif
     AutoLockJob autoLockJob(WebURLLoaderManager::sharedInstance(), jobId);
     WebURLLoaderInternal* job = autoLockJob.lock();
     if (!job || job->isCancelled())
@@ -687,7 +704,12 @@ static size_t headerCallbackOnIoThread(char* ptr, size_t size, size_t nmemb, voi
 
 static curlioerr ioctlCallbackOnIoThread(CURL* handle, int cmd, void* data)
 {
+#if defined(_WIN32)
     int jobId = (int)data;
+#else
+    // macOS LP64: round-trip the int jobId through intptr_t (see writeCallback).
+    int jobId = (int)(intptr_t)data;
+#endif
     AutoLockJob autoLockJob(WebURLLoaderManager::sharedInstance(), jobId);
     WebURLLoaderInternal* job = autoLockJob.lock();
     if (!job || job->isCancelled())
@@ -703,7 +725,12 @@ static curlioerr ioctlCallbackOnIoThread(CURL* handle, int cmd, void* data)
 
 size_t readCallbackOnIoThread(void* ptr, size_t size, size_t nmemb, void* data)
 {
+#if defined(_WIN32)
     int jobId = (int)data;
+#else
+    // macOS LP64: round-trip the int jobId through intptr_t (see writeCallback).
+    int jobId = (int)(intptr_t)data;
+#endif
     AutoLockJob autoLockJob(WebURLLoaderManager::sharedInstance(), jobId);
     WebURLLoaderInternal* job = autoLockJob.lock();
     if (!job || job->isCancelled())
@@ -784,7 +811,12 @@ bool WebURLLoaderManager::downloadOnIoThread()
         ASSERT(handle);
         char* info = NULL;
         CURLcode err = curl_easy_getinfo(handle, CURLINFO_PRIVATE, &info);
+#if defined(_WIN32)
         int jobId = (int)info;
+#else
+        // macOS LP64: round-trip the int jobId stored in CURLINFO_PRIVATE.
+        int jobId = (int)(intptr_t)info;
+#endif
         ASSERT_UNUSED(err, CURLE_OK == err);
         ASSERT(jobId > 0);
         AutoLockJob autoLockJob(WebURLLoaderManager::sharedInstance(), jobId);
@@ -1003,7 +1035,17 @@ static SetupDataInfo* setupFormDataOnMainThread(WebURLLoaderInternal* job, CURLo
             flattenElement = new FlattenHTTPBodyElement();
             flattenElement->type = FlattenHTTPBodyElement::Type::TypeFile;
             Vector<UChar> filePath = WTF::ensureUTF16UChar(element.filePath, true);
+#if defined(_WIN32)
             flattenElement->filePath = filePath.data();
+#else
+            // macOS: widen 16-bit UChar to 32-bit wchar_t (see FlattenHTTPBodyElement.h).
+            {
+                std::wstring widePath;
+                for (size_t ci = 0; ci < filePath.size() && filePath[ci]; ++ci)
+                    widePath.push_back((wchar_t)filePath[ci]);
+                flattenElement->filePath = widePath;
+            }
+#endif
             flattenElement->fileStart = offset;
             flattenElement->fileLength = length;
             result->flattenElements.append(flattenElement);
@@ -1081,7 +1123,12 @@ static void setupPostOrPutOnIoThread(WebURLLoaderInternal* job, bool isPost, Set
             curl_easy_setopt(job->m_handle, CURLOPT_POSTFIELDSIZE, element->data.size());
             curl_easy_setopt(job->m_handle, CURLOPT_COPYPOSTFIELDS, element->data.data());
 
+#if defined(_WIN32)
             InterlockedExchangeAdd(reinterpret_cast<long volatile*>(&job->m_sentDataBytes), static_cast<long>(element->data.size()));
+#else
+            // macOS LP64: add atomically at full 64-bit width (see MainTask.h).
+            __sync_fetch_and_add(&job->m_sentDataBytes, static_cast<unsigned long>(element->data.size()));
+#endif
 
             delete element;
             return;
@@ -1273,7 +1320,13 @@ static bool isLocalFileNotExist(const char* urlTrim, WebURLLoaderInternal* job)
         return false;
 
     String outString = String::format("isLocalFileNotExist: %s\n", WTF::ensureStringToUTF8(url, true).data());
+#if defined(_WIN32)
     OutputDebugStringW(outString.charactersWithNullTermination().data());
+#else
+    // macOS: wchar_t is 32-bit, so UChar (16-bit) data cannot be passed to the
+    // wchar_t-based shim. Emit via the UTF-8/char path instead.
+    OutputDebugStringA(WTF::ensureStringToUTF8(outString, true).data());
+#endif
 
     return result;
 }

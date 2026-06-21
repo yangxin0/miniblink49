@@ -89,6 +89,7 @@ if(MINIBLINK_BUILD_BLINK)
     include(third_party/WebKit/Source/modules/blink_modules.cmake)  # web-platform feature modules
     include(net/net_portable.cmake)                          # portable net/ subset
     include(wke/wke_globals.cmake)                            # wke embedding-layer globals blink links against
+    include(content/content_browser.cmake)                   # embedding-host page host (content::WebPageImpl + Cocoa web_impl_mac)
     add_subdirectory(test/blink)  # smoke test: prove geometry links + computes
 
     if(APPLE)

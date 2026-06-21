@@ -69,6 +69,14 @@ static WebString nsStringToWebString(NSString* s)
 
 namespace content {
 
+// Forward declaration only: this Cocoa TU must NOT include WebPageImpl.h,
+// because that header pulls in KURL.h whose unqualified WTF::TextEncoding use
+// collides with Carbon/CoreServices' global `TextEncoding` (dragged in by
+// AppKit). This global is merely a pointer definition (no member access), so a
+// forward declaration is sufficient. The matching extern declaration lives in
+// ContextMenuMacImpl.cpp, which is a pure C++ TU and does include WebPageImpl.h.
+class WebPageImpl;
+
 WebPageImpl* g_saveImageingWebPage = nullptr;
 
 WebClipboardImpl::WebClipboardImpl()

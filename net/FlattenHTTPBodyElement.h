@@ -379,7 +379,19 @@ public:
                     flattenElement = new FlattenHTTPBodyElement();
                     flattenElement->type = FlattenHTTPBodyElement::Type::TypeFile;
                     Vector<UChar> filePathBuf = WTF::ensureUTF16UChar(filePath, true);
+#if defined(_WIN32)
                     flattenElement->filePath = filePathBuf.data();
+#else
+                    // macOS: wchar_t is 32-bit, so 16-bit UChar data cannot be
+                    // assigned to std::wstring directly. Widen up to the NUL that
+                    // ensureUTF16UChar appended (matching the Win32 wchar_t* path).
+                    {
+                        std::wstring widePath;
+                        for (size_t ci = 0; ci < filePathBuf.size() && filePathBuf[ci]; ++ci)
+                            widePath.push_back((wchar_t)filePathBuf[ci]);
+                        flattenElement->filePath = widePath;
+                    }
+#endif
                     flattenElement->fileStart = offset; // item->offset;
                     flattenElement->fileLength = length; // item->length;
                     flattenElements->append(flattenElement);

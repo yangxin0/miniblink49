@@ -31,6 +31,10 @@
 #include "third_party/WebKit/public/web/WebFrameClient.h"
 #include "third_party/WebKit/public/web/WebDraggableRegion.h"
 #include "third_party/WebKit/public/web/WebDocument.h"
+// WebDragData.h was previously pulled in transitively via the (now Win32-only)
+// DragHandle.h; include it directly so the portable drag-data marshalling
+// (webDropDataToWkeDragData / startDragging) compiles on both platforms.
+#include "third_party/WebKit/public/platform/WebDragData.h"
 #include "third_party/WebKit/Source/web/WebViewImpl.h"
 #include "third_party/WebKit/Source/web/WebPluginContainerImpl.h"
 #include "third_party/WebKit/Source/web/FrameLoaderClientImpl.h"
@@ -85,7 +89,12 @@
 #include "wke/wkeWebWindow.h"
 #include "wke/wkeGlobalVar.h"
 #endif
+#if defined(_WIN32)
+// bitmap_platform_device_win.h is the Win32-only skia device; its
+// DrawToNativeContext/DrawToNativeLayeredContext override Win32-specific
+// virtuals that don't exist on the macOS skia device (bitmap_platform_device_mac).
 #include "skia/ext/bitmap_platform_device_win.h"
+#endif
 
 extern DWORD g_paintToMemoryCanvasInUiThreadCount;
 extern DWORD g_mouseCount;
@@ -244,8 +253,11 @@ WebPageImpl::~WebPageImpl()
     if (m_screenInfo)
         delete m_screenInfo;
 
+#if defined(_WIN32)
+    // ToolTip is a Win32-only inline GDI window; on macOS these stay null.
     delete m_toolTip;
     delete m_validationMessageTip;
+#endif
 
     if (m_draggableRegion)
       ::DeleteObject(m_draggableRegion);
@@ -392,8 +404,8 @@ public:
         int layerDirty = m_page->m_layerDirty; 
         int needsLayout = m_page->m_needsLayout; 
         if (m_isComefromMainFrame) {
-            InterlockedExchange(reinterpret_cast<long volatile*>(&m_page->m_layerDirty), 0);
-            InterlockedExchange(reinterpret_cast<long volatile*>(&m_page->m_needsLayout), 0);
+            InterlockedExchange(reinterpret_cast<LONG volatile*>(&m_page->m_layerDirty), 0);
+            InterlockedExchange(reinterpret_cast<LONG volatile*>(&m_page->m_needsLayout), 0);
         }
         m_isLayout = (0 != layerDirty || 0 != needsLayout);
 
@@ -417,8 +429,8 @@ public:
         int layerDirty = m_page->m_layerDirty;
         int needsLayout = m_page->m_needsLayout;
         if (m_isComefromMainFrame) {
-            InterlockedExchange(reinterpret_cast<long volatile*>(&m_page->m_layerDirty), 0);
-            InterlockedExchange(reinterpret_cast<long volatile*>(&m_page->m_needsLayout), 0);
+            InterlockedExchange(reinterpret_cast<LONG volatile*>(&m_page->m_layerDirty), 0);
+            InterlockedExchange(reinterpret_cast<LONG volatile*>(&m_page->m_needsLayout), 0);
         }
 
         bool isLayout = 0 != layerDirty || 0 != needsLayout;
@@ -702,6 +714,8 @@ void WebPageImpl::doClose()
     }
 #endif
 
+#if defined(_WIN32)
+    // OLE drag-drop teardown is Win32-only; on macOS m_dragHandle stays null.
     if (m_hWnd) {
         if (::IsWindow(m_hWnd)) { // 多线程渲染时，ui线程先销毁窗口，再走到此处
             ::RevokeDragDrop(m_hWnd);
@@ -713,6 +727,7 @@ void WebPageImpl::doClose()
 
     delete m_dragHandle;
     m_dragHandle = nullptr;
+#endif
 
     content::WebThreadImpl* threadImpl = nullptr;
     threadImpl = (content::WebThreadImpl*)(blink::Platform::current()->currentThread());
@@ -825,7 +840,7 @@ void WebPageImpl::setNeedsCommitAndNotLayout()
 
 void WebPageImpl::setNeedsCommit()
 {
-    InterlockedExchange(reinterpret_cast<long volatile*>(&m_needsLayout), 1);
+    InterlockedExchange(reinterpret_cast<LONG volatile*>(&m_needsLayout), 1);
     setNeedsCommitAndNotLayout();
 }
 
@@ -908,7 +923,7 @@ void WebPageImpl::executeMainFrame()
 
 void WebPageImpl::onLayerTreeDirty()
 {
-    InterlockedExchange(reinterpret_cast<long volatile*>(&m_layerDirty), 1);
+    InterlockedExchange(reinterpret_cast<LONG volatile*>(&m_layerDirty), 1);
     setNeedsCommitAndNotLayout();
 }
 
@@ -1050,11 +1065,19 @@ HDC WebPageImpl::viewDC()
     if (!m_memoryCanvasForUi)
         return nullptr;
 
+#if defined(_WIN32)
+    // skia::BitmapPlatformDevice::GetBitmapDCUgly is a Win32-only API that
+    // exposes a GDI HDC backing the bitmap. The macOS skia device has no
+    // equivalent (it composites via CGContext), so return null here; macOS
+    // callers draw through the CGContext path instead.
     skia::BitmapPlatformDevice* device = (skia::BitmapPlatformDevice*)skia::GetPlatformDevice(skia::GetTopDevice(*m_memoryCanvasForUi));
     if (!device)
         return nullptr;
     HDC hDC = device->GetBitmapDCUgly(m_hWnd);
     return hDC;
+#else
+    return nullptr;
+#endif
 }
 
 void WebPageImpl::releaseHdc()
@@ -1193,11 +1216,16 @@ bool WebPageImpl::needDrawToScreen(HWND hWnd) const
 
 void WebPageImpl::drawLayeredWindow(HWND hWnd, SkCanvas* canvas, HDC hScreenDC, const IntRect& paintRect, HDC hMemoryDC) const
 {
+#if defined(_WIN32)
+    // Blits the skia bitmap to a Win32 layered window DC. The Cocoa
+    // backend composites via CoreAnimation, so this on-screen blit is
+    // Win32-only (skia::DrawToNativeLayeredContext takes a Win32 HDC).
     RECT rtWnd;
     ::GetWindowRect(hWnd, &rtWnd);
 
     RECT rc = blink::intRectToWinRect(paintRect);
     skia::DrawToNativeLayeredContext(canvas, hScreenDC, &rc, &rtWnd);
+#endif
 }
 
 // 本函数可能被调用在ui线程，也可以是合成线程。开启多线程绘制，则在合成线程
@@ -1211,12 +1239,23 @@ void WebPageImpl::paintToMemoryCanvasInUiThread(SkCanvas* canvas, const IntRect&
 
     HWND hWnd = m_pagePtr->getHWND();
     HDC hMemoryDC = nullptr;
+#if defined(_WIN32)
     hMemoryDC = skia::BeginPlatformPaint(hWnd, canvas);
+#else
+    // On macOS skia::BeginPlatformPaint returns a CGContext* (PlatformSurface).
+    // The wke paintUpdatedCallback ABI carries it as an opaque HDC handle;
+    // reinterpret it so the cross-platform callback path keeps working.
+    hMemoryDC = reinterpret_cast<HDC>(skia::BeginPlatformPaint(hWnd, canvas));
+#endif
 
     drawDebugLine(this, canvas, paintRect);
     
     g_paintToMemoryCanvasInUiThreadCount++;
 
+#if defined(_WIN32)
+    // On-screen blit to the Win32 window DC. The Cocoa backend draws via
+    // CoreAnimation, so this path (GetDC/DrawToNativeContext/ReleaseDC) is
+    // Win32-only; the wke paintUpdatedCallback below stays cross-platform.
     if (needDrawToScreen(hWnd)) { // 使用wke接口不由此上屏
         HDC hdc = ::GetDC(hWnd);
 #if 0
@@ -1243,6 +1282,7 @@ void WebPageImpl::paintToMemoryCanvasInUiThread(SkCanvas* canvas, const IntRect&
 
         ::ReleaseDC(hWnd, hdc);
     }
+#endif
 
     copyToMemoryCanvasForUi();
 
@@ -1393,6 +1433,10 @@ void WebPageImpl::fireCursorEvent(HWND hWnd, UINT message, WPARAM wParam, LPARAM
     if (handle)
         *handle = FALSE;
 
+#if defined(_WIN32)
+    // Win32 cursor mapping via LoadCursor/SetCursor and the GDI custom-cursor
+    // builder (createSharedCursorImpl, from PlatformCursor.h). The Cocoa cursor
+    // path (NSCursor) will live in web_impl_mac; guard this body out on macOS.
     HCURSOR hCur = NULL;
     switch (m_cursor.type) {
     case WebCursorInfo::TypeIBeam:
@@ -1471,6 +1515,7 @@ void WebPageImpl::fireCursorEvent(HWND hWnd, UINT message, WPARAM wParam, LPARAM
         if (handle)
             *handle = TRUE;
     }
+#endif // defined(_WIN32)
 }
 
 LRESULT WebPageImpl::fireWheelEvent(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
@@ -1638,6 +1683,9 @@ LRESULT WebPageImpl::fireMouseEvent(HWND hWnd, UINT message, WPARAM wParam, LPAR
 
 void WebPageImpl::handleMouseWhenDraging(UINT message)
 {
+#if defined(_WIN32)
+    // OLE drag-drop cursor simulation is Win32-only (DragHandle is an
+    // IDropTarget); the Cocoa drag handler will live in web_impl_mac.
     POINT screenPoint = { 0 };
     ::GetCursorPos(&screenPoint);
 
@@ -1665,6 +1713,7 @@ void WebPageImpl::handleMouseWhenDraging(UINT message)
         m_dragHandle->Drop(m_dragHandle->getDragData(), 0, pt, &pdwEffect);
         m_dragHandle->DragLeave();
     }
+#endif
 }
 
 void WebPageImpl::onEnterDragSimulate()
@@ -1794,7 +1843,10 @@ void WebPageImpl::startDragging(blink::WebLocalFrame* frame, const blink::WebDra
 
     wkeStartDraggingCallback callback = m_pagePtr->wkeHandler().startDraggingCallback;
     if (!callback) {
+#if defined(_WIN32)
+        // Native OLE drag source (DragHandle) is Win32-only.
         m_dragHandle->startDragging(frame, dragDate, mask, image, dragImageOffset);
+#endif
         return;
     }
 
@@ -1928,6 +1980,8 @@ COLORREF WebPageImpl::getBackgroundColor()
     return m_webViewImpl->backgroundColor();
 }
 
+#if defined(_WIN32)
+// OLE drag-drop registration is Win32-only (RegisterDragDrop + IDropTarget).
 struct RegisterDragDropTask {
     RegisterDragDropTask(int id, HWND hWnd, DragHandle* dragHandle)
     {
@@ -1956,6 +2010,7 @@ private:
     HWND m_hWnd;
     DragHandle* m_dragHandle;
 };
+#endif
 
 // class PostTaskWrap {
 // public:
@@ -2053,6 +2108,8 @@ void WebPageImpl::setHWND(HWND hWnd)
     if (/*!wke::g_isSetDragDropEnable ||*/ !m_enableDragDrop)
         return;
 
+#if defined(_WIN32)
+    // OLE drag-drop target registration is Win32-only.
     if (wke::g_wkeUiThreadPostTaskCallback) {
         m_dragHandle->setViewWindow(m_hWnd, m_webViewImpl);
         wke::g_wkeUiThreadPostTaskCallback(m_hWnd, RegisterDragDropTask::registerDragDropInUiThread, new RegisterDragDropTask(m_pagePtr->wkeWebView()->getId(), m_hWnd, m_dragHandle));
@@ -2060,6 +2117,7 @@ void WebPageImpl::setHWND(HWND hWnd)
         m_dragHandle->setViewWindow(m_hWnd, m_webViewImpl);
         ::RegisterDragDrop(m_hWnd, m_dragHandle);
     }
+#endif
 }
 
 WebPageImpl* WebPageImpl::getSelfForCurrentContext()
@@ -2200,6 +2258,7 @@ WebScreenInfo WebPageImpl::screenInfo()
 {
     if (m_screenInfo)
         return *m_screenInfo;
+#if defined(_WIN32)
     POINT pt = { 0, 0 };
     HMONITOR hMonitor = ::MonitorFromPoint(pt, MONITOR_DEFAULTTOPRIMARY);
 
@@ -2210,6 +2269,11 @@ WebScreenInfo WebPageImpl::screenInfo()
     m_screenInfo = new blink::WebScreenInfo();
     m_screenInfo->rect = WebRect(winRectToIntRect(mi.rcMonitor));
     m_screenInfo->availableRect = WebRect(winRectToIntRect(mi.rcWork));
+#else
+    // The Cocoa screen geometry query (NSScreen) will live in web_impl_mac;
+    // until then provide an empty WebScreenInfo so callers get valid data.
+    m_screenInfo = new blink::WebScreenInfo();
+#endif
 
     return *m_screenInfo;
 }
@@ -2227,7 +2291,10 @@ void WebPageImpl::setMouseOverURL(const blink::WebURL& url)
 
 void WebPageImpl::setToolTipText(const blink::WebString& toolTip, blink::WebTextDirection hint)
 {
+#if defined(_WIN32)
+    // Win32 GDI tooltip window; the Cocoa tooltip will live in web_impl_mac.
     m_toolTip->show(WTF::ensureUTF16UChar((String)toolTip, true).data(), nullptr);
+#endif
 }
 
 void WebPageImpl::onMouseDown(const blink::WebNode& mouseDownNode)
@@ -2330,9 +2397,13 @@ void WebPageImpl::showValidationMessage(
     blink::WebTextDirection supplementalTextDir
     )
 {
+#if defined(_WIN32)
+    // Win32 GDI validation-message tooltip; the Cocoa equivalent will live in
+    // web_impl_mac.
     POINT pos = { anchorInViewport.x, anchorInViewport.y };
     ::ClientToScreen(m_hWnd, &pos);
     m_validationMessageTip->show(WTF::ensureUTF16UChar((String)mainText, true).data(), &pos);
+#endif
 }
 
 void WebPageImpl::hideValidationMessage()
@@ -2350,6 +2421,11 @@ void WebPageImpl::didStartProvisionalLoad()
     m_firstDrawCount = 0;
 }
 
+#if defined(_WIN32)
+// File-chooser helpers below are Win32-only: they disable the native root
+// window during the modal dialog and re-foreground it afterwards, and call
+// runFileChooserImpl (from the Win32-guarded RunFileChooserImpl.h). The Cocoa
+// file chooser (NSOpenPanel) will live in web_impl_mac.
 class RootWndAutoDisable {
 public:
     RootWndAutoDisable(HWND hWnd)
@@ -2398,6 +2474,14 @@ bool WebPageImpl::runFileChooser(const blink::WebFileChooserParams& params, blin
     blink::Platform::current()->currentThread()->postDelayedTask(FROM_HERE, new DelayPopupAterFileChooserTask(m_hWnd), 1000);
     return b;
 }
+#else // defined(_WIN32)
+bool WebPageImpl::runFileChooser(const blink::WebFileChooserParams& params, blink::WebFileChooserCompletion* completion)
+{
+    // The Cocoa file chooser (NSOpenPanel) will live in web_impl_mac; for now
+    // decline the request so blink falls back gracefully.
+    return false;
+}
+#endif // defined(_WIN32)
 
 void WebPageImpl::willEnterDebugLoop()
 {
@@ -2455,7 +2539,17 @@ bool WebPageImpl::initSetting()
     settings->setTextAreasAreResizable(true);
     
     //settings->setStandardFontFamily(WebString(L"微软雅黑", 4));
+#if defined(_WIN32)
     settings->setStandardFontFamily(blink::WebString(L"宋体", 2));
+#else
+    // On macOS wchar_t is 4 bytes while WebUChar (the WebString UTF-16 element)
+    // is 2 bytes, so L"..." does not match the WebString(const WebUChar*, len)
+    // constructor. Use a char16_t literal reinterpreted as WebUChar*.
+    {
+        static const char16_t kSongtiFont[] = u"宋体";
+        settings->setStandardFontFamily(blink::WebString(reinterpret_cast<const blink::WebUChar*>(kSongtiFont), 2));
+    }
+#endif
     settings->setUsesEncodingDetector(true);
     settings->setJavaScriptEnabled(true);
     settings->setAllowFileAccessFromFileURLs(true);

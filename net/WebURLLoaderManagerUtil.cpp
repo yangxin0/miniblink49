@@ -9,7 +9,9 @@
 #include "third_party/WebKit/Source/wtf/ThreadingPrimitives.h"
 #include "wke/wkeWebView.h"
 #include "content/browser/WebPage.h"
-#include <shlwapi.h>
+#if defined(_WIN32)
+#include <shlwapi.h>  // no shlwapi API is actually used in this TU; Win32-only
+#endif
 
 namespace net {
 	

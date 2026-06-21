@@ -2,9 +2,31 @@
 #include "content/browser/WebFrameClientImpl.h"
 #include "content/browser/WebPage.h"
 #include "content/browser/WebPageImpl.h"
+#if defined(_WIN32)
 #include "content/ui/ContextMeun.h"
+#else
+// macOS sibling backend; mirrors the same content::ContextMenu interface.
+// Unlike the Win32 ContextMeun.h, this lightweight header does not transitively
+// pull in blink::Platform (it deliberately avoids the heavy WebPage/WebViewImpl
+// chain to dodge a Carbon/WTF TextEncoding name clash). WebFrameClientImpl.cpp
+// uses blink::Platform::current() directly, so include Platform.h explicitly on
+// non-Windows. On Windows it is still provided transitively via ContextMeun.h,
+// so this branch leaves the Windows build byte-for-byte unchanged.
+#include "content/web_impl_mac/ContextMenuMac.h"
+#include "third_party/WebKit/public/platform/Platform.h"
+// WebURLLoaderClient + WebDataConsumerHandle were supplied transitively by the
+// now-guarded WebPluginImpl.h; WebURLLoaderClientWrapped (below) derives from
+// WebURLLoaderClient, so pull them directly on the macOS branch. Windows still
+// gets them via WebPluginImpl.h, so its build is byte-for-byte unchanged.
+#include "third_party/WebKit/public/platform/WebURLLoaderClient.h"
+#include "third_party/WebKit/public/platform/WebDataConsumerHandle.h"
+#endif
 #include "content/web_impl_win/WebMediaPlayerImpl.h"
+#if defined(_WIN32)
+// NPAPI plugin host is the Win32 backend (pulls Carbon/NPEvent on mac). macOS
+// has no NPAPI plugin support yet (createPlugin returns null below), so skip it.
 #include "content/web_impl_win/npapi/WebPluginImpl.h"
+#endif
 #include "orig_chrome/content/OrigChromeMgr.h"
 #if (defined ENABLE_WKE) && (ENABLE_WKE == 1)
 #include "wke/wkeWebView.h"
@@ -188,6 +210,10 @@ blink::WebPluginPlaceholder* WebFrameClientImpl::createPluginPlaceholder(WebLoca
 
 blink::WebPlugin* WebFrameClientImpl::createPlugin(WebLocalFrame* frame, const WebPluginParams& params)
 {
+#if !defined(_WIN32)
+    // NPAPI plugins are not supported on the macOS backend yet.
+    return nullptr;
+#else
     WebPluginParams newParam = params;
     Vector<String> paramNames;
     Vector<String> paramValues;
@@ -222,6 +248,7 @@ blink::WebPlugin* WebFrameClientImpl::createPlugin(WebLocalFrame* frame, const W
     plugin->setWkeWebView(m_webPage->wkeWebView());
 
     return plugin.leakRef();
+#endif // !_WIN32
 }
 
 blink::WebMediaPlayer* WebFrameClientImpl::createMediaPlayer(WebLocalFrame* frame, const WebURL& url , WebMediaPlayerClient* client, WebContentDecryptionModule*)

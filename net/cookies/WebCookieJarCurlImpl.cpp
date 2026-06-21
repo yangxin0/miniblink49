@@ -129,8 +129,16 @@ static void addMatchingCurlCookie(const char* cookie, const String& domain, cons
 
     int expires = strExpires.toInt();
 
+#if defined(_WIN32)
     __int64 now = 0;
     time(&now);
+#else
+    // macOS: time_t is 'long' (LP64) which mismatches __int64 ('long long').
+    // Call ::time with a real time_t, then widen into the 64-bit local.
+    time_t nowT = 0;
+    time(&nowT);
+    __int64 now = static_cast<__int64>(nowT);
+#endif
 
     // Check if cookie has expired
     if (expires && now > expires)
@@ -244,11 +252,11 @@ static String getNetscapeCookieFormat(const KURL& url, const String& value)
     }
 
     if (equalCount > 0) { // ssxmod_itna=xxx=xxxx;
-        if (firstEqualPos == 0) // Èç¹ûµÈÓÚºÅÔÚµÚÒ»Î»£¬Ö±½ÓÅÐ¶ÏÎªÎÞÐ§cookie
+        if (firstEqualPos == 0) // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Úºï¿½ï¿½Úµï¿½Ò»Î»ï¿½ï¿½Ö±ï¿½ï¿½ï¿½Ð¶ï¿½Îªï¿½ï¿½Ð§cookie
             return "";
 
         cookieName = attr.substring(0, firstEqualPos);
-        if (attr.length() - 1 != firstEqualPos) { // Èç¹ûµÈÓÚºÅÔÚ×îÄ©Î²£¬ÔòÅÐ¶ÏvalueÊÇ¿ÕµÄ
+        if (attr.length() - 1 != firstEqualPos) { // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Úºï¿½ï¿½ï¿½ï¿½ï¿½Ä©Î²ï¿½ï¿½ï¿½ï¿½ï¿½Ð¶ï¿½valueï¿½Ç¿Õµï¿½
             cookieValue = attr.substring(firstEqualPos + 1);
         }
 

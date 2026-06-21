@@ -176,6 +176,7 @@ static inline LONG InterlockedIncrement(volatile LONG* v) { return __sync_add_an
 static inline LONG InterlockedDecrement(volatile LONG* v) { return __sync_sub_and_fetch(v, 1); }
 static inline LONG InterlockedExchangeAdd(volatile LONG* v, LONG a) { return __sync_fetch_and_add(v, a); }
 static inline LONG InterlockedCompareExchange(volatile LONG* v, LONG ex, LONG cmp) { return __sync_val_compare_and_swap(v, cmp, ex); }
+static inline LONG InterlockedExchange(volatile LONG* v, LONG val) { return __sync_lock_test_and_set(v, val); }
 
 // --- Dynamic loading + misc (posix-backed) -----------------------------------
 // wke's public header (wkeInitializeEx) loads the wke library via LoadLibrary/
@@ -413,6 +414,11 @@ typedef ULONG_PTR DWORD_PTR;
 #define CW_USEDEFAULT ((int)0x80000000)
 #endif
 
+// --- ShellExecute show commands ----------------------------------------------
+#ifndef SW_SHOWNORMAL
+#define SW_SHOWNORMAL 1
+#endif
+
 // --- GDI region combine modes ------------------------------------------------
 #ifndef RGN_OR
 #define RGN_AND 1
@@ -474,6 +480,10 @@ static inline BOOL   EnableWindow(HWND, BOOL) { return FALSE; }
 static inline BOOL   SetForegroundWindow(HWND) { return FALSE; }
 static inline BOOL   PostMessageW(HWND, UINT, WPARAM, LPARAM) { return FALSE; }
 static inline BOOL   KillTimer(HWND, UINT_PTR) { return FALSE; }
+static inline LONG_PTR GetWindowLongPtrW(HWND, int) { return 0; }
+static inline LONG_PTR SetWindowLongPtrW(HWND, int, LONG_PTR) { return 0; }
+#define GetWindowLongPtr GetWindowLongPtrW
+#define SetWindowLongPtr SetWindowLongPtrW
 // GDI region (used by the Win draggable-region path; inert on macOS)
 static inline HRGN   CreateRectRgn(int, int, int, int) { return NULL; }
 static inline int    SetRectRgn(HRGN, int, int, int, int) { return 0; }
