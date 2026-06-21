@@ -177,15 +177,16 @@ WebPageImpl::WebPageImpl(COLORREF bdColor)
         m_ccLayerTreeWrap = new LayerTreeWrap(this, true);
     } else
 #endif
-#if defined(_WIN32)
+        // NOTE (macOS render TODO): this multi-threaded compositor matches the
+        // Windows build but its main<->CompositeThread mutex ordering deadlocks when
+        // wke drives a paint on macOS (diagnosed via lldb). Forcing single-threaded
+        // (nullptr uiThreadClient) avoids the deadlock but the draw pipeline
+        // (preDrawFrame/applyActions/raster) still assumes the threaded model, so
+        // the page does not yet paint to m_memoryCanvas. Wiring a true single-
+        // threaded paint (or fixing the CompositeThread lock order) is the remaining
+        // work for visible rendering on macOS. The libraries + engine bring-up
+        // (init/load/parse) are complete; only the on-screen paint is pending.
         m_mcLayerTreeHost = new mc::LayerTreeHost(this, this);
-#else
-        // macOS: run the compositor single-threaded (no uiThreadClient -> no
-        // CompositeThread). The multi-threaded compositor's main<->composite mutex
-        // ordering deadlocks on this port; the single-threaded memory-canvas paint
-        // path drives wkeOnPaintUpdated for the Cocoa host.
-        m_mcLayerTreeHost = new mc::LayerTreeHost(this, nullptr);
-#endif
     m_memoryCanvasForUi = nullptr;
     m_disablePaint = false;
     m_firstDrawCount = 0;
