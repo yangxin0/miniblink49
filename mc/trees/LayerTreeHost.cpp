@@ -91,10 +91,17 @@ LayerTreeHost::LayerTreeHost(LayerTreeHostClent* hostClient, LayerTreeHostUiThre
     m_postpaintMessageCount = 0;
     m_hasResize = false;
     m_compositeThread = nullptr;
+#if defined(_WIN32)
     if (m_uiThreadClient) {
         m_compositeThread = blink::WebThreadSupportingGC::create("CompositeThread");
         m_compositeThread->platformThread().postTask(FROM_HERE, WTF::bind(&initializeCompositeThread, m_compositeThread.get()));
     }
+#else
+    // macOS: keep m_uiThreadClient but do NOT spawn a CompositeThread — the
+    // main<->composite mutex ordering deadlocks on this port. The draw runs
+    // synchronously on the UI thread instead (see requestDrawFrameToRun... and
+    // requestApplyActionsToRun... which execute inline when !m_compositeThread).
+#endif
     gLayerTreeHost = this;
 }
 
@@ -973,14 +980,43 @@ blink::IntRect LayerTreeHost::getClientRect()
 
 void LayerTreeHost::requestDrawFrameToRunIntoCompositeThread()
 {
+#if !defined(_WIN32)
+    if (!m_compositeThread) {
+        // macOS single-threaded synchronous draw (no CompositeThread). Apply any
+        // pending layer actions, software-paint the layer tree into m_memoryCanvas,
+        // then hand it to the UI client (fills the bit buffer + fires the wke
+        // paintUpdatedCallback). drawToCanvas locks m_rootCCLayerMutex; we hold
+        // m_compositeMutex only while touching m_memoryCanvas, and release it
+        // before the UI callback (which may re-enter the host).
+        applyActions(false);
+
+        SkRect paintRect;
+        SkCanvas* canvas = nullptr;
+        {
+            WTF::Locker<WTF::Mutex> locker(m_compositeMutex);
+            if (m_clientRect.isEmpty())
+                return;
+            if (!m_memoryCanvas || m_hasResize) {
+                m_hasResize = false;
+                if (m_memoryCanvas)
+                    delete m_memoryCanvas;
+                m_memoryCanvas = skia::CreatePlatformCanvas(m_clientRect.width(), m_clientRect.height(), !m_hasTransparentBackground);
+            }
+            clearCanvas(m_memoryCanvas, m_clientRect, m_hasTransparentBackground);
+            paintRect = SkRect::MakeXYWH(m_clientRect.x(), m_clientRect.y(), m_clientRect.width(), m_clientRect.height());
+            m_isDrawDirty = true;
+            drawToCanvas(m_memoryCanvas, paintRect);
+            canvas = m_memoryCanvas;
+        }
+        if (m_uiThreadClient && canvas) {
+            blink::IntRect ir(m_clientRect.x(), m_clientRect.y(), m_clientRect.width(), m_clientRect.height());
+            m_uiThreadClient->paintToMemoryCanvasInUiThread(canvas, ir);
+        }
+        return;
+    }
+#endif
     WTF::Locker<WTF::Mutex> locker(m_compositeMutex);
     if (!m_compositeThread) {
-        // macOS runs single-threaded (no CompositeThread — the multi-threaded
-        // main<->composite mutex ordering deadlocks on this port). The draw
-        // pipeline (preDrawFrame/applyActions/raster) still assumes the threaded
-        // model, so this is a no-op for now; wiring a true single-threaded paint
-        // into m_memoryCanvas is the remaining macOS render task. (Windows keeps
-        // the assert; m_uiThreadClient is null on macOS so it would pass anyway.)
         RELEASE_ASSERT(!m_uiThreadClient);
         return;
     }
@@ -994,6 +1030,15 @@ void LayerTreeHost::requestDrawFrameToRunIntoCompositeThread()
 
 void LayerTreeHost::requestApplyActionsToRunIntoCompositeThread(bool needCheck)
 {
+#if !defined(_WIN32)
+    if (!m_compositeThread) {
+        // macOS: apply pending layer actions inline on the UI thread (no
+        // CompositeThread). applyActions takes m_rootCCLayerMutex internally, so
+        // don't hold m_compositeMutex across it.
+        applyActions(needCheck);
+        return;
+    }
+#endif
     WTF::Locker<WTF::Mutex> locker(m_compositeMutex);
     if (!m_compositeThread) {
         RELEASE_ASSERT(!m_uiThreadClient);

@@ -195,7 +195,11 @@ bool SkOTUtils::LocalizedStrings_NameTable::next(SkTypeface::LocalizedString* lo
         fFamilyNameIter.reset(fTypes[fTypesIndex]);
     } while (true);
 #endif
-    *(int*)1 = 1;
+#if defined(_WIN32)
+    *(int*)1 = 1;  // miniblink "should-never-be-called" marker (Win font path differs)
+#endif
+    // The macOS CoreText font path DOES reach this; return false (no localized
+    // family names) instead of crashing — name enumeration isn't needed to render.
     return false;
 }
 

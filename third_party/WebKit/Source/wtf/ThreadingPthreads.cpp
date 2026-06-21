@@ -113,7 +113,18 @@ MutexBase::MutexBase(bool recursive)
 {
     pthread_mutexattr_t attr;
     pthread_mutexattr_init(&attr);
+#if defined(__APPLE__)
+    // On Windows WTF::Mutex maps to a CRITICAL_SECTION, which is ALWAYS recursive.
+    // The miniblink/blink/mc code was written against that semantics and relies on
+    // re-entrant locking in several places (e.g. mc::LayerTreeHost::drawToCanvas
+    // holds m_rootCCLayerMutex then calls getRootCCLayer() which locks it again).
+    // A plain PTHREAD_MUTEX_NORMAL self-deadlocks there, so make all WTF mutexes
+    // recursive on macOS to match the Win32 CRITICAL_SECTION behavior the port
+    // targets. (recursive==true callers stay recursive either way.)
+    pthread_mutexattr_settype(&attr, PTHREAD_MUTEX_RECURSIVE);
+#else
     pthread_mutexattr_settype(&attr, recursive ? PTHREAD_MUTEX_RECURSIVE : PTHREAD_MUTEX_NORMAL);
+#endif
 
     int result = pthread_mutex_init(&m_mutex.m_internalMutex, &attr);
     ASSERT_UNUSED(result, !result);

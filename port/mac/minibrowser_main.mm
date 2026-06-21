@@ -49,7 +49,13 @@ static NSView* g_contentView = nil;
     CGContextRef bmp = CGBitmapContextCreate(buf.data(), w, h, 8, pitch, cs,
         kCGImageAlphaPremultipliedLast | kCGBitmapByteOrder32Big);
     CGImageRef img = CGBitmapContextCreateImage(bmp);
+    // wke's buffer is top-down (row 0 = top). In this flipped NSView, draw the
+    // image with a vertical flip so it appears upright instead of mirrored.
+    CGContextSaveGState(ctx);
+    CGContextTranslateCTM(ctx, 0, h);
+    CGContextScaleCTM(ctx, 1, -1);
     CGContextDrawImage(ctx, CGRectMake(0, 0, w, h), img);
+    CGContextRestoreGState(ctx);
     CGImageRelease(img);
     CGContextRelease(bmp);
     CGColorSpaceRelease(cs);
