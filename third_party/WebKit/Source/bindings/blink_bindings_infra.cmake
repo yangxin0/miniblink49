@@ -8,6 +8,10 @@ set(BIV8 "${CMAKE_SOURCE_DIR}/third_party/WebKit/Source/bindings/core/v8")
 
 file(GLOB BLINK_BINDINGS_INFRA "${BIV8}/*.cpp" "${BIV8}/custom/*.cpp" "${BIV8}/inspector/*.cpp")
 list(FILTER BLINK_BINDINGS_INFRA EXCLUDE REGEX "Test\\.cpp$")
+# These custom V8 wrappers collide with the FULL generated wrappers (gen/blink/bindings
+# already emit complete V8MediaQueryList/V8PromiseRejectionEvent incl. wrapperTypeInfo).
+# The generated ones are canonical; drop the redundant custom copies (duplicate symbols).
+list(FILTER BLINK_BINDINGS_INFRA EXCLUDE REGEX "/(V8MediaQueryListCustom|V8PromiseRejectionEventCustom)\\.cpp$")
 # inspector/V8InjectedScriptHost: migrated to V8 8.7 (Object::Set/Delete context forms,
 # String::NewFromUtf8->v8AtomicString, ToString->MaybeLocal, Call context,
 # ForceSet->CreateDataProperty, Debug::GetInternalProperties shim).

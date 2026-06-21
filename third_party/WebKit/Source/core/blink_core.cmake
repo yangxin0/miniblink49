@@ -44,6 +44,10 @@ list(FILTER BLINK_CORE_SRC EXCLUDE REGEX "CustomElementNone\\.cpp$|CanvasRenderi
 list(FILTER BLINK_CORE_SRC EXCLUDE REGEX "LayoutTheme(Android|Default|Linux|Win|FontProviderWin)\\.cpp$")
 # paint: non-mac theme painter (we keep the mac path).
 list(FILTER BLINK_CORE_SRC EXCLUDE REGEX "ThemePainterDefault\\.cpp$")
+# InspectorNone.cpp is the inspector-DISABLED stub (empty InspectorInstrumentation/
+# TraceEvents/BaseAgent/TaskRunner bodies). We build the REAL inspector, so exclude
+# the stub to avoid duplicate-symbol collisions at the final binary link.
+list(FILTER BLINK_CORE_SRC EXCLUDE REGEX "/InspectorNone\\.cpp$")
 # workers: WorkerMessagingProxy + WorkerThread now compile (WorkerThread's
 # v8::V8::TerminateExecution -> isolate->TerminateExecution migration; GcTimeScheduler.h
 # Windows memory-query guarded with a macOS mach task_info port).
