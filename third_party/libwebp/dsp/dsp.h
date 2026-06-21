@@ -63,8 +63,11 @@ extern "C" {
 
 // The intrinsics currently cause compiler errors with arm-nacl-gcc and the
 // inline assembly would need to be modified for use with Native Client.
+// WEBP_DISABLE_NEON: this in-tree libwebp copy ships SSE2/MIPS dsp but no NEON
+// sources, so on arm64 the dispatch would reference undefined VP8*InitNEON. The
+// macOS build defines WEBP_DISABLE_NEON to take the scalar path instead.
 #if (defined(__ARM_NEON__) || defined(WEBP_ANDROID_NEON) || \
-     defined(__aarch64__)) && !defined(__native_client__)
+     defined(__aarch64__)) && !defined(__native_client__) && !defined(WEBP_DISABLE_NEON)
 #define WEBP_USE_NEON
 #endif
 
