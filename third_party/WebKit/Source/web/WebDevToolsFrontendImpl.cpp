@@ -81,7 +81,7 @@ WebDevToolsFrontendImpl::~WebDevToolsFrontendImpl()
     ScriptState::Scope scope(scriptState);
 
     v8::Local<v8::Object> global = scriptState->context()->Global();
-    global->Delete(v8AtomicString(isolate, "DevToolsHost"));
+    global->Delete(scriptState->context(), v8AtomicString(isolate, "DevToolsHost"));  // V8 8.7: ctx + Maybe<bool>
     m_devtoolsHost = nullptr;
 }
 
@@ -98,7 +98,7 @@ void WebDevToolsFrontendImpl::didClearWindowObject(WebLocalFrameImpl* frame)
         v8::Local<v8::Object> global = scriptState->context()->Global();
         v8::Local<v8::Value> devtoolsHostObj = toV8(m_devtoolsHost.get(), global, scriptState->isolate());
         ASSERT(!devtoolsHostObj.IsEmpty());
-        global->Set(v8AtomicString(isolate, "DevToolsHost"), devtoolsHostObj);
+        global->Set(scriptState->context(), v8AtomicString(isolate, "DevToolsHost"), devtoolsHostObj);  // V8 8.7: ctx
     }
 
     if (m_injectedScriptForOrigin.isEmpty())
