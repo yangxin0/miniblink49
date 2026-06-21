@@ -229,6 +229,14 @@ static void onDidCreateScriptContext(wkeWebView webView, void* /*param*/,
     wkeRunJsByFrame(webView, frameId, kPolyfillJS, false);
 }
 
+// Route page console.log / warnings / errors to stdout (useful for debugging).
+static void onConsole(wkeWebView, void*, wkeConsoleLevel level, const wkeString message,
+    const wkeString sourceName, unsigned sourceLine, const wkeString /*stackTrace*/) {
+    const utf8* msg = message ? wkeGetString(message) : "";
+    const utf8* src = sourceName ? wkeGetString(sourceName) : "";
+    NSLog(@"[console:%d] %s  (%s:%u)", (int)level, msg ? msg : "", src ? src : "", sourceLine);
+}
+
 @interface MbAppDelegate : NSObject <NSApplicationDelegate>
 @end
 @implementation MbAppDelegate
@@ -269,6 +277,7 @@ int main(int argc, const char** argv) {
         // polyfills into every frame before its scripts run.
         wkeSetUserAgent(g_webView, kModernUA);
         wkeOnDidCreateScriptContext(g_webView, onDidCreateScriptContext, nullptr);
+        wkeOnConsole(g_webView, onConsole, nullptr);
         wkeLoadURL(g_webView, url);
 
         NSLog(@"[minibrowser] loading %s", url);

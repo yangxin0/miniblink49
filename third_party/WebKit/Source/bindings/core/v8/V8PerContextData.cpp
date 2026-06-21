@@ -130,7 +130,12 @@ v8::Local<v8::Function> V8PerContextData::constructorForTypeSlowCase(const Wrapp
             return v8::Local<v8::Function>();
     }
 
-    v8::Local<v8::Object> prototypeObject = function->Get(currentContext, v8AtomicString(m_isolate, "prototype")).ToLocalChecked().As<v8::Object>();
+    // Use ToLocal instead of ToLocalChecked: on the macOS/V8 8.7 build a failed
+    // prototype lookup must not abort the process via the blink fatal handler.
+    v8::Local<v8::Value> protoVal;
+    if (!function->Get(currentContext, v8AtomicString(m_isolate, "prototype")).ToLocal(&protoVal) || !protoVal->IsObject())
+        return v8::Local<v8::Function>();
+    v8::Local<v8::Object> prototypeObject = protoVal.As<v8::Object>();
     if (prototypeObject->InternalFieldCount() == v8PrototypeInternalFieldcount
         && type->wrapperTypePrototype == WrapperTypeInfo::WrapperTypeObjectPrototype)
         prototypeObject->SetAlignedPointerInInternalField(v8PrototypeTypeIndex, const_cast<WrapperTypeInfo*>(type));

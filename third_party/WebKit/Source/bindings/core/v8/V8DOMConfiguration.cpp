@@ -273,7 +273,19 @@ void V8DOMConfiguration::installMethod(v8::Isolate* isolate, v8::Local<v8::Objec
 
 static void setClassString(v8::Isolate* isolate, v8::Local<v8::ObjectTemplate> objectTemplate, const char* classString)
 {
+#if V8_MAJOR_VERSION < 8
     objectTemplate->Set(v8::Symbol::GetToStringTag(isolate), v8AtomicString(isolate, classString), static_cast<v8::PropertyAttribute>(v8::ReadOnly | v8::DontEnum));
+#else
+    // V8 8.7: FunctionTemplate::SetClassName() already installs @@toStringTag on
+    // the prototype during instantiation, so this explicit Set() produces a
+    // second descriptor for the same symbol. Newer V8 rejects that at
+    // GetFunction() time with "Object template has duplicate property
+    // 'Symbol(Symbol.toStringTag)'", which made every DOM interface constructor
+    // (starting with Window) fail to instantiate -> the main-world context could
+    // not install DOMWindow -> page JavaScript never ran at all. Skip the
+    // redundant Set on modern V8; the class string is still provided by V8.
+    (void)objectTemplate; (void)classString;
+#endif
 }
 
 v8::Local<v8::Signature> V8DOMConfiguration::installDOMClassTemplate(v8::Isolate* isolate, v8::Local<v8::FunctionTemplate> functionDescriptor, const char* interfaceName, v8::Local<v8::FunctionTemplate> parentClass, size_t fieldCount,
