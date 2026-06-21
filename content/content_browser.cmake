@@ -14,13 +14,15 @@ set(C "${CMAKE_SOURCE_DIR}/content")
 file(GLOB CB_BROWSER   "${C}/browser/*.cpp")
 file(GLOB CB_IMPL_WIN  "${C}/web_impl_win/*.cpp")
 file(GLOB CB_IMPL_MAC  "${C}/web_impl_mac/*.mm" "${C}/web_impl_mac/*.cpp")
+file(GLOB CB_RESOURCES "${C}/resources/*.cpp")     # embedded CSS/JS/PNG resource blobs
+file(GLOB CB_DEVTOOLS  "${C}/devtools/*.cpp")       # inspector agent/client glue
 
 # Windows-only files: WinINet HTTP/cookies (curl siblings used instead), Win32
 # clipboard (NSPasteboard sibling instead), and dead WinINet client.
 list(FILTER CB_IMPL_WIN EXCLUDE REGEX "/(WebURLLoaderImpl|WebCookieJarINetImpl|WebClipboardImpl|w3client)\\.cpp$")
 
 # (net cookie/loader/websocket now live in the full net_portable archive.)
-add_library(content_browser STATIC ${CB_BROWSER} ${CB_IMPL_WIN} ${CB_IMPL_MAC})
+add_library(content_browser STATIC ${CB_BROWSER} ${CB_IMPL_WIN} ${CB_IMPL_MAC} ${CB_RESOURCES} ${CB_DEVTOOLS})
 target_link_libraries(content_browser PUBLIC blink_web net_portable wke_globals)
 target_include_directories(content_browser PUBLIC
     "${CMAKE_SOURCE_DIR}" "${CMAKE_SOURCE_DIR}/content" "${CMAKE_SOURCE_DIR}/wke"

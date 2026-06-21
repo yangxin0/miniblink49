@@ -174,11 +174,13 @@ public:
 
     void runImpl()
     {
+#if defined(_WIN32)
         MSG msg;
         while (::GetMessageW(&msg, NULL, 0, 0)) {
 
-            // ÎªÁËÈ·±£jsµÄPromiseÄÜÖ´ÐÐ£¬Ç¿ÐÐÖ´ÐÐMicrotasks¡£±¾À´ÒòÎªisolateData->recursionLevel()µÄ´æÔÚ£¬Ö´ÐÐ²»ÁË¡£
-            // ¼ûthird_party\WebKit\Source\core\dom\Microtask.cpp
+            // Force-run Microtasks so JS promises in the debug loop execute (the
+            // isolateData->recursionLevel() otherwise blocks them). See
+            // third_party/WebKit/Source/core/dom/Microtask.cpp.
             v8::Isolate* isolate = v8::Isolate::GetCurrent();
             blink::V8RecursionScope recursionScope(isolate);
             isolate->RunMicrotasks();
@@ -188,6 +190,18 @@ public:
             if (m_quit)
                 return;
         }
+#else
+        // macOS: the DevTools debug loop is driven by the Cocoa run loop / the
+        // host thread's task queue rather than a Win32 message pump. Spin running
+        // microtasks until asked to quit. (DevTools is a non-core debugging path;
+        // a Cocoa-native pump can replace this when the inspector UI is wired.)
+        while (!m_quit) {
+            v8::Isolate* isolate = v8::Isolate::GetCurrent();
+            blink::V8RecursionScope recursionScope(isolate);
+            isolate->RunMicrotasks();
+            usleep(1000);
+        }
+#endif
     }
 
     void run() override
@@ -223,7 +237,7 @@ void DevToolsAgent::willEnterDebugLoopInRun()
         if (0 < CheckReEnter::getEnterCount())
             CheckReEnter::decrementEnterCount();
         else
-            g_noSetCheckReEnter = true; // ´ÓnetµÄload finishÀïµ÷ÓÃ¹ýÀ´µÄÊ±ºò£¬¿ÉÄÜ¼ÆÊýÊÇ0
+            g_noSetCheckReEnter = true; // ï¿½ï¿½netï¿½ï¿½load finishï¿½ï¿½ï¿½ï¿½Ã¹ï¿½ï¿½ï¿½ï¿½ï¿½Ê±ï¿½ò£¬¿ï¿½ï¿½Ü¼ï¿½ï¿½ï¿½ï¿½ï¿½0
     }
     blink::ThreadState* threadState = blink::ThreadState::current();
     threadState->enterGCForbiddenScope();
@@ -237,7 +251,7 @@ void DevToolsAgent::didExitDebugLoopInRun()
     blink::ThreadState* threadState = blink::ThreadState::current();
     threadState->leaveGCForbiddenScope();
     
-    // ·Åµ½Õâ£¬ÊÇÒòÎªClientMessageLoopAdapterµÄË³ÐòÊÇÏÈÖ´ÐÐsetIgnoreInputEvents(false)£¬»áÒý·¢¶ÏÑÔ
+    // ï¿½Åµï¿½ï¿½â£¬ï¿½ï¿½ï¿½ï¿½ÎªClientMessageLoopAdapterï¿½ï¿½Ë³ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ö´ï¿½ï¿½setIgnoreInputEvents(false)ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
     m_page->didExitDebugLoop();
     m_devToolsClient->didExitDebugLoop();
 
