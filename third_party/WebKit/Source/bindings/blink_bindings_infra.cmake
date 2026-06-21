@@ -8,9 +8,9 @@ set(BIV8 "${CMAKE_SOURCE_DIR}/third_party/WebKit/Source/bindings/core/v8")
 
 file(GLOB BLINK_BINDINGS_INFRA "${BIV8}/*.cpp" "${BIV8}/custom/*.cpp" "${BIV8}/inspector/*.cpp")
 list(FILTER BLINK_BINDINGS_INFRA EXCLUDE REGEX "Test\\.cpp$")
-# inspector/V8InjectedScriptHost needs a deeper V8 8.7 migration (Object::Set context
-# args + v8::Debug::GetInternalProperties, removed in 8.7) -> deferred with devtools.
-list(FILTER BLINK_BINDINGS_INFRA EXCLUDE REGEX "/V8InjectedScriptHost\\.cpp$")
+# inspector/V8InjectedScriptHost: migrated to V8 8.7 (Object::Set/Delete context forms,
+# String::NewFromUtf8->v8AtomicString, ToString->MaybeLocal, Call context,
+# ForceSet->CreateDataProperty, Debug::GetInternalProperties shim).
 # The NPAPI plugin bindings (npruntime/NPV8Object/V8NPObject/V8NPUtils/
 # V8HTMLPlugInElementCustom), ScriptController and the modern V8GCController_v8_5_7
 # variant now all compile on macOS (third_party/npapi + win_compat includes, the

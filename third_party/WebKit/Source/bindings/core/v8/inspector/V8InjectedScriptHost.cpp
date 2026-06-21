@@ -226,23 +226,23 @@ void V8InjectedScriptHost::functionDetailsCallback(const v8::FunctionCallbackInf
 
     v8::Isolate* isolate = info.GetIsolate();
     v8::Local<v8::Object> location = v8::Object::New(isolate);
-    location->Set(v8AtomicString(isolate, "lineNumber"), v8::Integer::New(isolate, lineNumber));
-    location->Set(v8AtomicString(isolate, "columnNumber"), v8::Integer::New(isolate, columnNumber));
-    location->Set(v8AtomicString(isolate, "scriptId"), v8::Integer::New(isolate, function->ScriptId())->ToString(isolate));
+    location->Set(info.GetIsolate()->GetCurrentContext(), v8AtomicString(isolate, "lineNumber"), v8::Integer::New(isolate, lineNumber));
+    location->Set(info.GetIsolate()->GetCurrentContext(), v8AtomicString(isolate, "columnNumber"), v8::Integer::New(isolate, columnNumber));
+    location->Set(info.GetIsolate()->GetCurrentContext(), v8AtomicString(isolate, "scriptId"), v8::Integer::New(isolate, function->ScriptId())->ToString(isolate->GetCurrentContext()).ToLocalChecked());
 
     v8::Local<v8::Object> result = v8::Object::New(isolate);
-    result->Set(v8AtomicString(isolate, "location"), location);
+    result->Set(info.GetIsolate()->GetCurrentContext(), v8AtomicString(isolate, "location"), location);
 
     v8::Local<v8::String> name = functionDisplayName(function);
-    result->Set(v8AtomicString(isolate, "functionName"), name.IsEmpty() ? v8AtomicString(isolate, "") : name);
+    result->Set(info.GetIsolate()->GetCurrentContext(), v8AtomicString(isolate, "functionName"), name.IsEmpty() ? v8AtomicString(isolate, "") : name);
 
-    result->Set(v8AtomicString(isolate, "isGenerator"), v8::Boolean::New(isolate, function->IsGeneratorFunction()));
+    result->Set(info.GetIsolate()->GetCurrentContext(), v8AtomicString(isolate, "isGenerator"), v8::Boolean::New(isolate, function->IsGeneratorFunction()));
 
     InjectedScriptHost* host = V8InjectedScriptHost::unwrap(info.Holder());
     V8Debugger& debugger = host->debugger();
     v8::Local<v8::Value> scopes = debugger.functionScopes(function);
     if (!scopes.IsEmpty() && scopes->IsArray())
-        result->Set(v8AtomicString(isolate, "rawScopes"), scopes);
+        result->Set(info.GetIsolate()->GetCurrentContext(), v8AtomicString(isolate, "rawScopes"), scopes);
 
     v8SetReturnValue(info, result);
 }
@@ -306,9 +306,9 @@ static v8::Local<v8::Array> getJSListenerFunctions(v8::Isolate* isolate, Executi
         }
         ASSERT(!function.IsEmpty());
         v8::Local<v8::Object> listenerEntry = v8::Object::New(isolate);
-        listenerEntry->Set(v8AtomicString(isolate, "listener"), function);
-        listenerEntry->Set(v8AtomicString(isolate, "useCapture"), v8::Boolean::New(isolate, listenerInfo.eventListenerVector[i].useCapture));
-        result->Set(v8::Number::New(isolate, outputIndex++), listenerEntry);
+        listenerEntry->Set(isolate->GetCurrentContext(), v8AtomicString(isolate, "listener"), function);
+        listenerEntry->Set(isolate->GetCurrentContext(), v8AtomicString(isolate, "useCapture"), v8::Boolean::New(isolate, listenerInfo.eventListenerVector[i].useCapture));
+        result->Set(isolate->GetCurrentContext(), v8::Number::New(isolate, outputIndex++), listenerEntry);
     }
     return result;
 }
@@ -331,7 +331,7 @@ void V8InjectedScriptHost::getEventListenersCallback(const v8::FunctionCallbackI
         if (!listeners->Length())
             continue;
         AtomicString eventType = listenersArray[i].eventType;
-        result->Set(v8String(info.GetIsolate(), eventType), listeners);
+        result->Set(info.GetIsolate()->GetCurrentContext(), v8String(info.GetIsolate(), eventType), listeners);
     }
 
     v8SetReturnValue(info, result);
@@ -353,13 +353,13 @@ void V8InjectedScriptHost::evalCallback(const v8::FunctionCallbackInfo<v8::Value
 {
     v8::Isolate* isolate = info.GetIsolate();
     if (info.Length() < 1) {
-        isolate->ThrowException(v8::Exception::Error(v8::String::NewFromUtf8(isolate, "One argument expected.")));
+        isolate->ThrowException(v8::Exception::Error(v8AtomicString(isolate, "One argument expected.")));
         return;
     }
 
-    v8::Local<v8::String> expression = info[0]->ToString(isolate);
+    v8::Local<v8::String> expression = info[0]->ToString(isolate->GetCurrentContext()).ToLocalChecked();
     if (expression.IsEmpty()) {
-        isolate->ThrowException(v8::Exception::Error(v8::String::NewFromUtf8(isolate, "The argument must be a string.")));
+        isolate->ThrowException(v8::Exception::Error(v8AtomicString(isolate, "The argument must be a string.")));
         return;
     }
 
@@ -376,8 +376,8 @@ void V8InjectedScriptHost::evalCallback(const v8::FunctionCallbackInfo<v8::Value
 static void setExceptionAsReturnValue(const v8::FunctionCallbackInfo<v8::Value>& info, v8::Local<v8::Object> returnValue, v8::TryCatch& tryCatch)
 {
     v8::Isolate* isolate = info.GetIsolate();
-    returnValue->Set(v8::String::NewFromUtf8(isolate, "result"), tryCatch.Exception());
-    returnValue->Set(v8::String::NewFromUtf8(isolate, "exceptionDetails"), JavaScriptCallFrame::createExceptionDetails(isolate, tryCatch.Message()));
+    returnValue->Set(info.GetIsolate()->GetCurrentContext(), v8AtomicString(isolate, "result"), tryCatch.Exception());
+    returnValue->Set(info.GetIsolate()->GetCurrentContext(), v8AtomicString(isolate, "exceptionDetails"), JavaScriptCallFrame::createExceptionDetails(isolate, tryCatch.Message()));
     v8SetReturnValue(info, returnValue);
 }
 
@@ -385,13 +385,13 @@ void V8InjectedScriptHost::evaluateWithExceptionDetailsCallback(const v8::Functi
 {
     v8::Isolate* isolate = info.GetIsolate();
     if (info.Length() < 1) {
-        isolate->ThrowException(v8::Exception::Error(v8::String::NewFromUtf8(isolate, "One argument expected.")));
+        isolate->ThrowException(v8::Exception::Error(v8AtomicString(isolate, "One argument expected.")));
         return;
     }
 
-    v8::Local<v8::String> expression = info[0]->ToString(isolate);
+    v8::Local<v8::String> expression = info[0]->ToString(isolate->GetCurrentContext()).ToLocalChecked();
     if (expression.IsEmpty()) {
-        isolate->ThrowException(v8::Exception::Error(v8::String::NewFromUtf8(isolate, "The argument must be a string.")));
+        isolate->ThrowException(v8::Exception::Error(v8AtomicString(isolate, "The argument must be a string.")));
         return;
     }
 
@@ -412,8 +412,8 @@ void V8InjectedScriptHost::evaluateWithExceptionDetailsCallback(const v8::Functi
         return;
     }
 
-    wrappedResult->Set(v8::String::NewFromUtf8(isolate, "result"), result);
-    wrappedResult->Set(v8::String::NewFromUtf8(isolate, "exceptionDetails"), v8::Undefined(isolate));
+    wrappedResult->Set(info.GetIsolate()->GetCurrentContext(), v8AtomicString(isolate, "result"), result);
+    wrappedResult->Set(info.GetIsolate()->GetCurrentContext(), v8AtomicString(isolate, "exceptionDetails"), v8::Undefined(isolate));
     v8SetReturnValue(info, wrappedResult);
 }
 
@@ -512,7 +512,7 @@ void V8InjectedScriptHost::callFunctionCallback(const v8::FunctionCallbackInfo<v
     v8::Local<v8::Value> receiver = info[1];
 
     if (info.Length() < 3 || info[2]->IsUndefined()) {
-        v8::Local<v8::Value> result = function->Call(receiver, 0, 0);
+        v8::Local<v8::Value> result = function->Call(info.GetIsolate()->GetCurrentContext(), receiver, 0, 0).ToLocalChecked();
         v8SetReturnValue(info, result);
         return;
     }
@@ -530,7 +530,7 @@ void V8InjectedScriptHost::callFunctionCallback(const v8::FunctionCallbackInfo<v
             return;
     }
 
-    v8::Local<v8::Value> result = function->Call(receiver, argc, argv.get());
+    v8::Local<v8::Value> result = function->Call(info.GetIsolate()->GetCurrentContext(), receiver, argc, argv.get()).ToLocalChecked();
     v8SetReturnValue(info, result);
 }
 
@@ -551,7 +551,7 @@ void V8InjectedScriptHost::setNonEnumPropertyCallback(const v8::FunctionCallback
 
     v8::Local<v8::Object> object = info[0].As<v8::Object>();
     // TODO(bashi): Use DefineOwnProperty() if possible.
-    object->ForceSet(info.GetIsolate()->GetCurrentContext(), info[1], info[2], v8::DontEnum);
+    object->CreateDataProperty(info.GetIsolate()->GetCurrentContext(), info[1].As<v8::Name>(), info[2]);
 }
 
 void V8InjectedScriptHost::bindCallback(const v8::FunctionCallbackInfo<v8::Value>& info)
@@ -562,7 +562,7 @@ void V8InjectedScriptHost::bindCallback(const v8::FunctionCallbackInfo<v8::Value
     if (!injectedScriptNative)
         return;
 
-    v8::Local<v8::String> v8groupName = info[1]->ToString(info.GetIsolate());
+    v8::Local<v8::String> v8groupName = info[1]->ToString(info.GetIsolate()->GetCurrentContext()).ToLocalChecked();
     String groupName = toCoreStringWithUndefinedOrNullCheck(v8groupName);
     int id = injectedScriptNative->bind(info[0], groupName);
     info.GetReturnValue().Set(id);
