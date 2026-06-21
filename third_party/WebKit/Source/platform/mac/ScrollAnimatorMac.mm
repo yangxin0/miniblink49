@@ -25,6 +25,13 @@
 
 #include "config.h"
 
+// Pull full Cocoa (NSScroller*/NSAnimationDelegate) with CarbonCore's TextEncoding
+// renamed to avoid the WTF::TextEncoding clash.
+#define TextEncoding CarbonTextEncoding
+#import <Carbon/Carbon.h>
+#import <Cocoa/Cocoa.h>
+#undef TextEncoding
+
 #include "platform/mac/ScrollAnimatorMac.h"
 
 #include "platform/PlatformGestureEvent.h"

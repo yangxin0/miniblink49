@@ -29,6 +29,10 @@
  */
 
 #include "config.h"
+#define TextEncoding CarbonTextEncoding
+#import <Carbon/Carbon.h>
+#import <Cocoa/Cocoa.h>
+#undef TextEncoding
 #include "platform/scroll/ScrollbarThemeMacOverlayAPI.h"
 
 #include "platform/graphics/GraphicsContext.h"

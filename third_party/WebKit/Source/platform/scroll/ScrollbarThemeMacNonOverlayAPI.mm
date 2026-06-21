@@ -29,6 +29,10 @@
  */
 
 #include "config.h"
+#define TextEncoding CarbonTextEncoding
+#import <Carbon/Carbon.h>
+#import <Cocoa/Cocoa.h>
+#undef TextEncoding
 #include "platform/scroll/ScrollbarThemeMacNonOverlayAPI.h"
 
 #include "platform/graphics/GraphicsContext.h"
@@ -40,7 +44,6 @@
 #include "public/platform/WebRect.h"
 #include "public/platform/WebThemeEngine.h"
 #include "skia/ext/skia_utils_mac.h"
-#include <Carbon/Carbon.h>
 
 namespace blink {
 
@@ -133,11 +136,9 @@ bool ScrollbarThemeMacNonOverlayAPI::paint(ScrollbarThemeClient* scrollbar, Grap
         drawingCanvas = canvas;
     }
 
-    // Draw the track and its thumb.
-    gfx::SkiaBitLocker bitLocker(
-        drawingCanvas,
-        ThemeMac::inflateRectForAA(scrollbar->frameRect()),
-        canDrawDirectly ? context->deviceScaleFactor() : 1.0f);
+    // Draw the track and its thumb. This skia's SkiaBitLocker only has the 1-arg
+    // ctor (the dirty-rect/scale form is a later optimization).
+    gfx::SkiaBitLocker bitLocker(drawingCanvas);
     CGContextRef cgContext = bitLocker.cgContext();
     HIThemeDrawTrack(&trackInfo, 0, cgContext, kHIThemeOrientationNormal);
 
