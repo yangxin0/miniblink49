@@ -25,6 +25,18 @@ if(NOT MSVC)
     target_compile_options(miniblink_jpeg PRIVATE -w)
 endif()
 
+# --- ots (OpenType Sanitiser) — web @font-face validation; woff2.cc needs brotli (deferred) ---
+file(GLOB OTS_SRC "${CMAKE_SOURCE_DIR}/third_party/ots/src/*.cc")
+list(FILTER OTS_SRC EXCLUDE REGEX "woff2\\.cc$")
+add_library(miniblink_ots STATIC ${OTS_SRC})
+target_include_directories(miniblink_ots PUBLIC
+    "${CMAKE_SOURCE_DIR}/third_party/ots/include")
+target_include_directories(miniblink_ots PRIVATE
+    "${CMAKE_SOURCE_DIR}/third_party/ots/src" "${CMAKE_SOURCE_DIR}/third_party")
+if(NOT MSVC)
+    target_compile_options(miniblink_ots PRIVATE -w -fno-exceptions)
+endif()
+
 # --- libwebp (dec + dsp + enc + utils + demux) ---
 file(GLOB_RECURSE LIBWEBP_SRC "${CMAKE_SOURCE_DIR}/third_party/libwebp/*.c")
 add_library(miniblink_webp STATIC ${LIBWEBP_SRC})

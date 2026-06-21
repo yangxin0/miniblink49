@@ -104,9 +104,9 @@ list(FILTER BLINK_TEXT EXCLUDE REGEX "LocaleICU|LocaleWin")
 # macOS uses the CoreText FontCacheMac, not FontCacheSkia/FontCacheSkiaWin.
 # FontCustomPlatformData (web @font-face sanitization) needs the ots library + a
 # <windows.h> include for its debug log -> deferred (4 symbols, not essential).
-# FontCustomPlatformData kept (its create() is a stub returning null; doesn't call
-# the ots library). OpenTypeSanitizer still deferred (calls ots::Process -> ots lib).
-list(FILTER BLINK_FONTS EXCLUDE REGEX "FontCacheSkia|OpenTypeSanitizer|/win/|/android/|/linux/")
+# macOS uses CoreText FontCacheMac, not FontCacheSkia/Win. OpenTypeSanitizer now
+# kept (the ots lib is built; WOFF2 deferred).
+list(FILTER BLINK_FONTS EXCLUDE REGEX "FontCacheSkia|/win/|/android/|/linux/")
 
 # --- Platform infrastructure: the Platform interface, exported Web* wrappers,
 #     and support objects the heap (and the rest of blink) need at link time. ---
@@ -160,12 +160,13 @@ target_include_directories(blink_platform PUBLIC
     "${CMAKE_SOURCE_DIR}/third_party/khronos"   # GLES2/* (DragImage and other root files)
     "${CMAKE_SOURCE_DIR}/third_party/harfbuzz-ng/src"  # hb.h (fonts/shaping)
     "${CMAKE_SOURCE_DIR}/third_party"           # libpng/png.h, libjpeg/jpeglib.h, libwebp/* (image-decoders)
+    "${CMAKE_SOURCE_DIR}/third_party/ots/include"  # opentype-sanitiser.h (OpenTypeSanitizer)
     "${CMAKE_SOURCE_DIR}/third_party/v8shim"    # v8-debug.h shim (plugins/heap pull ScriptState)
     "${CMAKE_SOURCE_DIR}/win_compat"            # <windows.h> shim (ImageBuffer pulls wke)
     "${CMAKE_SOURCE_DIR}/orig_chrome")
 
 target_link_libraries(blink_platform PUBLIC wtf skia harfbuzz
-    miniblink_png miniblink_jpeg miniblink_webp)
+    miniblink_png miniblink_jpeg miniblink_webp miniblink_ots)
 if(APPLE)
     # System ICU (unversioned symbols) + CoreText/CoreGraphics for fonts.
     target_link_libraries(blink_platform PUBLIC
