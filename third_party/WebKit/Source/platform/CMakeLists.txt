@@ -82,9 +82,9 @@ list(FILTER BLINK_SUBLAYERS EXCLUDE REGEX "Test\\.cpp$")
 list(FILTER BLINK_SUBLAYERS EXCLUDE REGEX "KURL_new\\.cpp$|KURL_w\\.cpp$")
 # clipboard: keep the Posix variant; the Win one needs shlwapi.h.
 list(FILTER BLINK_SUBLAYERS EXCLUDE REGEX "ClipboardUtilitiesWin\\.cpp$")
-# image codecs: JPEGImageDecoder has a libjpeg API skew (jpeg_read_* signature);
-# GDIPlus is Win-only. Keep GIF/PNG/WEBP/BMP/ICO decoders + skia encoders.
-list(FILTER BLINK_SUBLAYERS EXCLUDE REGEX "/JPEGImageDecoder\\.cpp$|/GDIPlus")
+# image codecs: GDIPlus is Win-only. JPEGImageDecoder kept (libjpeg enum-boolean
+# fixed by pre-defining TRUE/FALSE before jpeglib.h).
+list(FILTER BLINK_SUBLAYERS EXCLUDE REGEX "/GDIPlus")
 # UnifiedHeapController now compiles: migrated to the V8 8.7 EmbedderHeapTracer API
 # (TracePrologue(TraceFlags)/TraceEpilogue(TraceSummary*)/TracedReferenceBase).
 # Most of graphics/ is skia-2D and compiles clean (GraphicsContext, the

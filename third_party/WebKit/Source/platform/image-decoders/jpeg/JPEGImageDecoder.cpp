@@ -44,6 +44,15 @@
 
 extern "C" {
 #include <stdio.h> // jpeglib.h needs stdio FILE.
+// Pre-define TRUE/FALSE so libjpeg's jmorecfg.h uses `typedef int boolean` instead
+// of `typedef enum {FALSE,TRUE} boolean` -> the decoder's bool true/false assign
+// cleanly (and the int-sized boolean is C-ABI-compatible with the prebuilt lib).
+#ifndef TRUE
+#define TRUE 1
+#endif
+#ifndef FALSE
+#define FALSE 0
+#endif
 #include "libjpeg/jpeglib.h"
 //#if USE(ICCJPEG)
 //#include "iccjpeg.h"
