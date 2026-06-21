@@ -11,6 +11,7 @@
 //
 // Build: the `minibrowser` CMake target links the full engine archive set.
 #import <Cocoa/Cocoa.h>
+#include <vector>
 #include "wke/wke.h"
 
 static wkeWebView g_webView = nullptr;

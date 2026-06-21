@@ -107,7 +107,7 @@ if(MINIBLINK_BUILD_BLINK)
         add_executable(minibrowser "${CMAKE_SOURCE_DIR}/port/mac/minibrowser_main.mm")
         set_target_properties(minibrowser PROPERTIES CXX_STANDARD 14)
         target_include_directories(minibrowser PRIVATE "${CMAKE_SOURCE_DIR}" "${CMAKE_SOURCE_DIR}/wke" "${CMAKE_SOURCE_DIR}/win_compat")
-        target_compile_options(minibrowser PRIVATE -fno-exceptions -Wno-deprecated-declarations)
+        target_compile_options(minibrowser PRIVATE -fdeclspec -fno-exceptions -Wno-deprecated-declarations)
         target_link_libraries(minibrowser PRIVATE
             -Wl,-force_load,$<TARGET_FILE:wke> -Wl,-force_load,$<TARGET_FILE:wke_globals>
             -Wl,-force_load,$<TARGET_FILE:blink_bindings_infra>
