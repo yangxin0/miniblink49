@@ -197,6 +197,11 @@ static inline void OutputDebugStringW(const wchar_t* s) {
     if (!s) return;
     for (const wchar_t* p = s; *p; ++p) fputc((int)(*p & 0x7F), stderr);
 }
+#ifndef OutputDebugStringA
+static inline void OutputDebugStringA(const char* s) {
+    if (s) fputs(s, stderr);
+}
+#endif
 
 // Wide fopen / file move used by net/ — convert the wide (ASCII) paths and defer
 // to the posix calls.

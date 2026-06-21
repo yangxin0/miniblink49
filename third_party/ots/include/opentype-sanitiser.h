@@ -22,6 +22,12 @@ typedef unsigned __int64 uint64_t;
 #else
 #include <arpa/inet.h>
 #include <stdint.h>
+// Non-Windows: map the my_* byte-order helpers to the standard posix functions
+// from <arpa/inet.h> (the original header only defined them on _WIN32).
+#define my_ntohl(x) ntohl(x)
+#define my_ntohs(x) ntohs(x)
+#define my_htonl(x) htonl(x)
+#define my_htons(x) htons(x)
 #endif
 
 #include <algorithm>

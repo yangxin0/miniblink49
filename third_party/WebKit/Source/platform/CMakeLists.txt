@@ -48,6 +48,9 @@ file(GLOB BLINK_HEAP     "${BSRC}/heap/*.cpp")
 file(GLOB_RECURSE BLINK_GRAPHICS "${BSRC}/graphics/*.cpp")
 file(GLOB BLINK_TEXT     "${BSRC}/text/*.cpp")
 file(GLOB_RECURSE BLINK_FONTS "${BSRC}/fonts/*.cpp")  # incl. fonts/shaping (harfbuzz)
+# macOS CoreText font backend (ObjC++): FontCacheMac/FontPlatformDataMac/
+# FontFamilyMatcherMac. These provide FontCache::* and FontPlatformData::setupPaint.
+file(GLOB BLINK_FONTS_MAC "${BSRC}/fonts/mac/*.mm")
 # More platform sublayers the link needs (all compile clean on macOS): scroll
 # (ScrollableArea/Scrollbar), network (ResourceRequest/Response), mhtml,
 # mediastream.
@@ -98,7 +101,10 @@ list(FILTER BLINK_TEXT EXCLUDE REGEX "LocaleICU|LocaleWin")
 # Deferred font backends: FontCustomPlatformData/FontCacheSkia (CoreText/fontconfig
 # platform-data), OpenTypeSanitizer (ots library my_ntohl), and the non-mac
 # platform subdirs (win/android/linux). fonts/shaping (harfbuzz) is kept.
-list(FILTER BLINK_FONTS EXCLUDE REGEX "FontCustomPlatformData|FontCacheSkia|/opentype/OpenTypeSanitizer|/win/|/android/|/linux/")
+# macOS uses the CoreText FontCacheMac, not FontCacheSkia/FontCacheSkiaWin.
+# FontCustomPlatformData (web @font-face sanitization) needs the ots library + a
+# <windows.h> include for its debug log -> deferred (4 symbols, not essential).
+list(FILTER BLINK_FONTS EXCLUDE REGEX "FontCacheSkia|FontCustomPlatformData|OpenTypeSanitizer|/win/|/android/|/linux/")
 
 # --- Platform infrastructure: the Platform interface, exported Web* wrappers,
 #     and support objects the heap (and the rest of blink) need at link time. ---
@@ -137,7 +143,7 @@ set_source_files_properties("${BSRC}/heap/UnifiedHeapController.cpp"
 
 add_library(blink_platform STATIC
     ${BLINK_CORE_SOURCES} ${BLINK_HEAP} ${BLINK_GRAPHICS} ${BLINK_TEXT}
-    ${BLINK_FONTS} ${BLINK_SUBLAYERS} ${BLINK_INFRA_SOURCES} ${BLINK_EXPORTED}
+    ${BLINK_FONTS} ${BLINK_FONTS_MAC} ${BLINK_SUBLAYERS} ${BLINK_INFRA_SOURCES} ${BLINK_EXPORTED}
     ${BLINK_BASE_SHIM})
 # alias.cc is plain Chromium base, not WTF: don't force-include WTF's config.h.
 set_source_files_properties("${BLINK_BASE_SHIM}" PROPERTIES COMPILE_OPTIONS "")
