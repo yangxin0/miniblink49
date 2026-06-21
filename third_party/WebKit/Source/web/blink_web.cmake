@@ -11,7 +11,7 @@
 
 set(WEBSRC "${CMAKE_SOURCE_DIR}/third_party/WebKit/Source/web")
 
-file(GLOB BLINK_WEB_SRC "${WEBSRC}/*.cpp")
+file(GLOB BLINK_WEB_SRC "${WEBSRC}/*.cpp" "${WEBSRC}/painting/*.cpp")  # +painting/ContinuousPainter
 list(FILTER BLINK_WEB_SRC EXCLUDE REGEX "Test\\.cpp$")
 # Deferred: devtools/inspector glue (legacy v8::Debug API), find-in-page
 # (TextFinder, guard quirk), NPAPI WebBindings, the worker glue that pulls the
