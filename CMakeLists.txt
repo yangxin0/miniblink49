@@ -98,6 +98,27 @@ if(MINIBLINK_BUILD_BLINK)
     #   include(orig_chrome/content/orig_chrome_content.cmake)
     include(content/content_browser.cmake)                   # embedding-host page host (content::WebPageImpl + Cocoa web_impl_mac)
     include(wke/wke.cmake)                                    # wke public C API (libwke surface)
+
+    if(APPLE)
+        # The mini-browser: a Cocoa host that drives the wke C API. Links the full
+        # engine archive set. force_load wke/wke_globals/bindings_infra so the C-API
+        # entry points + blink's ENABLE_WKE hooks are all included.
+        set(_v8mono "${MINIBLINK_V8_ROOT}/out/arm64.release/obj/libv8_monolith.a")
+        add_executable(minibrowser "${CMAKE_SOURCE_DIR}/port/mac/minibrowser_main.mm")
+        set_target_properties(minibrowser PROPERTIES CXX_STANDARD 14)
+        target_include_directories(minibrowser PRIVATE "${CMAKE_SOURCE_DIR}" "${CMAKE_SOURCE_DIR}/wke" "${CMAKE_SOURCE_DIR}/win_compat")
+        target_compile_options(minibrowser PRIVATE -fno-exceptions -Wno-deprecated-declarations)
+        target_link_libraries(minibrowser PRIVATE
+            -Wl,-force_load,$<TARGET_FILE:wke> -Wl,-force_load,$<TARGET_FILE:wke_globals>
+            -Wl,-force_load,$<TARGET_FILE:blink_bindings_infra>
+            content_browser mc net_portable blink_web blink_modules blink_bindings blink_core
+            blink_generated blink_platform blink_heap_asm wtf skia_ext skia harfbuzz
+            miniblink_png miniblink_jpeg miniblink_webp miniblink_ots gin base "${_v8mono}"
+            -licucore -lxml2 -lxslt -lz -lcurl
+            "-framework Cocoa" "-framework CoreText" "-framework CoreGraphics"
+            "-framework CoreFoundation" "-framework Foundation" "-framework AppKit" "-framework Carbon")
+    endif()
+
     add_subdirectory(test/blink)  # smoke test: prove geometry links + computes
 
     if(APPLE)
