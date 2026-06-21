@@ -12,8 +12,14 @@
 #include "content/web_impl_win/WebFileUtilitiesImpl.h"
 #include "content/web_impl_win/WebCryptoImpl.h"
 #include "content/web_impl_win/WaitableEvent.h"
+#if defined(_WIN32)
+// The NPAPI plugin subsystem is Carbon/Windows-bound. On macOS arm64 the npapi
+// headers pull in CarbonCore (Threads.h) whose `ThreadState` collides with
+// blink's `ThreadState`, and Carbon is unavailable on arm64. Plugins are not
+// part of the macOS bring-up, so the plugin path is compiled out here.
 #include "content/web_impl_win/npapi/WebPluginImpl.h"
 #include "content/web_impl_win/npapi/PluginDatabase.h"
+#endif
 #include "content/web_impl_win/WebMessagePortChannelImpl.h"
 #include "content/resources/MissingImageData.h"
 #include "content/resources/TextAreaResizeCornerData.h"
@@ -64,7 +70,9 @@
 #include "base/values.h"
 #include "base/time/time.h"
 #include "base/WindowsVersion.h"
+#if defined(_WIN32)
 #include <crtdbg.h>
+#endif
 #include <iosfwd>
 #include <sstream>
 
@@ -146,7 +154,11 @@ static void onFreeHook(void* address)
 //     net::ActivatingObjCheck::inst()->remove((intptr_t)address);
 }
 
-// hook ÕâÖÖÀàÐÍµÄ£º76121030    FF 25 2C 90 18 76    jmp dword ptr [__imp__NtUserBeginPaint@8 (7618902Ch)] 
+// The following IAT/hot-patch helpers rewrite x86 prologues in place and rely on
+// the Win32 PE loader (FARPROC/PROC, VirtualProtect, GetProcAddress). They are
+// x86-Windows-only and are never called on macOS, so they are compiled out here.
+#if defined(_WIN32)
+// hook ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ÍµÄ£ï¿½76121030    FF 25 2C 90 18 76    jmp dword ptr [__imp__NtUserBeginPaint@8 (7618902Ch)]
 BOOL HookAddrByJmp(void* addr, PROC pfnNew, PROC* pfnOld)
 {
     FARPROC pFunc = (FARPROC)addr;
@@ -174,14 +186,14 @@ BOOL HookAddrByJmp(void* addr, PROC pfnNew, PROC* pfnOld)
 
     VirtualProtect((LPVOID)((DWORD)pFunc - 5), 7, PAGE_EXECUTE_READWRITE, &dwOldProtect);
 
-    dwAddress = (DWORD)pfnNew - (DWORD)pFunc; //¼ÆËãHookº¯ÊýºÍ±»Hookº¯ÊýµÄµØÖ·Æ«ÒÆ
+    dwAddress = (DWORD)pfnNew - (DWORD)pFunc; //ï¿½ï¿½ï¿½ï¿½Hookï¿½ï¿½ï¿½ï¿½ï¿½Í±ï¿½Hookï¿½ï¿½ï¿½ï¿½ï¿½Äµï¿½Ö·Æ«ï¿½ï¿½
 
-    memcpy(&pBuf[1], &dwAddress, 4); //½«Æ«ÒÆµØÖ·Æ´´Õµ½¡°JMP XXXXx"ÖÐ
+    memcpy(&pBuf[1], &dwAddress, 4); //ï¿½ï¿½Æ«ï¿½Æµï¿½Ö·Æ´ï¿½Õµï¿½ï¿½ï¿½JMP XXXXx"ï¿½ï¿½
 
-    memcpy((LPVOID)((DWORD)pFunc - 5), pBuf, 5); //½«¡°JMP pfnNew¡±Ð´ÈëpFunc-5µÄÎ»ÖÃ£¬Ò²¾ÍÊÇÎå¸öNOPµÄÎ»ÖÃ
+    memcpy((LPVOID)((DWORD)pFunc - 5), pBuf, 5); //ï¿½ï¿½ï¿½ï¿½JMP pfnNewï¿½ï¿½Ð´ï¿½ï¿½pFunc-5ï¿½ï¿½Î»ï¿½Ã£ï¿½Ò²ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½NOPï¿½ï¿½Î»ï¿½ï¿½
 
     // 2. MOV EDI, EDI (0x8BFF)
-    // ½«¡°JMP-7¡±Ð´ÈëpFuncµÄÎ»ÖÃ£¬Ò²¾ÍÊÇMOV EDI, EDIµÄÎ»ÖÃ
+    // ï¿½ï¿½ï¿½ï¿½JMP-7ï¿½ï¿½Ð´ï¿½ï¿½pFuncï¿½ï¿½Î»ï¿½Ã£ï¿½Ò²ï¿½ï¿½ï¿½ï¿½MOV EDI, EDIï¿½ï¿½Î»ï¿½ï¿½
     memcpy(pFunc, pBuf2, 2);
 
     VirtualProtect((LPVOID)((DWORD)pFunc - 5), 7, dwOldProtect, &dwOldProtect);
@@ -210,14 +222,14 @@ BOOL HookAddrByHotpatch(void* addr, PROC pfnNew, PROC* pfnOld)
 
     VirtualProtect((LPVOID)((DWORD)pFunc - 5), 7, PAGE_EXECUTE_READWRITE, &dwOldProtect);
 
-    dwAddress = (DWORD)pfnNew - (DWORD)pFunc; //¼ÆËãHookº¯ÊýºÍ±»Hookº¯ÊýµÄµØÖ·Æ«ÒÆ
+    dwAddress = (DWORD)pfnNew - (DWORD)pFunc; //ï¿½ï¿½ï¿½ï¿½Hookï¿½ï¿½ï¿½ï¿½ï¿½Í±ï¿½Hookï¿½ï¿½ï¿½ï¿½ï¿½Äµï¿½Ö·Æ«ï¿½ï¿½
 
-    memcpy(&pBuf[1], &dwAddress, 4); //½«Æ«ÒÆµØÖ·Æ´´Õµ½¡°JMP XXXXx"ÖÐ
+    memcpy(&pBuf[1], &dwAddress, 4); //ï¿½ï¿½Æ«ï¿½Æµï¿½Ö·Æ´ï¿½Õµï¿½ï¿½ï¿½JMP XXXXx"ï¿½ï¿½
 
-    memcpy((LPVOID)((DWORD)pFunc - 5), pBuf, 5); //½«¡°JMP pfnNew¡±Ð´ÈëpFunc-5µÄÎ»ÖÃ£¬Ò²¾ÍÊÇÎå¸öNOPµÄÎ»ÖÃ
+    memcpy((LPVOID)((DWORD)pFunc - 5), pBuf, 5); //ï¿½ï¿½ï¿½ï¿½JMP pfnNewï¿½ï¿½Ð´ï¿½ï¿½pFunc-5ï¿½ï¿½Î»ï¿½Ã£ï¿½Ò²ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½NOPï¿½ï¿½Î»ï¿½ï¿½
 
     // 2. MOV EDI, EDI (0x8BFF)
-    // ½«¡°JMP-7¡±Ð´ÈëpFuncµÄÎ»ÖÃ£¬Ò²¾ÍÊÇMOV EDI, EDIµÄÎ»ÖÃ
+    // ï¿½ï¿½ï¿½ï¿½JMP-7ï¿½ï¿½Ð´ï¿½ï¿½pFuncï¿½ï¿½Î»ï¿½Ã£ï¿½Ò²ï¿½ï¿½ï¿½ï¿½MOV EDI, EDIï¿½ï¿½Î»ï¿½ï¿½
     memcpy(pFunc, pBuf2, 2);
 
     VirtualProtect((LPVOID)((DWORD)pFunc - 5), 7, dwOldProtect, &dwOldProtect);
@@ -229,6 +241,7 @@ BOOL HookByHotpatch(LPCWSTR szDllName, LPCSTR szFuncName, PROC pfnNew, PROC* pfn
     FARPROC pFunc = (FARPROC)GetProcAddress(LoadLibraryW(szDllName), szFuncName);
     return HookAddrByHotpatch(pFunc, pfnNew, pfnOld);
 }
+#endif // defined(_WIN32)
 
 namespace blink {
 #ifdef _DEBUG
@@ -245,6 +258,32 @@ void scrt_initialize_thread_safe_statics();
 extern "C" void x86_check_features(void);
 
 namespace content {
+
+#if !defined(_WIN32)
+// Win32 thread-local-storage shim backed by pthread keys. The Windows code uses
+// a DWORD TLS index with -1 as the "unallocated" sentinel; we mirror that with a
+// table of pthread_key_t so the surrounding logic stays byte-for-byte identical.
+#include <pthread.h>
+static pthread_key_t s_tlsKeys[64];
+static DWORD s_tlsKeyCount = 0;
+static DWORD TlsAlloc()
+{
+    pthread_key_t key;
+    if (0 != pthread_key_create(&key, nullptr))
+        return (DWORD)-1;
+    DWORD index = s_tlsKeyCount++;
+    s_tlsKeys[index] = key;
+    return index;
+}
+static void* TlsGetValue(DWORD index)
+{
+    return pthread_getspecific(s_tlsKeys[index]);
+}
+static BOOL TlsSetValue(DWORD index, void* value)
+{
+    return 0 == pthread_setspecific(s_tlsKeys[index], value);
+}
+#endif // !defined(_WIN32)
 
 DWORD sCurrentThreadTlsKey = -1;
 
@@ -297,9 +336,16 @@ static void setRuntimeEnabledFeatures()
     blink::RuntimeEnabledFeatures::setCompositorAnimationTimelinesEnabled(true);
 
     blink::RuntimeEnabledFeatures::setAlwaysUseComplexTextEnabled(true);
+#if defined(_WIN32)
+    // DirectWrite is a Windows-only FontCache backend; the macOS FontCache uses
+    // CoreText and has no setUseDirectWrite() switch.
     blink::FontCache::setUseDirectWrite(base::getWindowsVersion(nullptr, nullptr) >= base::WindowsVista);
+#endif
 }
 
+// Win32 API function-pointer typedefs (SAL annotations, PULONG, WINAPI calling
+// convention) used only by the hot-patch path in initialize(); Windows-only.
+#if defined(_WIN32)
 typedef BOOL (WINAPI* PFN_SetThreadStackGuarantee)(PULONG StackSizeInBytes);
 
 typedef HANDLE (WINAPI* PFN_CreateFileW)(
@@ -325,6 +371,7 @@ HANDLE WINAPI HookCreateFileW(
 {
     return s_CreateFileW(lpFileName, dwDesiredAccess, dwShareMode, lpSecurityAttributes, dwCreationDisposition, dwFlagsAndAttributes, hTemplateFile);
 }
+#endif // defined(_WIN32)
 
 class IdleGcWorker : public blink::WebThread::Task {
 public:
@@ -348,7 +395,10 @@ void BlinkPlatformImpl::initialize(bool ocEnable)
 #if USING_VC6RT == 1
     scrt_initialize_thread_safe_statics();
 #endif
+#if defined(_WIN32) && (defined(_M_IX86) || defined(_M_X64))
+    // x86 SSE/CPUID feature probe; not applicable on arm64.
     x86_check_features();
+#endif
 
     //_control87(0x133f, 0xffff);
 //     unsigned int control_word_x87 = 0;
@@ -362,8 +412,12 @@ void BlinkPlatformImpl::initialize(bool ocEnable)
 
     //HookByHotpatch(L"C:\\Windows\\SysWOW64\\kernel32.dll", (LPCSTR)"CreateFileW", ((PROC)(HookCreateFileW)), (PROC*)&s_CreateFileW);
     
+#if defined(_WIN32)
+    // COM/OLE apartment initialization is a Windows-only requirement (used by
+    // shell file dialogs, drag-and-drop, etc.). No equivalent on macOS.
     ::CoInitializeEx(nullptr, 0); // COINIT_MULTITHREADED
     ::OleInitialize(nullptr);
+#endif
 
 #ifndef NO_USE_ORIG_CHROME
     if (ocEnable)
@@ -375,10 +429,10 @@ void BlinkPlatformImpl::initialize(bool ocEnable)
     //     v8::V8::SetFlagsFromString("--turbo", strlen("--turbo"));
     //     v8::V8::SetFlagsFromString("--scavenge_reclaim_unmodified_objects", strlen("--scavenge_reclaim_unmodified_objects"));
 
-    // 75°æ±¾¿ªÆôV8_CONCURRENT_MARKING_BOOL»áÓÐ±ÀÀ£¡£²âÊÔÍøÕ¾£º
+    // 75ï¿½æ±¾ï¿½ï¿½ï¿½ï¿½V8_CONCURRENT_MARKING_BOOLï¿½ï¿½ï¿½Ð±ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Õ¾ï¿½ï¿½
     // https://xsdt1.i-xinnuo.com/xqc_pc/xqc.html#/pdfPage?title=%E5%90%88%E5%90%8C%E6%AD%A3%E6%96%87%E6%B5%8B%E8%AF%95.pdf&fileId=60ff7c7be4b017f601627438
-    // ¼ÇµÃÉèÖÃua£º"Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like XSD) Chrome/79.0.3945.130 Safari/537.36"
-    // 57°æ±¾¿ªÆôincremental_marking·ÃÎÊÉÏÃæÍøÖ·Ò²ÓÐ±ÀÀ£
+    // ï¿½Çµï¿½ï¿½ï¿½ï¿½ï¿½uaï¿½ï¿½"Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like XSD) Chrome/79.0.3945.130 Safari/537.36"
+    // 57ï¿½æ±¾ï¿½ï¿½ï¿½ï¿½incremental_markingï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ö·Ò²ï¿½Ð±ï¿½ï¿½ï¿½
 #if V8_MAJOR_VERSION >= 7
     const char* v8flags[] = {
         "--harmony_dynamic_import",
@@ -396,7 +450,7 @@ void BlinkPlatformImpl::initialize(bool ocEnable)
         "--harmony_await_optimization",
         /////
         "--young_generation_large_objects",
-        "--no_incremental_marking", // ÔÝ²»Ö§³Öincremental_marking¡£Ö÷ÒªÊÇUnifiedHeapController::AdvanceTracingÔÚ¶ÀÁ¢Ïß³Ì£¬ÒòÎªÃ»ÓÐv8::contextµ¼ÖÂ±ÀÀ£
+        "--no_incremental_marking", // ï¿½Ý²ï¿½Ö§ï¿½ï¿½incremental_markingï¿½ï¿½ï¿½ï¿½Òªï¿½ï¿½UnifiedHeapController::AdvanceTracingï¿½Ú¶ï¿½ï¿½ï¿½ï¿½ß³Ì£ï¿½ï¿½ï¿½ÎªÃ»ï¿½ï¿½v8::contextï¿½ï¿½ï¿½Â±ï¿½ï¿½ï¿½
         "--no_incremental_marking_wrappers",
         //       "--no_parallel_scavenge",
         "--no_concurrent_marking",
@@ -567,7 +621,9 @@ void shutdownIoThread(blink::WebThreadSupportingGC* webThread, int* waitCount)
 
 void BlinkPlatformImpl::preShutdown()
 {
+#if defined(_WIN32)
     WebPluginImpl::shutdown();
+#endif
     destroyWebInfo();
 
     int waitCount = m_ioThreads.size();
@@ -949,6 +1005,7 @@ blink::WebData BlinkPlatformImpl::parseDataURL(const blink::WebURL& url, blink::
 
 void readJsFile(const char* path, std::vector<char>* buffer)
 {
+#if defined(_WIN32)
     HANDLE hFile = CreateFileA(path, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
     if (INVALID_HANDLE_VALUE == hFile) {
         DebugBreak();
@@ -963,6 +1020,23 @@ void readJsFile(const char* path, std::vector<char>* buffer)
     BOOL b = ::ReadFile(hFile, &buffer->at(0), bufferSize, &numberOfBytesRead, nullptr);
     ::CloseHandle(hFile);
     b = b;
+#else
+    // POSIX equivalent of the Win32 read-whole-file helper above.
+    FILE* file = fopen(path, "rb");
+    if (!file) {
+        DebugBreak();
+        return;
+    }
+    fseek(file, 0, SEEK_END);
+    long size = ftell(file);
+    fseek(file, 0, SEEK_SET);
+    if (size > 0) {
+        buffer->resize((size_t)size);
+        size_t read = fread(&buffer->at(0), 1, (size_t)size, file);
+        (void)read;
+    }
+    fclose(file);
+#endif
 }
 
 blink::WebData BlinkPlatformImpl::loadResource(const char* name)
@@ -1139,7 +1213,11 @@ blink::WebScrollbarBehavior* BlinkPlatformImpl::scrollbarBehavior()
 
 uint32_t BlinkPlatformImpl::getUniqueIdForProcess()
 {
+#if defined(_WIN32)
     return ::GetCurrentProcessId();
+#else
+    return (uint32_t)::getpid();
+#endif
 }
 
 void BlinkPlatformImpl::createMessageChannel(blink::WebMessagePortChannel** channel1, blink::WebMessagePortChannel** channel2)
@@ -1168,7 +1246,13 @@ blink::WebURLError BlinkPlatformImpl::cancelledError(const blink::WebURL& url) c
     WTF::String outError = "url cancelledError:";
     outError.append((WTF::String)url.string());
     outError.append("\n");
+#if defined(_WIN32)
     OutputDebugStringW(outError.charactersWithNullTermination().data());
+#else
+    // macOS wchar_t is 4 bytes while UChar is 2 bytes; route the diagnostic
+    // through the UTF-8 narrow variant instead.
+    OutputDebugStringA(outError.utf8().data());
+#endif
 
     return error;
 }
@@ -1268,7 +1352,8 @@ void BlinkPlatformImpl::getPluginList(bool refresh, blink::WebPluginListBuilder*
 
     if (wke::g_getPluginListCallback && !wke::g_getPluginListCallback(refresh, builder, nullptr))
         return;
-    
+
+#if defined(_WIN32)
     const Vector<PluginPackage*>& plugins = PluginDatabase::installedPlugins()->plugins();
 
     for (size_t i = 0; i < plugins.size(); ++i) {
@@ -1286,8 +1371,8 @@ void BlinkPlatformImpl::getPluginList(bool refresh, blink::WebPluginListBuilder*
             String type = it->key;
             String desc = it->value;
 
-            // third_party\WebKit\Source\core\dom\DOMImplementation.cpp»áÑ¯ÎÊ
-            // third_party\WebKit\Source\platform\plugins\PluginData.cpp ÀïµÃµ½µÄ²å¼þmimeÊÇ·ñÓÐÖ§³ÖµÄ£¬ÓÐµÄ»°¾Í´´½¨PluginDocument
+            // third_party\WebKit\Source\core\dom\DOMImplementation.cppï¿½ï¿½Ñ¯ï¿½ï¿½
+            // third_party\WebKit\Source\platform\plugins\PluginData.cpp ï¿½ï¿½Ãµï¿½ï¿½Ä²ï¿½ï¿½mimeï¿½Ç·ï¿½ï¿½ï¿½Ö§ï¿½ÖµÄ£ï¿½ï¿½ÐµÄ»ï¿½ï¿½Í´ï¿½ï¿½ï¿½PluginDocument
             if (desc.startsWith("application/virtual-plugin-")) {
                 if (!package->load())
                     continue;
@@ -1307,6 +1392,7 @@ void BlinkPlatformImpl::getPluginList(bool refresh, blink::WebPluginListBuilder*
             }
         }
     }
+#endif // defined(_WIN32)
 }
 
 blink::WebFileUtilities* BlinkPlatformImpl::fileUtilities()
@@ -1428,8 +1514,11 @@ blink::WebGestureCurve* BlinkPlatformImpl::createFlingAnimationCurve(blink::WebG
 
 } // namespace content
 
+#if defined(_WIN32)
 HMODULE g_hModule;
 
+// DLL entry point; Windows-only. On macOS the dylib has no DllMain equivalent
+// (module-attach work, if needed, would use a __attribute__((constructor))).
 BOOL APIENTRY DllMain(HMODULE hModule,
     DWORD  ulReasonForCall,
     LPVOID lpReserved
@@ -1446,3 +1535,4 @@ BOOL APIENTRY DllMain(HMODULE hModule,
     }
     return TRUE;
 }
+#endif // defined(_WIN32)

@@ -23,6 +23,16 @@
 #include <stdint.h>
 #include <stddef.h>
 
+// Pre-parse Apple's MacTypes (via CoreFoundation) BEFORE any translation-unit body.
+// This shim is force-included right after config.h, so MacTypes' Fixed/Rect/RGBColor
+// typedefs are defined while only the global namespace is in scope. Without this, a
+// content TU that does `using namespace blink;` and later pulls CoreFoundation (e.g.
+// through wtf/RetainPtr.h) hits an ambiguity between ::Fixed and blink::Fixed (the
+// LengthType enumerator) inside MacTypes.h itself. Parsing it first avoids that.
+#ifdef __APPLE__
+#include <CoreFoundation/CoreFoundation.h>
+#endif
+
 // MSVC sized-integer keywords used in the wke sources.
 #ifndef _MSC_VER
 #define __int8   char
@@ -271,5 +281,208 @@ typedef struct tagTRACKMOUSEEVENT {
     HWND  hwndTrack;
     DWORD dwHoverTime;
 } TRACKMOUSEEVENT, *LPTRACKMOUSEEVENT;
+
+typedef struct tagPOINTL { LONG x, y; } POINTL, *PPOINTL;
+
+// =====================================================================================
+// Win32 USER/GDI surface for the content/ page-host & input translator.
+//
+// On macOS the Cocoa backend drives windowing, paint and input (see port/mac/* and
+// content/web_impl_mac/*), so the Win32 message-pump path in content/browser/* is never
+// executed here. These declarations exist only so that shared, Win32-shaped code parses
+// and links; the function stubs are deliberately inert no-ops. Each symbol is #ifndef-
+// guarded so a file that defines its own local shim (e.g. WebThreadImpl.cpp) still wins.
+// =====================================================================================
+
+#ifndef INVALID_HANDLE_VALUE
+#define INVALID_HANDLE_VALUE ((HANDLE)(LONG_PTR)-1)
+#endif
+
+// --- Color (GDI) -------------------------------------------------------------
+#ifndef RGB
+#define RGB(r,g,b)   ((COLORREF)(((BYTE)(r))|((WORD)((BYTE)(g))<<8)|(((DWORD)(BYTE)(b))<<16)))
+#define GetRValue(c) ((BYTE)(c))
+#define GetGValue(c) ((BYTE)(((WORD)(c))>>8))
+#define GetBValue(c) ((BYTE)((c)>>16))
+#endif
+
+// --- Word/param packing macros ----------------------------------------------
+#ifndef LOWORD
+#define LOWORD(l)  ((WORD)((DWORD_PTR)(l) & 0xffff))
+#define HIWORD(l)  ((WORD)(((DWORD_PTR)(l) >> 16) & 0xffff))
+#define LOBYTE(w)  ((BYTE)((DWORD_PTR)(w) & 0xff))
+#define HIBYTE(w)  ((BYTE)(((DWORD_PTR)(w) >> 8) & 0xff))
+#define MAKELONG(a,b)   ((LONG)(((WORD)(a))|(((DWORD)((WORD)(b)))<<16)))
+#define MAKELPARAM(l,h) ((LPARAM)MAKELONG(l,h))
+#define MAKEWPARAM(l,h) ((WPARAM)MAKELONG(l,h))
+#define GET_WHEEL_DELTA_WPARAM(w) ((short)HIWORD(w))
+#define GET_X_LPARAM(lp) ((int)(short)LOWORD(lp))
+#define GET_Y_LPARAM(lp) ((int)(short)HIWORD(lp))
+#endif
+#ifndef DWORD_PTR
+typedef ULONG_PTR DWORD_PTR;
+#endif
+
+// --- Virtual-key codes (Win32 standard values) -------------------------------
+#ifndef VK_RETURN
+#define VK_BACK 0x08
+#define VK_TAB 0x09
+#define VK_CLEAR 0x0C
+#define VK_RETURN 0x0D
+#define VK_SHIFT 0x10
+#define VK_CONTROL 0x11
+#define VK_MENU 0x12
+#define VK_PAUSE 0x13
+#define VK_CAPITAL 0x14
+#define VK_ESCAPE 0x1B
+#define VK_SPACE 0x20
+#define VK_PRIOR 0x21
+#define VK_NEXT 0x22
+#define VK_END 0x23
+#define VK_HOME 0x24
+#define VK_LEFT 0x25
+#define VK_UP 0x26
+#define VK_RIGHT 0x27
+#define VK_DOWN 0x28
+#define VK_INSERT 0x2D
+#define VK_DELETE 0x2E
+#define VK_LWIN 0x5B
+#define VK_RWIN 0x5C
+#define VK_NUMPAD0 0x60
+#define VK_NUMPAD1 0x61
+#define VK_NUMPAD2 0x62
+#define VK_NUMPAD3 0x63
+#define VK_NUMPAD4 0x64
+#define VK_NUMPAD5 0x65
+#define VK_NUMPAD6 0x66
+#define VK_NUMPAD7 0x67
+#define VK_NUMPAD8 0x68
+#define VK_NUMPAD9 0x69
+#define VK_MULTIPLY 0x6A
+#define VK_ADD 0x6B
+#define VK_SEPARATOR 0x6C
+#define VK_SUBTRACT 0x6D
+#define VK_DECIMAL 0x6E
+#define VK_DIVIDE 0x6F
+#define VK_NUMLOCK 0x90
+#define VK_SCROLL 0x91
+#endif
+
+// --- Window messages & mouse-key flags --------------------------------------
+#ifndef WM_MOUSEMOVE
+#define WM_SETCURSOR 0x0020
+#define WM_SYSCOMMAND 0x0112
+#define WM_MOUSEMOVE 0x0200
+#define WM_LBUTTONDOWN 0x0201
+#define WM_LBUTTONUP 0x0202
+#define WM_LBUTTONDBLCLK 0x0203
+#define WM_RBUTTONDOWN 0x0204
+#define WM_RBUTTONUP 0x0205
+#define WM_RBUTTONDBLCLK 0x0206
+#define WM_MBUTTONDOWN 0x0207
+#define WM_MBUTTONUP 0x0208
+#define WM_MBUTTONDBLCLK 0x0209
+#define WM_MOUSEWHEEL 0x020A
+#define WM_MOUSELEAVE 0x02A3
+#define WM_TIMER 0x0113
+#define WM_IME_CHAR 0x0286
+#define MK_LBUTTON 0x0001
+#define MK_RBUTTON 0x0002
+#define MK_SHIFT 0x0004
+#define MK_CONTROL 0x0008
+#define MK_MBUTTON 0x0010
+#define HTCAPTION 2
+#define HTCLIENT 1
+#define SC_MOVE 0xF010
+#define KF_EXTENDED 0x0100
+#define WHEEL_DELTA 120
+#define WHEEL_PAGESCROLL 0xFFFFFFFF
+#define SPI_GETWHEELSCROLLLINES 0x0068
+#define SPI_GETWHEELSCROLLCHARS 0x006C
+#endif
+
+// --- Window styles -----------------------------------------------------------
+#ifndef WS_VISIBLE
+#define WS_VISIBLE 0x10000000L
+#define WS_OVERLAPPEDWINDOW 0x00CF0000L
+#define WS_CHILD 0x40000000L
+#define WS_EX_LAYERED 0x00080000L
+#define GWL_STYLE (-16)
+#define GWL_EXSTYLE (-20)
+#define GWLP_USERDATA (-21)
+#define CW_USEDEFAULT ((int)0x80000000)
+#endif
+
+// --- GDI region combine modes ------------------------------------------------
+#ifndef RGN_OR
+#define RGN_AND 1
+#define RGN_OR 2
+#define RGN_XOR 3
+#define RGN_DIFF 4
+#define RGN_COPY 5
+#endif
+
+// --- Standard cursor IDs -----------------------------------------------------
+#ifndef IDC_ARROW
+#define IDC_ARROW       ((const WCHAR*)32512)
+#define IDC_IBEAM       ((const WCHAR*)32513)
+#define IDC_WAIT        ((const WCHAR*)32514)
+#define IDC_CROSS       ((const WCHAR*)32515)
+#define IDC_SIZEALL     ((const WCHAR*)32646)
+#define IDC_SIZENWSE    ((const WCHAR*)32642)
+#define IDC_SIZENESW    ((const WCHAR*)32643)
+#define IDC_SIZEWE      ((const WCHAR*)32644)
+#define IDC_SIZENS      ((const WCHAR*)32645)
+#define IDC_HAND        ((const WCHAR*)32649)
+#define IDC_HELP        ((const WCHAR*)32651)
+#define IDC_NO          ((const WCHAR*)32648)
+#define IDC_APPSTARTING ((const WCHAR*)32650)
+#endif
+
+// --- USER32 input/window functions (inert no-ops; Cocoa drives input on mac) -
+#ifndef MINIBLINK_WIN_COMPAT_USER_STUBS
+#define MINIBLINK_WIN_COMPAT_USER_STUBS
+static inline short  GetKeyState(int) { return 0; }
+static inline BOOL   GetCursorPos(LPPOINT p) { if (p) { p->x = 0; p->y = 0; } return TRUE; }
+static inline BOOL   ClientToScreen(HWND, LPPOINT) { return TRUE; }
+static inline BOOL   ScreenToClient(HWND, LPPOINT) { return TRUE; }
+static inline HWND   SetCapture(HWND) { return NULL; }
+static inline BOOL   ReleaseCapture(void) { return TRUE; }
+static inline BOOL   IsWindow(HWND) { return FALSE; }
+static inline BOOL   IsWindowVisible(HWND) { return FALSE; }
+static inline HWND   GetFocus(void) { return NULL; }
+static inline HWND   SetFocus(HWND) { return NULL; }
+static inline HWND   GetParent(HWND) { return NULL; }
+static inline HWND   GetActiveWindow(void) { return NULL; }
+static inline BOOL   GetClientRect(HWND, LPRECT r) { if (r) { r->left=r->top=r->right=r->bottom=0; } return TRUE; }
+static inline BOOL   GetWindowRect(HWND, LPRECT r) { if (r) { r->left=r->top=r->right=r->bottom=0; } return TRUE; }
+static inline BOOL   PtInRect(const RECT*, POINT) { return FALSE; }
+static inline UINT   GetDoubleClickTime(void) { return 500; }
+static inline BOOL   SystemParametersInfoW(UINT, UINT, void*, UINT) { return FALSE; }
+// Templated on the char type: callers pass either L"..." (wchar_t, 32-bit on macOS)
+// or a WCHAR* (16-bit); both must bind to these inert stubs.
+template<typename T> static inline HMODULE GetModuleHandleW(const T*) { return NULL; }
+static inline HMODULE GetModuleHandleA(const char*) { return NULL; }
+static inline DWORD  GetTickCount(void) { return (DWORD)(GetCurrentThreadId()); }
+template<typename T> static inline HCURSOR LoadCursorW(HINSTANCE, const T*) { return NULL; }
+static inline HCURSOR SetCursor(HCURSOR) { return NULL; }
+static inline BOOL   DestroyIcon(HICON) { return TRUE; }
+static inline BOOL   ShowWindow(HWND, int) { return FALSE; }
+static inline BOOL   UpdateWindow(HWND) { return FALSE; }
+static inline BOOL   DestroyWindow(HWND) { return FALSE; }
+static inline BOOL   EnableWindow(HWND, BOOL) { return FALSE; }
+static inline BOOL   SetForegroundWindow(HWND) { return FALSE; }
+static inline BOOL   PostMessageW(HWND, UINT, WPARAM, LPARAM) { return FALSE; }
+static inline BOOL   KillTimer(HWND, UINT_PTR) { return FALSE; }
+// GDI region (used by the Win draggable-region path; inert on macOS)
+static inline HRGN   CreateRectRgn(int, int, int, int) { return NULL; }
+static inline int    SetRectRgn(HRGN, int, int, int, int) { return 0; }
+static inline int    CombineRgn(HRGN, HRGN, HRGN, int) { return 0; }
+template<typename T> static inline BOOL DeleteObject(T) { return TRUE; }
+#define GetModuleHandle GetModuleHandleW
+#define SystemParametersInfo SystemParametersInfoW
+#define LoadCursor LoadCursorW
+#define PostMessage PostMessageW
+#endif
 
 #endif // MINIBLINK_WIN_COMPAT_WINDOWS_H_

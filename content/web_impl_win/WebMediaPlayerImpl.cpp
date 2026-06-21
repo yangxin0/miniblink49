@@ -8,8 +8,18 @@
 #include "content/web_impl_win/npapi/PluginPackage.h"
 #include "content/web_impl_win/npapi/PluginDatabase.h"
 
+#if defined(_WIN32)
 #include "media/BufferedDataSourceHostImpl.h"
 #include "media/SimpleDataSource.h"
+#else
+// On macOS these media headers pull in media/BufferedResourceLoader.h, which uses
+// extra-qualified member definitions (e.g. ActiveLoader::ActiveLoader inside the
+// class body) that MSVC tolerates but clang rejects. The data-source code paths
+// here are all #if 0'd out, and the only live use of BufferedDataSourceHostImpl is
+// as a member pointer (allocated/freed via new/delete), so a forward declaration
+// is sufficient.
+namespace media { class BufferedDataSourceHostImpl; }
+#endif
 
 #include "third_party/WebKit/Source/wtf/Functional.h"
 #include "third_party/WebKit/Source/web/WebViewImpl.h"
@@ -617,7 +627,15 @@ void WebMediaPlayerImpl::paint(WebCanvas* canvas, const WebRect& rect, unsigned 
     skrc.set(0, 0, m_size.width, m_size.height);
     m_memoryCanvas->drawRect(skrc, clearPaint);
 
+    // On Windows skia::BeginPlatformPaint returns an HDC; on macOS it returns a
+    // PlatformSurface (CGContextRef). wke::WkeMediaPlayer::paint() takes an opaque
+    // HDC handle, so pass the platform surface reinterpreted as that handle. The
+    // concrete wke media-player backend is responsible for interpreting it per OS.
+#if defined(_WIN32)
     HDC hMemoryDC = skia::BeginPlatformPaint(nullptr, m_memoryCanvas);
+#else
+    HDC hMemoryDC = reinterpret_cast<HDC>(skia::BeginPlatformPaint(nullptr, m_memoryCanvas));
+#endif
 
     wkeRect r = { rect.x, rect.y, rect.width, rect.height };
     m_wkePlayer->paint(hMemoryDC, r, alpha, mode);
@@ -639,6 +657,14 @@ void WebMediaPlayerImpl::setContentsToNativeWindowOffset(const blink::WebPoint& 
 
 bool WebMediaPlayerImpl::handleMouseEvent(const blink::WebMouseEvent& evt)
 {
+#if !defined(_WIN32)
+    // The wke media-player mouse API (handleMouseEvent(msg, wParam, lParam)) is
+    // shaped around Win32 window messages (WM_*/MK_*/MAKELPARAM). There is no such
+    // message infrastructure on macOS, so report the event as not handled. A native
+    // Cocoa backend would translate NSEvent into the player's own input model.
+    (void)evt;
+    return false;
+#else
     bool isDefaultHandled = false;
     uint32_t wParam = 0;
     uint32_t lParam = 0;
@@ -709,6 +735,7 @@ bool WebMediaPlayerImpl::handleMouseEvent(const blink::WebMouseEvent& evt)
     }
 
     return isDefaultHandled;
+#endif // defined(_WIN32)
 }
 
 bool WebMediaPlayerImpl::handleKeyboardEvent(const blink::WebKeyboardEvent& evt)

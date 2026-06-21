@@ -1,9 +1,40 @@
 ﻿#include "base/macros.h"
+#include <string>
 
 namespace content {
 
+#if defined(_WIN32)
+// On Windows wchar_t is 16-bit == WebUChar, so the L"..." literal is a UTF-16 buffer.
 #define MAKE_UCHAR_TO_WEBSTRING(s) \
     blink::WebString(s, sizeof(s)/sizeof(WebUChar))
+#else
+// On macOS wchar_t is 32-bit (UTF-32) but WebUChar is 16-bit, so the WebString(UChar*,
+// len) ctor never matches. Convert the wide literal to UTF-8 and use fromUTF8.
+static inline blink::WebString wcharToWebString(const wchar_t* s)
+{
+    std::string utf8;
+    for (; *s; ++s) {
+        unsigned int cp = (unsigned int)*s;
+        if (cp < 0x80) {
+            utf8.push_back((char)cp);
+        } else if (cp < 0x800) {
+            utf8.push_back((char)(0xC0 | (cp >> 6)));
+            utf8.push_back((char)(0x80 | (cp & 0x3F)));
+        } else if (cp < 0x10000) {
+            utf8.push_back((char)(0xE0 | (cp >> 12)));
+            utf8.push_back((char)(0x80 | ((cp >> 6) & 0x3F)));
+            utf8.push_back((char)(0x80 | (cp & 0x3F)));
+        } else {
+            utf8.push_back((char)(0xF0 | (cp >> 18)));
+            utf8.push_back((char)(0x80 | ((cp >> 12) & 0x3F)));
+            utf8.push_back((char)(0x80 | ((cp >> 6) & 0x3F)));
+            utf8.push_back((char)(0x80 | (cp & 0x3F)));
+        }
+    }
+    return blink::WebString::fromUTF8(utf8.data(), utf8.length());
+}
+#define MAKE_UCHAR_TO_WEBSTRING(s) content::wcharToWebString(s)
+#endif
 
 blink::WebString queryLocalizedStringFromResources(blink::WebLocalizedString::Name name)
 {

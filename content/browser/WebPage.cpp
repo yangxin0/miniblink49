@@ -1,6 +1,10 @@
 
 #include "windows.h"
+#if defined(_WIN32)
+// commctrl.h provides Win32 common-control APIs. Nothing in this file actually
+// references those symbols, so on non-Windows hosts (macOS) we simply skip it.
 #include "commctrl.h"
+#endif
 #undef max
 #undef min
 
@@ -108,7 +112,7 @@ IntRect WebPage::caretRect()
     return IntRect();
 }
 
-// ±¾´Îµã»÷ÊÇÒ»´ÎÄ£Äâ±êÌâÀ¸
+// ï¿½ï¿½ï¿½Îµï¿½ï¿½ï¿½ï¿½Ò»ï¿½ï¿½Ä£ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 void WebPage::setIsDraggableRegionNcHitTest()
 {
     //m_pageImpl->m_isDraggableRegionNcHitTest = true;
@@ -271,6 +275,7 @@ void WebPage::repaintRequested(const IntRect& windowRect, bool forceRepaintIfEmp
 void WebPage::firePaintEvent(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
     PAINTSTRUCT ps = { 0 };
+#if defined(_WIN32)
     if (hWnd)
         ::BeginPaint(hWnd, &ps);
     else
@@ -280,6 +285,15 @@ void WebPage::firePaintEvent(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPar
         m_pageImpl->firePaintEvent(ps.hdc, ps.rcPaint);
     if (hWnd)
         ::EndPaint(hWnd, &ps);
+#else
+    // On macOS there is no GDI BeginPaint/EndPaint device context. Painting is
+    // driven by Cocoa; the damage rect is supplied via wParam (a RECT*) and the
+    // bitmap is composited by the platform backend, so forward an empty hdc.
+    if (wParam)
+        ps.rcPaint = *(RECT*)wParam;
+    if (m_pageImpl)
+        m_pageImpl->firePaintEvent(ps.hdc, ps.rcPaint);
+#endif
 }
 
 void WebPage::fireCaptureChangedEvent(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
@@ -398,7 +412,7 @@ blink::IntPoint WebPage::getHwndRenderOffset() const
 
 #if 1
 
-// ·µ»Ø1±íÊ¾µ÷ÓÃdefº¯Êý¡£ÕâÊÇÒòÎª1ÊÇS_FALSE
+// ï¿½ï¿½ï¿½ï¿½1ï¿½ï¿½Ê¾ï¿½ï¿½ï¿½ï¿½defï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Îª1ï¿½ï¿½S_FALSE
 LRESULT WebPage::fireInputEvent(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
 //     bool handled = false;
@@ -427,7 +441,7 @@ LRESULT WebPage::fireInputEvent(HWND hWnd, UINT message, WPARAM wParam, LPARAM l
     return fireInputEventToRichEdit(hWnd, message, wParam, lParam);
 }
 
-// Ò»°ã¶¼ÊÇricheditµÄÊÂ¼þ
+// Ò»ï¿½ã¶¼ï¿½ï¿½richeditï¿½ï¿½ï¿½Â¼ï¿½
 bool WebPage::fireInputEventToRichEdit(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
     bool handled = false;

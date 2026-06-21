@@ -33,6 +33,8 @@
 #include "config.h"
 #include "CurrentTimeImpl.h"
 
+#if defined(_WIN32)
+
 // Windows is first since we want to use hires timers, despite USE(CF)
 // being defined.
 // If defined, WIN32_LEAN_AND_MEAN disables timeBeginPeriod/timeEndPeriod.
@@ -128,8 +130,8 @@ static bool qpcAvailable()
     return s_available;
 }
 
-// 老版本代码有个问题，就是使用了本地时间，会被人篡改。
-// 所以我们舍弃精度，直接使用高精度计时器
+// 锟较版本锟斤拷锟斤拷锟叫革拷锟斤拷锟解，锟斤拷锟斤拷使锟斤拷锟剿憋拷锟斤拷时锟戒，锟结被锟剿篡改★拷
+// 锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟饺ｏ拷直锟斤拷使锟矫高撅拷锟饺硷拷时锟斤拷
 double currentTimeImpl()
 {
     static double s_syncLowResUTCTime = 0;
@@ -205,4 +207,82 @@ double currentTimeImpl_unuse()
     return utc / 1000.0;
 }
 
-} // namespace WTF
+} // namespace content
+
+#else // !defined(_WIN32)
+
+// macOS / posix implementation.
+// Mirrors the Windows behavior: combine a low-resolution wall-clock UTC source
+// (gettimeofday) with a high-resolution monotonic source (mach_absolute_time)
+// so we get a monotonically-increasing UTC value with sub-millisecond precision.
+// We sample the wall clock once, then advance it by the monotonic delta, and we
+// guard against the clock running backwards exactly like currentTimeImpl() does.
+
+#include <math.h>
+#include <stdint.h>
+#include <sys/time.h>
+#include <mach/mach_time.h>
+
+namespace content {
+
+static const double kMsPerSecond = 1000.0;
+
+// Returns a high-resolution monotonic time in milliseconds.
+static double highResUpTime()
+{
+    static mach_timebase_info_data_t s_timebase = { 0, 0 };
+    if (s_timebase.denom == 0)
+        mach_timebase_info(&s_timebase);
+
+    uint64_t absolute = mach_absolute_time();
+    // Convert mach ticks -> nanoseconds -> milliseconds.
+    double nanos = static_cast<double>(absolute) * s_timebase.numer / s_timebase.denom;
+    return nanos / 1000000.0;
+}
+
+// Returns the low-resolution wall-clock UTC time in milliseconds since the epoch.
+static double lowResUTCTime()
+{
+    struct timeval tv;
+    gettimeofday(&tv, 0);
+    return tv.tv_sec * kMsPerSecond + tv.tv_usec / 1000.0;
+}
+
+// Returns the current UTC time in seconds, counted from January 1, 1970.
+double currentTimeImpl()
+{
+    static double s_syncLowResUTCTime = 0;
+    static double s_syncHighResUpTime = 0;
+    static double s_lastUTCTime = 0;
+    static bool s_isSyncedTime = false;
+
+    double lowResTime = lowResUTCTime();
+    double highResTime = highResUpTime();
+
+    if (!s_isSyncedTime) {
+        s_syncLowResUTCTime = lowResTime;
+        s_syncHighResUpTime = highResTime;
+        s_isSyncedTime = true;
+    }
+
+    double highResElapsed = highResTime - s_syncHighResUpTime;
+    double utc = s_syncLowResUTCTime + highResElapsed;
+
+    // Re-sync if the high-res monotonic clock has drifted too far from the
+    // wall clock (e.g. the system clock was adjusted).
+    double lowResElapsed = lowResTime - s_syncLowResUTCTime;
+    const double maximumAllowedDriftMsec = 15.625 * 2.0;
+    if (fabs(highResElapsed - lowResElapsed) > maximumAllowedDriftMsec)
+        s_isSyncedTime = false;
+
+    // Make sure time never runs backwards.
+    if (utc < s_lastUTCTime)
+        utc = s_lastUTCTime + 0.0001;
+
+    s_lastUTCTime = utc;
+    return utc / 1000.0;
+}
+
+} // namespace content
+
+#endif // defined(_WIN32)

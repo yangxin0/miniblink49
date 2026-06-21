@@ -4,6 +4,17 @@
 
 #include "content/web_impl_win/WaitableEvent.h"
 
+// This is the Win32-event-based implementation of content::WaitableEvent.
+// It relies on the OS_WIN member layout (m_handle, the HANDLE ctor) declared
+// in WaitableEvent.h. On macOS/POSIX that header takes its OS_POSIX branch
+// (a reference-counted, lock+condition-variable kernel that does not declare
+// m_handle), so this entire Win32 body must be excluded there. The POSIX
+// behavior is provided by the in-tree sibling
+// orig_chrome/base/synchronization/waitable_event_posix.cc; keeping this file
+// as an empty translation unit on non-Windows mirrors the Windows build
+// without duplicating that implementation.
+#if defined(_WIN32)
+
 #include <windows.h>
 
 namespace content {
@@ -95,3 +106,5 @@ size_t WaitableEvent::waitMany(WaitableEvent** events, size_t count)
 }
 
 }  // namespace content
+
+#endif  // defined(_WIN32)

@@ -130,7 +130,15 @@ bool operator<(const TimerHeapElement& a, const TimerHeapElement& b)
 
 // Class to represent iterators in the heap when calling the standard library heap algorithms.
 // Returns TimerHeapElement for elements in the heap rather than the WebTimerBase pointers themselves.
+#if defined(_WIN32)
 class TimerHeapIterator : public std::iterator<std::random_access_iterator_tag, TimerHeapElement, int> {
+#else
+// libc++ (macOS) enforces that iterator_traits<It>::reference matches the return
+// type of *it. Since operator*() returns TimerHeapElement by value, pass
+// TimerHeapElement (by value) as the Reference template parameter to keep the
+// trait consistent; the default (TimerHeapElement&) would trip a static_assert.
+class TimerHeapIterator : public std::iterator<std::random_access_iterator_tag, TimerHeapElement, int, TimerHeapElement*, TimerHeapElement> {
+#endif
 public:
     TimerHeapIterator(WebThreadImpl* threadTimers) : m_index(-1), m_threadTimers(threadTimers) { }
     TimerHeapIterator(int i, WebThreadImpl* threadTimers) : m_index(i), m_threadTimers(threadTimers) { checkConsistency(); }

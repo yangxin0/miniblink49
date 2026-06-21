@@ -38,7 +38,13 @@ WebURLLoaderImplCurl::~WebURLLoaderImplCurl()
 
 void WebURLLoaderImplCurl::init()
 {
+#if defined(_WIN32)
     m_hadDestroied = false;
+#else
+    // m_hadDestroied is a bool* (shared destruction flag); MSVC accepts `false`
+    // as a null-pointer constant, clang does not. Use nullptr to mirror it.
+    m_hadDestroied = nullptr;
+#endif
     m_jobIds = 0;
     m_blobLoader = nullptr;
 }
@@ -121,7 +127,7 @@ void WebURLLoaderImplCurl::loadAsynchronously(const blink::WebURLRequest& reques
         return;
     m_jobIds = jobIds;
 
-    // Ö´ÐÐÍêaddºó£¬this¿ÉÄÜ±»Ïú»Ù£¬µ±dataurlµÄÊ±ºò
+    // Ö´ï¿½ï¿½ï¿½ï¿½addï¿½ï¿½thisï¿½ï¿½ï¿½Ü±ï¿½ï¿½ï¿½ï¿½Ù£ï¿½ï¿½ï¿½dataurlï¿½ï¿½Ê±ï¿½ï¿½
 #if 0
     blink::KURL url = (blink::KURL)requestNew.url();
     Vector<UChar> host = WTF::ensureUTF16UChar(url.host());

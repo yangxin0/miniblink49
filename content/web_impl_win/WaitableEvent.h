@@ -141,7 +141,7 @@ private:
     // WaitableEventWatchers may then take a reference and thus match the Windows
     // behaviour.
     struct WaitableEventKernel :
-        public RefCountedThreadSafe<WaitableEventKernel> {
+        public base::RefCountedThreadSafe<WaitableEventKernel> {
     public:
         WaitableEventKernel(bool manual_reset, bool initially_signaled);
 
@@ -153,7 +153,7 @@ private:
         std::list<Waiter*> waiters_;
 
     private:
-        friend class RefCountedThreadSafe<WaitableEventKernel>;
+        friend class base::RefCountedThreadSafe<WaitableEventKernel>;
         ~WaitableEventKernel();
     };
 

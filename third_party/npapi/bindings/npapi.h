@@ -110,6 +110,13 @@
 #define TextEncoding CarbonTextEncoding
 #include <ApplicationServices/ApplicationServices.h>
 #include <OpenGL/OpenGL.h>
+// Carbon is 32-bit-only and unavailable on 64-bit macOS. Beyond that, its MacTypes
+// header defines Fixed/Rect/RGBColor/Comment which collide (ambiguity) with blink's
+// own `enum LengthType { Fixed ... }` once `using namespace blink;` is in scope. So
+// force the NPAPI Carbon event model off on LP64. (Windows uses XP_WIN, never here.)
+#if defined(__LP64__) && !defined(NP_NO_CARBON)
+#define NP_NO_CARBON
+#endif
 #ifndef NP_NO_CARBON
 #include <Carbon/Carbon.h>
 #endif

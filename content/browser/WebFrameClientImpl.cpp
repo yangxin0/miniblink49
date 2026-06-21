@@ -127,8 +127,14 @@ void WebFrameClientImpl::didAddMessageToConsole(const WebConsoleMessage& message
     }
 
     if (wke::g_consoleOutputEnable) {
+#if defined(_WIN32)
         Vector<UChar> utf16 = WTF::ensureUTF16UChar(outstr, true);
         OutputDebugStringW(utf16.data());
+#else
+        // macOS: wchar_t is 4 bytes, so UChar* (UTF-16) does not match the
+        // win_compat OutputDebugStringW(const wchar_t*) signature. Emit UTF-8.
+        OutputDebugStringA(outstr.utf8().data());
+#endif
     }
 
 #if (defined ENABLE_WKE) && (ENABLE_WKE == 1)
@@ -558,7 +564,7 @@ WebNavigationPolicy WebFrameClientImpl::decidePolicyForNavigation(const Navigati
             break;
         }
 
-        // WebString::utf8ÔÚº¬ÓÐutfµÄÖÐÎÄÊ±£¬»áµ±³ÉlatinÀ´×ª»»
+        // WebString::utf8ï¿½Úºï¿½ï¿½ï¿½utfï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ê±ï¿½ï¿½ï¿½áµ±ï¿½ï¿½latinï¿½ï¿½×ªï¿½ï¿½
         WebString url16 = info.urlRequest.url().string();
         wke::CString url(url16);
 
@@ -693,7 +699,7 @@ static void setRequestHead(WebLocalFrame* webFrame, WebPage* webPage, WebURLRequ
 
 void WebFrameClientImpl::willSendRequest(WebLocalFrame* webFrame, unsigned identifier, WebURLRequest& request, const WebURLResponse& redirectResponse)
 {
-    if (request.extraData()) // ResourceLoader::willSendRequest»á×ßµ½Õâ
+    if (request.extraData()) // ResourceLoader::willSendRequestï¿½ï¿½ï¿½ßµï¿½ï¿½ï¿½
         return;
 
 //     blink::Frame* blinkFrame = blink::toCoreFrame(webFrame);
@@ -706,7 +712,7 @@ void WebFrameClientImpl::willSendRequest(WebLocalFrame* webFrame, unsigned ident
     requestExtraData->page = m_webPage;
 #endif
 
-    requestExtraData->setFrame(webFrame); // Á½ÖÖÄ£Ê½¶¼ÐèÒª´Ë¶ÔÏó
+    requestExtraData->setFrame(webFrame); // ï¿½ï¿½ï¿½ï¿½Ä£Ê½ï¿½ï¿½ï¿½ï¿½Òªï¿½Ë¶ï¿½ï¿½ï¿½
     request.setExtraData(requestExtraData);
 
     setRequestHead(webFrame, m_webPage, request);
@@ -736,8 +742,14 @@ void WebFrameClientImpl::runModalAlertDialog(const WebString& message)
     if (!needCall)
         return;
 
+#if defined(_WIN32)
     Vector<UChar> text = WTF::ensureUTF16UChar(message, true);
     ::MessageBoxW(nullptr, text.data(), L"Miniblink Alert", 0);
+#else
+    // macOS: no native modal box fallback here; the real dialog is delivered
+    // through the wke alertBoxCallback above. Log when no callback is set.
+    OutputDebugStringA(String(message).utf8().data());
+#endif
 }
 
 bool WebFrameClientImpl::runModalConfirmDialog(const WebString& message)
@@ -755,9 +767,15 @@ bool WebFrameClientImpl::runModalConfirmDialog(const WebString& message)
     if (!needCall)
         return false;
 
+#if defined(_WIN32)
     Vector<UChar> text = WTF::ensureUTF16UChar(message, true);
     int result = ::MessageBoxW(NULL, text.data(), L"Miniblink Confirm", MB_OKCANCEL);
     return result == IDOK;
+#else
+    // macOS: real confirm dialog goes through wke confirmBoxCallback above.
+    OutputDebugStringA(String(message).utf8().data());
+    return false;
+#endif
 }
 
 bool WebFrameClientImpl::runModalPromptDialog(const WebString& message, const WebString& defaultValue, WebString* actualValue)
@@ -774,8 +792,14 @@ bool WebFrameClientImpl::runModalPromptDialog(const WebString& message, const We
         result = m_webPage->wkeHandler().promptBoxCallback(m_webPage->wkeWebView(),
             m_webPage->wkeHandler().promptBoxCallbackParam, &wkeMsg, &defaultResult, &resultString);
 
+#if defined(_WIN32)
         const wchar_t* resultStringW = resultString.stringW();
         actualValue->assign(resultStringW, wcslen(resultStringW));
+#else
+        // macOS: wchar_t is 4 bytes, so the UTF-16 stringW() does not match
+        // WebString::assign(const WebUChar*, size_t). Go through the UTF-8 form.
+        actualValue->assign(blink::WebString::fromUTF8(resultString.string()));
+#endif
         return result;
     }
 #endif
@@ -783,9 +807,15 @@ bool WebFrameClientImpl::runModalPromptDialog(const WebString& message, const We
     if (!needCall)
         return false;
 
+#if defined(_WIN32)
     Vector<UChar> text = WTF::ensureUTF16UChar(message, true);
     int resultOk = ::MessageBoxW(NULL, text.data(), L"Miniblink Prompt", MB_OKCANCEL);
     return resultOk == IDOK;
+#else
+    // macOS: real prompt dialog goes through wke promptBoxCallback above.
+    OutputDebugStringA(String(message).utf8().data());
+    return false;
+#endif
 }
 
 bool WebFrameClientImpl::runModalBeforeUnloadDialog(bool isReload, const WebString& message)
@@ -817,7 +847,12 @@ void WebFrameClientImpl::clearContextMenu()
 
 void WebFrameClientImpl::didCreateScriptContext(WebLocalFrame* frame, v8::Local<v8::Context> context, int extensionGroup, int worldId)
 {
+#if defined(_WIN32)
     v8::V8::SetCaptureStackTraceForUncaughtExceptions(true, 50, v8::StackTrace::kDetailed);
+#else
+    // V8 8.7: this moved from the static v8::V8 API onto Isolate.
+    v8::Isolate::GetCurrent()->SetCaptureStackTraceForUncaughtExceptions(true, 50, v8::StackTrace::kDetailed);
+#endif
 
 #if (defined ENABLE_WKE) && (ENABLE_WKE == 1)
     if (frame->top() == frame)
@@ -877,7 +912,7 @@ public:
 
     void willSendRequest(WebURLLoader* loader, WebURLRequest& request, const WebURLResponse& redirectResponse) override
     {
-        if (request.extraData()) // ResourceLoader::willSendRequest»á×ßµ½Õâ
+        if (request.extraData()) // ResourceLoader::willSendRequestï¿½ï¿½ï¿½ßµï¿½ï¿½ï¿½
             return;
 
         String downloadName = m_downloadName;
@@ -890,7 +925,7 @@ public:
 #if (defined ENABLE_WKE) && (ENABLE_WKE == 1)
         requestExtraData->page = m_webPage;
 #endif
-        requestExtraData->setFrame(m_frame); // Á½ÖÖÄ£Ê½¶¼ÐèÒª´Ë¶ÔÏó
+        requestExtraData->setFrame(m_frame); // ï¿½ï¿½ï¿½ï¿½Ä£Ê½ï¿½ï¿½ï¿½ï¿½Òªï¿½Ë¶ï¿½ï¿½ï¿½
         request.setExtraData(requestExtraData);
 //         request.addHTTPHeaderField("Accept-Language", m_webPage->webPageImpl()->acceptLanguages());
 // 

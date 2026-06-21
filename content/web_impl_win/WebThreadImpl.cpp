@@ -6,7 +6,15 @@
 #include "content/web_impl_win/WebTimerBase.h"
 #include "content/web_impl_win/WebSchedulerImpl.h"
 #include "content/web_impl_win/ActivatingTimerCheck.h"
+#if defined(_WIN32)
 #include "content/browser/SharedTimerWin.h"
+#else
+// macOS: SharedTimerWin.h is a Win32-GDI timer-window implementation (HWND, WM_TIMER,
+// RegisterClassEx, timeBeginPeriod...) and cannot be shimmed. The posix/Cocoa sibling
+// content/web_impl_mac/SharedTimerMac.h provides the same two entry points
+// (setSharedTimerFireInterval / stopSharedTimer) that this file calls.
+#include "content/web_impl_mac/SharedTimerMac.h"
+#endif
 #include "third_party/WebKit/public/platform/WebTraceLocation.h"
 #include "third_party/WebKit/Source/wtf/ThreadingPrimitives.h"
 
@@ -21,9 +29,161 @@
 #include "base/compiler_specific.h"
 #include "base/thread.h"
 
+#if defined(_WIN32)
 #include <windows.h>
 #include <process.h>
 #include <mmsystem.h>
+#else
+// macOS: win_compat/windows.h is force-included and supplies CRITICAL_SECTION,
+// Sleep, InterlockedIncrement and the HANDLE types. It does NOT yet provide the
+// Win32 event / thread primitives this file uses (CreateEvent/SetEvent/CreateThread/
+// WaitForSingleObject/CloseHandle/INFINITE), so we map them to pthreads here.
+// These belong in win_compat/windows.h for reuse across content/ (see sharedNeeds);
+// they are defined locally for now so this translation unit compiles standalone.
+#include <pthread.h>
+
+#ifndef INFINITE
+#define INFINITE 0xFFFFFFFF
+#endif
+
+namespace content {
+namespace mac_win_event_shim {
+
+enum HandleKind { kEventHandle, kThreadHandle };
+
+// Common tagged header so WaitForSingleObject/CloseHandle can dispatch on the
+// underlying object kind (both events and thread handles are Win32 HANDLEs).
+struct HandleBase {
+    HandleKind kind;
+};
+
+// A manual/auto-reset event mapped onto a pthread mutex + condition variable.
+struct WinEvent : public HandleBase {
+    pthread_mutex_t mutex;
+    pthread_cond_t cond;
+    bool signaled;
+    bool manualReset;
+};
+
+typedef DWORD (*Win32ThreadProc)(void*);
+
+struct WinThread : public HandleBase {
+    pthread_t thread;
+};
+
+struct ThreadStart {
+    Win32ThreadProc proc;
+    void* param;
+};
+
+static inline void* threadTrampoline(void* arg)
+{
+    ThreadStart* start = reinterpret_cast<ThreadStart*>(arg);
+    Win32ThreadProc proc = start->proc;
+    void* param = start->param;
+    delete start;
+    proc(param);
+    return nullptr;
+}
+
+} // namespace mac_win_event_shim
+} // namespace content
+
+// CreateEvent(securityAttrs, bManualReset, bInitialState, name)
+static inline HANDLE CreateEvent(void*, BOOL manualReset, BOOL initialState, const wchar_t*)
+{
+    using namespace content::mac_win_event_shim;
+    WinEvent* ev = new WinEvent();
+    ev->kind = kEventHandle;
+    pthread_mutex_init(&ev->mutex, nullptr);
+    pthread_cond_init(&ev->cond, nullptr);
+    ev->signaled = (initialState != FALSE);
+    ev->manualReset = (manualReset != FALSE);
+    return reinterpret_cast<HANDLE>(static_cast<HandleBase*>(ev));
+}
+
+static inline BOOL SetEvent(HANDLE handle)
+{
+    using namespace content::mac_win_event_shim;
+    HandleBase* base = reinterpret_cast<HandleBase*>(handle);
+    if (!base || base->kind != kEventHandle)
+        return FALSE;
+    WinEvent* ev = static_cast<WinEvent*>(base);
+    pthread_mutex_lock(&ev->mutex);
+    ev->signaled = true;
+    pthread_cond_signal(&ev->cond);
+    pthread_mutex_unlock(&ev->mutex);
+    return TRUE;
+}
+
+// Returns WAIT_OBJECT_0 (0) when signaled / thread joined. Only INFINITE is used here.
+static inline DWORD WaitForSingleObject(HANDLE handle, DWORD)
+{
+    using namespace content::mac_win_event_shim;
+    HandleBase* base = reinterpret_cast<HandleBase*>(handle);
+    if (!base)
+        return (DWORD)0xFFFFFFFF; // WAIT_FAILED
+
+    if (base->kind == kThreadHandle) {
+        WinThread* th = static_cast<WinThread*>(base);
+        pthread_join(th->thread, nullptr);
+        return 0; // WAIT_OBJECT_0
+    }
+
+    WinEvent* ev = static_cast<WinEvent*>(base);
+    pthread_mutex_lock(&ev->mutex);
+    while (!ev->signaled)
+        pthread_cond_wait(&ev->cond, &ev->mutex);
+    if (!ev->manualReset)
+        ev->signaled = false; // auto-reset
+    pthread_mutex_unlock(&ev->mutex);
+    return 0; // WAIT_OBJECT_0
+}
+
+static inline BOOL CloseHandle(HANDLE handle)
+{
+    using namespace content::mac_win_event_shim;
+    HandleBase* base = reinterpret_cast<HandleBase*>(handle);
+    if (!base)
+        return FALSE;
+
+    if (base->kind == kThreadHandle) {
+        delete static_cast<WinThread*>(base);
+        return TRUE;
+    }
+
+    WinEvent* ev = static_cast<WinEvent*>(base);
+    pthread_mutex_destroy(&ev->mutex);
+    pthread_cond_destroy(&ev->cond);
+    delete ev;
+    return TRUE;
+}
+
+// CreateThread(secAttrs, stackSize, startRoutine, param, flags, outThreadId).
+// The Win32 start routine is "DWORD __stdcall fn(void*)"; pthread wants
+// "void* fn(void*)", so route through a small trampoline.
+static inline HANDLE CreateThread(void*, size_t,
+    content::mac_win_event_shim::Win32ThreadProc startRoutine, void* param, DWORD, DWORD* outThreadId)
+{
+    using namespace content::mac_win_event_shim;
+    ThreadStart* start = new ThreadStart();
+    start->proc = startRoutine;
+    start->param = param;
+
+    WinThread* th = new WinThread();
+    th->kind = kThreadHandle;
+    if (0 != pthread_create(&th->thread, nullptr, threadTrampoline, start)) {
+        delete th;
+        delete start;
+        if (outThreadId)
+            *outThreadId = 0;
+        return nullptr;
+    }
+    if (outThreadId)
+        *outThreadId = 0;
+    return reinterpret_cast<HANDLE>(static_cast<HandleBase*>(th));
+}
+#endif
 
 namespace content {
 
@@ -188,7 +348,7 @@ void WebThreadImpl::postDelayedTaskWithPriorityCrossThread(
     long long delayMs,
     int priority)
 {
-    if (!task) // ioÏß³ÌÍË³öµÄÊ±ºò£¬¿ÉÄÜÎªnull
+    if (!task) // ioï¿½ß³ï¿½ï¿½Ë³ï¿½ï¿½ï¿½Ê±ï¿½ò£¬¿ï¿½ï¿½ï¿½Îªnull
         return;
 
 #ifndef NO_USE_ORIG_CHROME
@@ -352,7 +512,7 @@ void WebThreadImpl::removeTaskObserver(TaskObserver* observer)
 
 void WebThreadImpl::willProcessTasks()
 {
-    // ÓÐÐ©»Øµ÷£¬±ÈÈçMicrotask::enqueueMicrotask£¬»áÔÚÍË³öµÄÊ±ºòappend½øÀ´£¬ÐèÒªÔÚ×îºóÖ´ÐÐ£¬·ñÔòÒ»Ð©ImageLoadÃ»·¨ÊÍ·Å
+    // ï¿½ï¿½Ð©ï¿½Øµï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Microtask::enqueueMicrotaskï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ë³ï¿½ï¿½ï¿½Ê±ï¿½ï¿½appendï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Òªï¿½ï¿½ï¿½ï¿½ï¿½Ö´ï¿½Ð£ï¿½ï¿½ï¿½ï¿½ï¿½Ò»Ð©ImageLoadÃ»ï¿½ï¿½ï¿½Í·ï¿½
     for (size_t i = 0; ; ++i) {
         ::EnterCriticalSection(&m_observersMutex);
         if (i >= m_observers.size()) {
@@ -479,7 +639,7 @@ void WebThreadImpl::fireTimeOnExit()
         timer->heapDeleteMin();
 
         willProcessTasks();
-        timer->fired(); // ¿ÉÄÜ»áappend m_timerHeap
+        timer->fired(); // ï¿½ï¿½ï¿½Ü»ï¿½append m_timerHeap
         didProcessTasks();
     }
 }
@@ -523,7 +683,7 @@ void WebThreadImpl::schedulerTasks()
     }
 #endif
 
-    startTriggerTasks(); // Èç¹û²»¼ÓÕâ¾ä£¬ÇÒÏÂÃæµÄÑ­»·ÔÚ±¾Ïß³Ì²»Í£Ìí¼Ó¶¨Ê±Æ÷£¬ÔòstartTriggerTasksÀïµÄ¾ÍÃ»»ú»áÖ´ÐÐÁË¡£
+    startTriggerTasks(); // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ä£¬ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ñ­ï¿½ï¿½ï¿½Ú±ï¿½ï¿½ß³Ì²ï¿½Í£ï¿½ï¿½ï¿½Ó¶ï¿½Ê±ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½startTriggerTasksï¿½ï¿½Ä¾ï¿½Ã»ï¿½ï¿½ï¿½ï¿½Ö´ï¿½ï¿½ï¿½Ë¡ï¿½
 
     if (m_timerHeap.size() > 500) {
         char* output = (char*)malloc(0x100);

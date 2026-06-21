@@ -47,14 +47,30 @@
 #include "content/browser/PageNavController.h"
 #include "content/browser/CheckReEnter.h"
 #include "content/ui/PopupMenuWin.h"
+#if defined(_WIN32)
+// PlatformCursor.h / RunFileChooserImpl.h define inline Win32 GDI (BITMAPINFO,
+// ICONINFO, HWndDC, GetDC/SelectObject, etc.) and are private to this file.
+// On macOS the cursor/file-chooser paths are guarded out below; the Cocoa
+// equivalents will live in content/web_impl_mac/.
 #include "content/ui/PlatformCursor.h"
 #include "content/ui/RunFileChooserImpl.h"
+// DragHandle implements an OLE IDropTarget (base/COMPtr.h -> <unknwn.h>,
+// <shlobj.h>) and is pure Win32 drag-and-drop. The Cocoa drag handler will
+// live in content/web_impl_mac/; guard the body call sites below for macOS.
 #include "content/ui/DragHandle.h"
+// ToolTip.h is an inline Win32 GDI tooltip window (CreateWindowEx + GDI paint,
+// <xstring>). Pure Windows UI; the Cocoa tooltip will live in web_impl_mac.
 #include "content/ui/ToolTip.h"
+#endif
 #include "content/web_impl_win/BlinkPlatformImpl.h"
 #include "content/web_impl_win/WebThreadImpl.h"
+#if defined(_WIN32)
+// NPAPI plugin host. On macOS npapi.h pulls <ApplicationServices>/<Carbon>,
+// whose `Fixed`/`Rect`/`Pattern` globals collide with blink enums, and NPAPI
+// plugins are unsupported on the Mac backend anyway. Guard out the plugin paths.
 #include "content/web_impl_win/npapi/PluginDatabase.h"
 #include "content/web_impl_win/npapi/WebPluginImpl.h"
+#endif
 #include "content/devtools/DevToolsClient.h"
 #include "content/devtools/DevToolsAgent.h"
 #include "orig_chrome/content/OrigChromeMgr.h"
@@ -170,10 +186,14 @@ WebPageImpl::WebPageImpl(COLORREF bdColor)
     m_lastBeginMainFrameTime = 0;
 
     WebPageImpl* self = this;
+#if defined(_WIN32)
     m_dragHandle = new DragHandle(
         [self] { self->onEnterDragSimulate(); },
         [self] { self->onLeaveDragSimulate(); },
         [self] { self->onDraggingSimulate(); });
+#else
+    m_dragHandle = nullptr;
+#endif
     m_isDragging = false;
     m_isFirstEnterDrag = false;
     m_autoRecordActionsCount = 0;
@@ -181,9 +201,14 @@ WebPageImpl::WebPageImpl(COLORREF bdColor)
 
     m_screenInfo = nullptr;
 
+#if defined(_WIN32)
     m_toolTip = new ToolTip(true, 0.02);
     m_validationMessageTip = new ToolTip(false, 1);
-    
+#else
+    m_toolTip = nullptr;
+    m_validationMessageTip = nullptr;
+#endif
+
     WebLocalFrameImpl* webLocalFrameImpl = (WebLocalFrameImpl*)WebLocalFrame::create(WebTreeScopeType::Document, m_webFrameClient);
     m_webViewImpl = WebViewImpl::create(this);
     m_webViewImpl->setMainFrame(webLocalFrameImpl);
@@ -940,9 +965,11 @@ IntRect WebPageImpl::caretRectImpl() const
 
     blink::WebPluginContainerImpl* container = blink::WebLocalFrameImpl::pluginContainerFromNode(frame, blink::WebNode(m_webViewImpl->focusedElement()));
     if (container && container->supportsInputMethod()) {
+#if defined(_WIN32)
         WebPluginImpl* plugin = (WebPluginImpl*)container->plugin();
         int inputType = 0;
         findPluginCaret = (plugin && plugin->getImeStatus(&inputType, &caret));
+#endif
     }
 
     RefPtrWillBeRawPtr<Range> range = frame->selection().selection().toNormalizedRange();
@@ -1485,10 +1512,14 @@ static bool fireImeEventToNpPlugin(UINT message, WPARAM wParam, blink::Frame* fo
     if (!container || !container->supportsInputMethod())
         return false;
 
+#if defined(_WIN32)
     WebPluginImpl* plugin = (WebPluginImpl*)container->plugin();
     if (!plugin)
         return false;
     return plugin->handleKeyboardCharEventForEmulateIme(wParam);
+#else
+    return false;
+#endif
 }
 
 bool WebPageImpl::fireKeyPressEvent(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
@@ -2447,7 +2478,9 @@ bool WebPageImpl::initSetting()
     settings->setLoadsImagesAutomatically(true);
     settings->setImagesEnabled(true);
 
+#if defined(_WIN32)
     PluginDatabase::installedPlugins()->refresh();
+#endif
 
     return true;
 }

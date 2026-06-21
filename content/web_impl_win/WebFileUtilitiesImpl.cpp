@@ -9,11 +9,29 @@
 
 #define PURE = 0
 
+#if defined(_WIN32)
 #include <windows.h>
 #include <Shlwapi.h>
+#else
+// macOS / POSIX backend: the Win32 Shell-path APIs (Shlwapi) and Win32 file
+// handle APIs do not exist. We implement the same behavior with POSIX calls.
+#include <fcntl.h>
+#include <limits.h>
+#include <stdlib.h>
+#include <sys/stat.h>
+#include <time.h>
+#include <unistd.h>
+
+// Win32 INVALID_HANDLE_VALUE is not provided by win_compat; define it here so
+// the macOS HANDLE-encoded fd code matches the Windows contract.
+#ifndef INVALID_HANDLE_VALUE
+#define INVALID_HANDLE_VALUE (reinterpret_cast<HANDLE>(static_cast<intptr_t>(-1)))
+#endif
+#endif
 
 namespace content {
 
+#if defined(_WIN32)
 static const ULONGLONG kSecondsFromFileTimeToTimet = 11644473600;
 
 static bool getFindData(const String path, WIN32_FIND_DATAW& findData)
@@ -116,6 +134,80 @@ bool fileExists(const String& path)
     return getFindData(path, findData);
 }
 
+#else // defined(_WIN32)
+
+// macOS / POSIX implementation of the free helper functions.
+
+String pathByAppendingComponent(const String& path, const String& component)
+{
+    if (path.isEmpty())
+        return component;
+
+    String result = path;
+    if (result.characterStartingAt(result.length() - 1) != '/')
+        result.append('/');
+    result.append(component);
+    return result;
+}
+
+// The shared header declares these with the Win32 HANDLE type. On macOS HANDLE
+// is an opaque void* (from win_compat/windows.h); we encode the POSIX file
+// descriptor inside it. A descriptor of -1 maps to INVALID_HANDLE_VALUE.
+static inline HANDLE fdToHandle(int fd) { return reinterpret_cast<HANDLE>(static_cast<intptr_t>(fd)); }
+static inline int handleToFd(HANDLE h) { return static_cast<int>(reinterpret_cast<intptr_t>(h)); }
+
+String openTemporaryFile(const String&, HANDLE& handle)
+{
+    handle = INVALID_HANDLE_VALUE;
+
+    // Honor TMPDIR like the Win32 GetTempPath behavior; default to /tmp.
+    const char* tmpDir = ::getenv("TMPDIR");
+    String dir = tmpDir ? String(tmpDir) : String("/tmp");
+    String templatePath = pathByAppendingComponent(dir, "XXXXXX.tmp");
+
+    Vector<char> templ = WTF::ensureStringToUTF8(templatePath, true);
+    // mkstemps expects a writable template with the suffix length specified.
+    int fd = ::mkstemps(templ.data(), 4 /* strlen(".tmp") */);
+    if (fd < 0)
+        return String();
+    handle = fdToHandle(fd);
+    return String::fromUTF8(templ.data());
+}
+
+int writeToFile(HANDLE handle, const char* data, int length)
+{
+    int fd = handleToFd(handle);
+    if (fd < 0)
+        return -1;
+
+    ssize_t bytesWritten = ::write(fd, data, length);
+    if (bytesWritten < 0)
+        return -1;
+    return static_cast<int>(bytesWritten);
+}
+
+String pathGetFileName(const String& path)
+{
+    if (path.isEmpty())
+        return path;
+    size_t slash = path.reverseFind('/');
+    if (slash == WTF::kNotFound)
+        return path;
+    return path.substring(slash + 1);
+}
+
+bool fileExists(const String& path)
+{
+    if (path.isNull() || path.isEmpty())
+        return false;
+    Vector<char> upath = WTF::ensureStringToUTF8(path, true);
+    struct stat st;
+    return ::stat(upath.data(), &st) == 0;
+}
+
+#endif // defined(_WIN32)
+
+#if defined(_WIN32)
 static void getFileModificationTimeFromFindData(const WIN32_FIND_DATAW& findData, time_t& time)
 {
     ULARGE_INTEGER fileTime;
@@ -138,12 +230,14 @@ static bool getFileSizeFromFindData(const WIN32_FIND_DATAW& findData, long long&
     size = fileSize.QuadPart;
     return true;
 }
+#endif // defined(_WIN32)
 
 WebFileUtilitiesImpl::WebFileUtilitiesImpl()
 {
 
 }
 
+#if defined(_WIN32)
 bool WebFileUtilitiesImpl::getFileInfo(const blink::WebString& path, blink::WebFileInfo& result)
 {
     if (path.isNull() || path.isEmpty())
@@ -188,9 +282,63 @@ blink::WebString WebFileUtilitiesImpl::baseName(const blink::WebString& path)
 }
 
 bool WebFileUtilitiesImpl::isDirectory(const blink::WebString& path)
-{ 
+{
     return ::PathIsDirectoryW(WTF::ensureUTF16UChar(path, true).data());
 }
+
+#else // defined(_WIN32)
+
+// macOS / POSIX implementation of the WebFileUtilities overrides.
+
+bool WebFileUtilitiesImpl::getFileInfo(const blink::WebString& path, blink::WebFileInfo& result)
+{
+    if (path.isNull() || path.isEmpty())
+        return false;
+
+    String pathString(path);
+    Vector<char> upath = WTF::ensureStringToUTF8(pathString, true);
+    struct stat st;
+    if (::stat(upath.data(), &st) != 0)
+        return false;
+
+    result.modificationTime = static_cast<double>(st.st_mtime);
+    result.length = static_cast<long long>(st.st_size);
+    result.type = S_ISDIR(st.st_mode) ? blink::WebFileInfo::TypeDirectory : blink::WebFileInfo::TypeFile;
+    result.platformPath = path;
+
+    return true;
+}
+
+blink::WebString WebFileUtilitiesImpl::directoryName(const blink::WebString& path)
+{
+    String pathString(path);
+    String name = pathString.left(pathString.length() - pathGetFileName(pathString).length());
+    if (!name.isEmpty() && name.characterStartingAt(name.length() - 1) == '/') {
+        // Remove any trailing "/".
+        name.truncate(name.length() - 1);
+    }
+    return name;
+}
+
+blink::WebString WebFileUtilitiesImpl::baseName(const blink::WebString& path)
+{
+    if (path.isNull() || path.isEmpty())
+        return "";
+    return pathGetFileName(String(path));
+}
+
+bool WebFileUtilitiesImpl::isDirectory(const blink::WebString& path)
+{
+    if (path.isNull() || path.isEmpty())
+        return false;
+    Vector<char> upath = WTF::ensureStringToUTF8(String(path), true);
+    struct stat st;
+    if (::stat(upath.data(), &st) != 0)
+        return false;
+    return S_ISDIR(st.st_mode);
+}
+
+#endif // defined(_WIN32)
 
 blink::WebURL WebFileUtilitiesImpl::filePathToURL(const blink::WebString& path)
 {

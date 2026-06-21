@@ -10,8 +10,13 @@
 struct SkIRect;
 struct SkPoint;
 struct SkRect;
+// win_compat/windows.h already typedefs DWORD as uint32_t (32-bit, matching Win32);
+// on macOS arm64 'unsigned long' is 64-bit, so redefining here would conflict. Only
+// declare these when the macOS win_compat shim is NOT in scope (real Windows build).
+#ifndef MINIBLINK_WIN_COMPAT_WINDOWS_H_
 typedef unsigned long DWORD;
 typedef DWORD COLORREF;
+#endif
 typedef struct tagPOINT POINT;
 typedef struct tagRECT RECT;
 
