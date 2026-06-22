@@ -36,6 +36,11 @@ endif()
 # NEW because cmake_minimum_required >= 3.16.)
 if(MSVC)
     set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded")
+    # Many miniblink sources have non-ASCII (Chinese) comments saved as UTF-8. Tell
+    # MSVC the sources are UTF-8 so it doesn't mis-decode them under the system
+    # codepage (936) — a mis-decoded trailing byte can swallow the next token, e.g.
+    # eating the `return` in KURL::path() and tripping C4716. Also silences C4819.
+    add_compile_options(/utf-8)
 endif()
 
 # Per-platform definitions consumed by ported code via #ifdef.

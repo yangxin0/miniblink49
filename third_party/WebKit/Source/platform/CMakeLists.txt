@@ -50,14 +50,22 @@ file(GLOB BLINK_TEXT     "${BSRC}/text/*.cpp")
 file(GLOB_RECURSE BLINK_FONTS "${BSRC}/fonts/*.cpp")  # incl. fonts/shaping (harfbuzz)
 # macOS CoreText font backend (ObjC++): FontCacheMac/FontPlatformDataMac/
 # FontFamilyMatcherMac. These provide FontCache::* and FontPlatformData::setupPaint.
-file(GLOB BLINK_FONTS_MAC "${BSRC}/fonts/mac/*.mm")
-file(GLOB BLINK_PLATFORM_MAC "${BSRC}/mac/*.mm")  # incl. ScrollAnimatorMac (full Cocoa import added)
-# macOS mac/ (theme/scroll), geometry/mac (Int*/Float* CGRect), text/mac (LocaleMac).
-file(GLOB BLINK_GEOMETRY_MAC "${BSRC}/geometry/mac/*.mm" "${BSRC}/geometry/cg/*.cpp")  # Int*/Float* <-> CG/NS
-# macOS overlay scrollbar theme (ObjC++): ScrollbarThemeMacCommon + OverlayAPI
-# (ScrollAnimatorMac references them). NonOverlayAPI (legacy) deferred (skew).
-file(GLOB BLINK_SCROLL_MAC "${BSRC}/scroll/ScrollbarThemeMac*.mm")  # Common/Overlay/NonOverlay
-file(GLOB BLINK_TEXT_MAC "${BSRC}/text/LocaleMac.mm")
+# macOS ObjC++ ports (CoreText fonts, Cocoa platform/geometry/scroll/locale) are
+# globbed only on Apple. On Windows the equivalents come from fonts/win + fonts/skia
+# (via BLINK_FONTS below), win/ platform helpers, and text/LocaleWin.
+if(APPLE)
+    file(GLOB BLINK_FONTS_MAC "${BSRC}/fonts/mac/*.mm")
+    file(GLOB BLINK_PLATFORM_MAC "${BSRC}/mac/*.mm")  # incl. ScrollAnimatorMac (full Cocoa import added)
+    # macOS mac/ (theme/scroll), geometry/mac (Int*/Float* CGRect), text/mac (LocaleMac).
+    file(GLOB BLINK_GEOMETRY_MAC "${BSRC}/geometry/mac/*.mm" "${BSRC}/geometry/cg/*.cpp")  # Int*/Float* <-> CG/NS
+    # macOS overlay scrollbar theme (ObjC++): ScrollbarThemeMacCommon + OverlayAPI
+    # (ScrollAnimatorMac references them). NonOverlayAPI (legacy) deferred (skew).
+    file(GLOB BLINK_SCROLL_MAC "${BSRC}/scroll/ScrollbarThemeMac*.mm")  # Common/Overlay/NonOverlay
+    file(GLOB BLINK_TEXT_MAC "${BSRC}/text/LocaleMac.mm")
+elseif(MB_OS_WINDOWS)
+    # Win32 platform helpers (HWndDC, PlatformMouseEventWin, SystemInfo).
+    file(GLOB BLINK_PLATFORM_WIN "${BSRC}/win/*.cpp")
+endif()
 # More platform sublayers the link needs (all compile clean on macOS): scroll
 # (ScrollableArea/Scrollbar), network (ResourceRequest/Response), mhtml,
 # mediastream.
@@ -103,8 +111,13 @@ list(FILTER BLINK_SUBLAYERS EXCLUDE REGEX "/GDIPlus")
 # Still deferred: Canvas2DLayerBridge (WebExternalTextureMailbox::syncPoint skew),
 # GDIPlusInit (Win-only).
 list(FILTER BLINK_GRAPHICS EXCLUDE REGEX "Canvas2DLayerBridge|GDIPlusInit")
-# Calendar/date ICU (ucal/udat) + Windows locale: deferred.
-list(FILTER BLINK_TEXT EXCLUDE REGEX "LocaleICU|LocaleWin")
+# Calendar/date ICU (ucal/udat) deferred. The native locale backend is
+# platform-specific: Windows keeps LocaleWin, macOS uses LocaleMac (.mm).
+if(MB_OS_WINDOWS)
+    list(FILTER BLINK_TEXT EXCLUDE REGEX "LocaleICU|LocaleMac")
+else()
+    list(FILTER BLINK_TEXT EXCLUDE REGEX "LocaleICU|LocaleWin")
+endif()
 # Deferred font backends: FontCustomPlatformData/FontCacheSkia (CoreText/fontconfig
 # platform-data), OpenTypeSanitizer (ots library my_ntohl), and the non-mac
 # platform subdirs (win/android/linux). fonts/shaping (harfbuzz) is kept.
@@ -113,7 +126,15 @@ list(FILTER BLINK_TEXT EXCLUDE REGEX "LocaleICU|LocaleWin")
 # <windows.h> include for its debug log -> deferred (4 symbols, not essential).
 # macOS uses CoreText FontCacheMac, not FontCacheSkia/Win. OpenTypeSanitizer now
 # kept (the ots lib is built; WOFF2 deferred).
-list(FILTER BLINK_FONTS EXCLUDE REGEX "FontCacheSkia|/win/|/android/|/linux/")
+# Font backend is platform-specific. macOS uses the CoreText FontCacheMac (.mm)
+# and excludes the skia/win/android/linux backends. Windows uses the skia-based
+# backend: fonts/skia (shared) + fonts/win (FontCacheSkiaWin, FontPlatformDataWin,
+# FontFallbackWin), excluding the mac/android/linux/fontconfig ones.
+if(MB_OS_WINDOWS)
+    list(FILTER BLINK_FONTS EXCLUDE REGEX "/mac/|/android/|/linux/|[Ff]ontconfig|FontCacheLinux|FontCacheAndroid")
+else()
+    list(FILTER BLINK_FONTS EXCLUDE REGEX "FontCacheSkia|/win/|/android/|/linux/")
+endif()
 
 # --- Platform infrastructure: the Platform interface, exported Web* wrappers,
 #     and support objects the heap (and the rest of blink) need at link time. ---
@@ -152,7 +173,8 @@ set_source_files_properties("${BSRC}/heap/UnifiedHeapController.cpp"
 
 add_library(blink_platform STATIC
     ${BLINK_CORE_SOURCES} ${BLINK_HEAP} ${BLINK_GRAPHICS} ${BLINK_TEXT}
-    ${BLINK_FONTS} ${BLINK_FONTS_MAC} ${BLINK_PLATFORM_MAC} ${BLINK_GEOMETRY_MAC} ${BLINK_SCROLL_MAC} ${BLINK_TEXT_MAC} ${BLINK_SUBLAYERS} ${BLINK_INFRA_SOURCES} ${BLINK_EXPORTED}
+    ${BLINK_FONTS} ${BLINK_FONTS_MAC} ${BLINK_PLATFORM_MAC} ${BLINK_GEOMETRY_MAC} ${BLINK_SCROLL_MAC} ${BLINK_TEXT_MAC}
+    ${BLINK_PLATFORM_WIN} ${BLINK_SUBLAYERS} ${BLINK_INFRA_SOURCES} ${BLINK_EXPORTED}
     ${BLINK_BASE_SHIM})
 # alias.cc is plain Chromium base, not WTF: don't force-include WTF's config.h.
 set_source_files_properties("${BLINK_BASE_SHIM}" PROPERTIES COMPILE_OPTIONS "")
