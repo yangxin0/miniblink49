@@ -349,7 +349,10 @@ bool ThemePainter::paintCheckboxUsingFallbackTheme(LayoutObject* o, const PaintI
         i.context->translate(-unzoomedRect.x(), -unzoomedRect.y());
     }
 
-    Platform::current()->fallbackThemeEngine()->paint(canvas, WebFallbackThemeEngine::PartCheckbox, getWebFallbackThemeState(o), WebRect(unzoomedRect), &extraParams);
+    // macOS port has no fallback theme engine; skip painting (size was already
+    // applied) rather than dereferencing null.
+    if (Platform::current()->fallbackThemeEngine())
+        Platform::current()->fallbackThemeEngine()->paint(canvas, WebFallbackThemeEngine::PartCheckbox, getWebFallbackThemeState(o), WebRect(unzoomedRect), &extraParams);
     return false;
 }
 
@@ -371,7 +374,8 @@ bool ThemePainter::paintRadioUsingFallbackTheme(LayoutObject* o, const PaintInfo
         i.context->translate(-unzoomedRect.x(), -unzoomedRect.y());
     }
 
-    Platform::current()->fallbackThemeEngine()->paint(canvas, WebFallbackThemeEngine::PartRadio, getWebFallbackThemeState(o), WebRect(unzoomedRect), &extraParams);
+    if (Platform::current()->fallbackThemeEngine())
+        Platform::current()->fallbackThemeEngine()->paint(canvas, WebFallbackThemeEngine::PartRadio, getWebFallbackThemeState(o), WebRect(unzoomedRect), &extraParams);
     return false;
 }
 

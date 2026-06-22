@@ -913,7 +913,12 @@ void LayoutTheme::adjustCheckboxStyleUsingFallbackTheme(ComputedStyle& style, El
     if (!style.width().isIntrinsicOrAuto() && !style.height().isAuto())
         return;
 
-    IntSize size = Platform::current()->fallbackThemeEngine()->getSize(WebFallbackThemeEngine::PartCheckbox);
+    // The macOS port provides no fallback theme engine; fall back to the classic
+    // 13x13 control size instead of dereferencing a null engine.
+    WebFallbackThemeEngine* fallbackEngine = Platform::current()->fallbackThemeEngine();
+    IntSize size(13, 13);
+    if (fallbackEngine)
+        size = fallbackEngine->getSize(WebFallbackThemeEngine::PartCheckbox);
     float zoomLevel = style.effectiveZoom();
     size.setWidth(size.width() * zoomLevel);
     size.setHeight(size.height() * zoomLevel);
@@ -933,7 +938,10 @@ void LayoutTheme::adjustRadioStyleUsingFallbackTheme(ComputedStyle& style, Eleme
     if (!style.width().isIntrinsicOrAuto() && !style.height().isAuto())
         return;
 
-    IntSize size = Platform::current()->fallbackThemeEngine()->getSize(WebFallbackThemeEngine::PartRadio);
+    WebFallbackThemeEngine* fallbackEngine = Platform::current()->fallbackThemeEngine();
+    IntSize size(13, 13);
+    if (fallbackEngine)
+        size = fallbackEngine->getSize(WebFallbackThemeEngine::PartRadio);
     float zoomLevel = style.effectiveZoom();
     size.setWidth(size.width() * zoomLevel);
     size.setHeight(size.height() * zoomLevel);
