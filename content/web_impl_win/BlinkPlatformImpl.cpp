@@ -477,6 +477,16 @@ void BlinkPlatformImpl::initialize(bool ocEnable)
     for (size_t i = 0; v8flags[i]; i++) {
         v8::V8::SetFlagsFromString(v8flags[i], strlen(v8flags[i]));
     }
+#if defined(__APPLE__)
+    // Stability: WebAssembly's code allocator/GC (WasmCodeAllocator::FreeCode)
+    // hits a fatal V8 CHECK on this arm64/macOS build (JIT W^X executable-memory
+    // handling), aborting the whole app on wasm-using sites (e.g. bilibili).
+    // Disable wasm so those sites fall back to their JS paths instead of crashing.
+    {
+        const char kNoWasm[] = "--no-expose-wasm";
+        v8::V8::SetFlagsFromString(kNoWasm, sizeof(kNoWasm) - 1);
+    }
+#endif
 
     gfx::win::InitDeviceScaleFactor();
     BlinkPlatformImpl* platform = new BlinkPlatformImpl();
