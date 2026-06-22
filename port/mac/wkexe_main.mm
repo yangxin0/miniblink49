@@ -147,6 +147,17 @@ static void onTitleChanged(wkeWebView, void*, const wkeString title) {  // -> wi
 @interface WkeExeDelegate : NSObject <NSApplicationDelegate, NSWindowDelegate> @end
 @implementation WkeExeDelegate
 - (BOOL)applicationShouldTerminateAfterLastWindowClosed:(NSApplication*)s { return YES; }
+// Keep the web view sized to the window (in physical pixels) as it resizes,
+// otherwise the page only paints in its original area and the rest stays blank.
+- (void)windowDidResize:(NSNotification*)note {
+    if (!g_webView) return;
+    NSRect b = [g_contentView bounds];
+    int w = (int)(b.size.width * g_scale), h = (int)(b.size.height * g_scale);
+    if (w <= 0 || h <= 0) return;
+    wkeResize(g_webView, w, h);
+    wkeRepaintIfNeeded(g_webView);
+    [g_contentView setNeedsDisplay:YES];
+}
 - (BOOL)windowShouldClose:(NSWindow*)w {
     NSAlert* a = [[NSAlert alloc] init];
     a.messageText = @"确定要退出程序吗？";   // "Quit the program?" (matches wkexe)
