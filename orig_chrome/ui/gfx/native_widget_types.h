@@ -112,7 +112,14 @@ typedef struct _AtkObject AtkObject;
 
 namespace gfx {
 
-#if defined(USE_AURA)
+#if defined(OS_WIN)
+// miniblink is a Win32 app (no Aura): native widget types are the raw Win32
+// handles, matching the historical Windows build.
+typedef HCURSOR NativeCursor;
+typedef HWND NativeView;
+typedef HWND NativeWindow;
+typedef MSG NativeEvent;
+#elif defined(USE_AURA)
 typedef ui::Cursor NativeCursor;
 typedef aura::Window* NativeView;
 typedef aura::Window* NativeWindow;

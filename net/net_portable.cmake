@@ -30,18 +30,26 @@ list(FILTER NET_PORTABLE_SRC EXCLUDE REGEX "/(SSLHandle|SharedMemoryReceivedData
 add_library(net_portable STATIC ${NET_PORTABLE_SRC})
 target_link_libraries(net_portable PUBLIC blink_web)
 target_include_directories(net_portable PUBLIC
-    "${CMAKE_SOURCE_DIR}" "${CMAKE_SOURCE_DIR}/wke" "${CMAKE_SOURCE_DIR}/win_compat"
+    "${CMAKE_SOURCE_DIR}" "${CMAKE_SOURCE_DIR}/wke"
     "${CMAKE_SOURCE_DIR}/third_party/libcurl_7.69/include" "${CMAKE_SOURCE_DIR}/third_party/npapi"
     "${CMAKE_SOURCE_DIR}/third_party/v8shim" "${CMAKE_SOURCE_DIR}/third_party/khronos"
     "${CMAKE_SOURCE_DIR}/third_party/skia/include/core" "${CMAKE_SOURCE_DIR}/third_party/skia/include/config")
+if(NOT MB_OS_WINDOWS)
+    target_include_directories(net_portable PUBLIC "${CMAKE_SOURCE_DIR}/win_compat")
+endif()
 target_compile_definitions(net_portable PUBLIC "V8CALL=" ENABLE_WKE=1 BLINK_IMPLEMENTATION=1
     V8_COMPRESS_POINTERS V8_31BIT_SMIS_ON_64BIT_ARCH V8_REVERSE_JSARGS)
 # net uses Win32 types but relies on Windows PCH inclusion; force-include the shim.
 # SHELL: keeps the "-include <path>" pair together — CMake otherwise de-duplicates
 # the bare "-include" token against the inherited "-include config.h", orphaning
 # config.h as a stray input ("cannot specify -o when generating multiple files").
-target_compile_options(net_portable PRIVATE
-    "SHELL:-include ${CMAKE_SOURCE_DIR}/win_compat/windows.h")
+if(MSVC)
+    # Real SDK windows.h + shellapi.h (ShellExecute, trimmed out by WIN32_LEAN_AND_MEAN).
+    target_compile_options(net_portable PRIVATE "/FIwindows.h" "/FIshellapi.h")
+else()
+    target_compile_options(net_portable PRIVATE
+        "SHELL:-include ${CMAKE_SOURCE_DIR}/win_compat/windows.h")
+endif()
 set_target_properties(net_portable PROPERTIES CXX_STANDARD 14)
 if(NOT MSVC)
     target_compile_options(net_portable PRIVATE
