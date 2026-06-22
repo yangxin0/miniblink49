@@ -30,6 +30,14 @@ if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
     set(CMAKE_BUILD_TYPE "Release" CACHE STRING "Build type" FORCE)
 endif()
 
+# The pinned V8 8.7 monolith is built with the STATIC C runtime (/MT, is_debug=false).
+# Every target that links it must use the same CRT or the linker reports duplicate /
+# missing CRT symbols, so force the static runtime for all MSVC targets. (CMP0091 is
+# NEW because cmake_minimum_required >= 3.16.)
+if(MSVC)
+    set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded")
+endif()
+
 # Per-platform definitions consumed by ported code via #ifdef.
 add_compile_definitions(
     $<$<BOOL:${MB_OS_WINDOWS}>:MB_OS_WINDOWS=1>

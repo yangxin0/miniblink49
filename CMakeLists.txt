@@ -35,7 +35,19 @@ include(Platform)
 # Point this at the V8 checkout built by tools/build-v8-8.7-macos.sh.
 set(MINIBLINK_V8_ROOT "$ENV{HOME}/build/v8-8.7/v8" CACHE PATH
     "Path to the pinned V8 8.7 checkout (contains include/ and out/<cpu>.release)")
-set(MINIBLINK_V8_OUT "out/${CMAKE_SYSTEM_PROCESSOR}.release" CACHE STRING
+
+# The monolith archive name and the conventional out/<cpu>.release subdir differ
+# per platform/toolchain:
+#   macOS/Linux (ar)  : out/<cpu>.release/obj/libv8_monolith.a
+#   Windows (clang-cl): out/x64.release/obj/v8_monolith.lib
+if(WIN32)
+    set(_v8_cpu "x64")
+    set(_v8_libfile "v8_monolith.lib")
+else()
+    set(_v8_cpu "${CMAKE_SYSTEM_PROCESSOR}")
+    set(_v8_libfile "libv8_monolith.a")
+endif()
+set(MINIBLINK_V8_OUT "out/${_v8_cpu}.release" CACHE STRING
     "V8 build output subdir under MINIBLINK_V8_ROOT")
 
 # ---- Output layout ----------------------------------------------------------
@@ -182,7 +194,7 @@ if(MINIBLINK_BUILD_BLINK)
 endif()
 
 # ---- Imported V8 monolith target -------------------------------------------
-set(_v8_lib "${MINIBLINK_V8_ROOT}/${MINIBLINK_V8_OUT}/obj/libv8_monolith.a")
+set(_v8_lib "${MINIBLINK_V8_ROOT}/${MINIBLINK_V8_OUT}/obj/${_v8_libfile}")
 set(_v8_inc "${MINIBLINK_V8_ROOT}/include")
 if(EXISTS "${_v8_lib}")
     add_library(v8_monolith STATIC IMPORTED GLOBAL)
@@ -197,6 +209,13 @@ if(EXISTS "${_v8_lib}")
         # info[1] returns the receiver/Holder, so every multi-arg DOM constructor
         # (new URL/Event/MouseEvent...) reads garbage and segfaults.
         INTERFACE_COMPILE_DEFINITIONS "V8_COMPRESS_POINTERS;V8_31BIT_SMIS_ON_64BIT_ARCH;V8_REVERSE_JSARGS")
+    if(WIN32)
+        # The Windows V8 monolith references these OS import libraries (high-res
+        # timers, stack symbolisation, registry/path helpers, sockets). Expose
+        # them to every consumer of v8_monolith.
+        set_property(TARGET v8_monolith PROPERTY INTERFACE_LINK_LIBRARIES
+            winmm dbghelp shlwapi advapi32 ws2_32 userenv psapi version)
+    endif()
     set(MINIBLINK_HAVE_V8 TRUE)
 
     # Smoke test: prove the engine links + runs JavaScript through CMake.
