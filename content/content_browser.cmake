@@ -34,10 +34,10 @@ if(MB_OS_WINDOWS)
 
     file(GLOB CB_NPAPI "${C}/web_impl_win/npapi/*.cpp")
     list(FILTER CB_NPAPI EXCLUDE REGEX "/mutil_thread_np/")
-    # NetscapePlugInStreamLoader / PluginStream couple to blink-53 internals
-    # (ResourceLoader/DocumentLoader) that have API-skewed; not needed for the
-    # core plugin DB/package path. Defer them.
-    list(FILTER CB_NPAPI EXCLUDE REGEX "NetscapePlugInStreamLoader\\.cpp$|/PluginStream\\.cpp$")
+    # NetscapePlugInStreamLoader couples to blink-53 ResourceLoader internals that
+    # have API-skewed (not on the core path); defer it. PluginStream is needed by
+    # WebPluginImpl, so it's kept.
+    list(FILTER CB_NPAPI EXCLUDE REGEX "NetscapePlugInStreamLoader\\.cpp$")
     list(APPEND CB_IMPL_WIN ${CB_NPAPI}
         # Stubs for the optional VIP subsystems the Windows content references but
         # that we don't build (OrigChromeMgr/LayerTreeWrap heavyweight mode; the
