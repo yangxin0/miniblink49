@@ -40,10 +40,17 @@ list(FILTER BLINK_CORE_SRC EXCLUDE REGEX "HTMLMetaElement-in\\.cpp$")
 # nested-subdir stragglers: API skews / platform variants (HTMLParserScheduler
 # recovered by the workflow).
 list(FILTER BLINK_CORE_SRC EXCLUDE REGEX "CustomElementNone\\.cpp$|CanvasRenderingContextFactory\\.cpp$")
-# layout: non-mac platform themes (we keep LayoutThemeMac). LayoutText/LayoutReplaced recovered.
-list(FILTER BLINK_CORE_SRC EXCLUDE REGEX "LayoutTheme(Android|Default|Linux|Win|FontProviderWin)\\.cpp$")
-# paint: non-mac theme painter (we keep the mac path).
-list(FILTER BLINK_CORE_SRC EXCLUDE REGEX "ThemePainterDefault\\.cpp$")
+# layout/paint native theme is platform-specific. macOS keeps LayoutThemeMac +
+# ThemePainterMac (and drops the others). Windows keeps LayoutThemeWin /
+# LayoutThemeDefault / LayoutFontProviderWin + ThemePainterDefault.
+if(MB_OS_WINDOWS)
+    list(FILTER BLINK_CORE_SRC EXCLUDE REGEX "LayoutTheme(Android|Linux|FontProviderAndroid|FontProviderLinux)\\.cpp$")
+    # SmartReplaceCF is the CoreFoundation (mac) variant; Windows uses SmartReplaceICU.
+    list(FILTER BLINK_CORE_SRC EXCLUDE REGEX "SmartReplaceCF\\.cpp$")
+else()
+    list(FILTER BLINK_CORE_SRC EXCLUDE REGEX "LayoutTheme(Android|Default|Linux|Win|FontProviderWin)\\.cpp$")
+    list(FILTER BLINK_CORE_SRC EXCLUDE REGEX "ThemePainterDefault\\.cpp$")
+endif()
 # InspectorNone.cpp is the inspector-DISABLED stub (empty InspectorInstrumentation/
 # TraceEvents/BaseAgent/TaskRunner bodies). We build the REAL inspector, so exclude
 # the stub to avoid duplicate-symbol collisions at the final binary link.
@@ -52,7 +59,9 @@ list(FILTER BLINK_CORE_SRC EXCLUDE REGEX "/InspectorNone\\.cpp$")
 # v8::V8::TerminateExecution -> isolate->TerminateExecution migration; GcTimeScheduler.h
 # Windows memory-query guarded with a macOS mach task_info port).
 
-list(APPEND BLINK_CORE_SRC "${CSRC}/layout/LayoutThemeMac.mm" "${CSRC}/paint/ThemePainterMac.mm")
+if(APPLE)
+    list(APPEND BLINK_CORE_SRC "${CSRC}/layout/LayoutThemeMac.mm" "${CSRC}/paint/ThemePainterMac.mm")
+endif()
 add_library(blink_core STATIC ${BLINK_CORE_SRC})
 
 target_link_libraries(blink_core PUBLIC blink_platform)
@@ -60,8 +69,20 @@ target_link_libraries(blink_core PUBLIC blink_platform)
 target_include_directories(blink_core PUBLIC
     "${CMAKE_SOURCE_DIR}/third_party/v8shim"     # v8-debug.h compatibility shim
     "${CMAKE_SOURCE_DIR}/third_party/khronos"    # in-tree GLES2/GLES3/EGL headers
-    "${CMAKE_SOURCE_DIR}/win_compat"             # <windows.h> shim (wke API surface)
     "${CMAKE_SOURCE_DIR}/third_party/npapi")     # bindings/npapi.h (HTMLPlugInElement)
+# win_compat is the <windows.h> shim for NON-Windows builds; on Windows the real
+# SDK windows.h is used (the shim #errors if included on Windows).
+if(NOT MB_OS_WINDOWS)
+    target_include_directories(blink_core PUBLIC "${CMAKE_SOURCE_DIR}/win_compat")
+else()
+    # Bundled libxml2/libxslt headers (XMLDocumentParser, TransformSource); macOS
+    # uses the system libxml2/libxslt. win32/include carries the pre-generated
+    # xmlversion.h config (must precede src/include).
+    target_include_directories(blink_core PRIVATE
+        "${CMAKE_SOURCE_DIR}/third_party/libxml/win32/include"
+        "${CMAKE_SOURCE_DIR}/third_party/libxml/src/include"
+        "${CMAKE_SOURCE_DIR}/third_party/libxslt")
+endif()
 
 target_compile_definitions(blink_core PUBLIC "V8CALL=" ENABLE_WKE=1)
 

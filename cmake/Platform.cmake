@@ -58,5 +58,7 @@ add_compile_definitions(
 if(MB_OS_WINDOWS)
     # NOMINMAX: stop windows.h defining min()/max() macros, which otherwise hijack
     # std::numeric_limits<T>::max() etc. in WTF (CheckedArithmetic.h) and elsewhere.
-    add_compile_definitions(UNICODE _UNICODE NOMINMAX)
+    # WIN32_LEAN_AND_MEAN: trim windows.h's surface so its macros (DrawText, GetObject,
+    # CreateWindow, ...) don't clash with blink method names of the same name.
+    add_compile_definitions(UNICODE _UNICODE NOMINMAX WIN32_LEAN_AND_MEAN)
 endif()
