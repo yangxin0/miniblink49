@@ -192,7 +192,7 @@ if(MINIBLINK_BUILD_BLINK)
         set(_mb_syslibs
             winmm dbghelp shlwapi advapi32 ws2_32 userenv psapi version
             gdi32 user32 ole32 oleaut32 comdlg32 winspool shell32 comctl32 imm32
-            usp10 crypt32 wininet)
+            usp10 crypt32 wininet wldap32 normaliz)  # wldap32: libcurl LDAP backend
 
         function(mb_windows_link tgt)
             target_include_directories(${tgt} PRIVATE "${CMAKE_SOURCE_DIR}" "${CMAKE_SOURCE_DIR}/wke")

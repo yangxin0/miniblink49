@@ -33,7 +33,10 @@ target_compile_definitions(mb_libxslt PRIVATE _CRT_SECURE_NO_WARNINGS _CRT_NONST
 target_link_libraries(mb_libxslt PUBLIC mb_libxml)
 
 # --- libcurl (net loader/cookies/websocket) ---------------------------------
-file(GLOB _mb_curl_src "${CMAKE_SOURCE_DIR}/third_party/libcurl_7.69/src/*.c")
+# Recurse to pick up vtls/ (SSL dispatch — Curl_ssl_config_matches), vauth/, etc.
+# The optional SSL/SSH/QUIC backends are #ifdef-guarded (USE_OPENSSL/USE_LIBSSH/...)
+# and compile to near-empty without those libs.
+file(GLOB_RECURSE _mb_curl_src "${CMAKE_SOURCE_DIR}/third_party/libcurl_7.69/src/*.c")
 add_library(mb_libcurl STATIC ${_mb_curl_src})
 target_include_directories(mb_libcurl PUBLIC
     "${CMAKE_SOURCE_DIR}/third_party/libcurl_7.69/include"

@@ -102,7 +102,12 @@ if(MB_OS_WINDOWS)
     # blink's shaping/break iteration need). macOS gets these from system libicucore;
     # on Windows compile it here so it inherits wtf's config.h force-include + Unicode
     # types (it pulls wtf/text/qt4/UnicodeQt4.h).
-    target_sources(wtf PRIVATE "${CMAKE_SOURCE_DIR}/third_party/icu/source/uchar.cpp")
+    target_sources(wtf PRIVATE
+        "${CMAKE_SOURCE_DIR}/third_party/icu/source/uchar.cpp"
+        # No-op stubs for the full-ICU normalization/property funcs harfbuzz's
+        # hb-icu.cc needs (unorm2_*, u_getCombiningClass, ...) — not in the minimal
+        # in-tree ICU; macOS links system libicucore for them.
+        "${CMAKE_SOURCE_DIR}/third_party/icu/source/icu_hbicu_stubs_win.cpp")
 endif()
 # Force-include the WTF/blink config bootstrap (MSVC spells it /FI, clang -include).
 if(MSVC)
