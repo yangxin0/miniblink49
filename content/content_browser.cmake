@@ -24,6 +24,22 @@ file(GLOB CB_DEVTOOLS  "${C}/devtools/*.cpp")       # inspector agent/client glu
 if(MB_OS_WINDOWS)
     list(FILTER CB_IMPL_WIN EXCLUDE REGEX "/(WebURLLoaderImpl|WebCookieJarINetImpl|w3client)\\.cpp$")
     set(CB_IMPL_MAC "")
+    # Windows compiles the real NPAPI plugin support (PluginPackage/Database,
+    # WebPluginImpl, s_wkeBrowserFuncs) from web_impl_win/npapi/ — macOS stubs it.
+    # The mutil_thread_np/ variant is the alternate multi-thread NP impl; skip it
+    # to avoid duplicate symbols.
+    file(GLOB CB_NPAPI "${C}/web_impl_win/npapi/*.cpp")
+    list(FILTER CB_NPAPI EXCLUDE REGEX "/mutil_thread_np/")
+    # NetscapePlugInStreamLoader / PluginStream couple to blink-53 internals
+    # (ResourceLoader/DocumentLoader) that have API-skewed; not needed for the
+    # core plugin DB/package path. Defer them.
+    list(FILTER CB_NPAPI EXCLUDE REGEX "NetscapePlugInStreamLoader\\.cpp$|/PluginStream\\.cpp$")
+    list(APPEND CB_IMPL_WIN ${CB_NPAPI}
+        # Stubs for the optional VIP subsystems the Windows content references but
+        # that we don't build (OrigChromeMgr/LayerTreeWrap heavyweight mode; the
+        # mbvip printing/pdfium stack; DPI init). The real WkePrinting.cpp /
+        # OrigChromeStubs.cpp pull in pdfium + duplicate g_uiThreadHeartbeatCallback.
+        "${CMAKE_SOURCE_DIR}/content/web_impl_win/MbWinOptionalStubs.cpp")
 else()
     list(FILTER CB_IMPL_WIN EXCLUDE REGEX "/(WebURLLoaderImpl|WebCookieJarINetImpl|WebClipboardImpl|w3client)\\.cpp$")
 endif()
@@ -33,6 +49,7 @@ add_library(content_browser STATIC ${CB_BROWSER} ${CB_IMPL_WIN} ${CB_IMPL_MAC} $
 target_link_libraries(content_browser PUBLIC blink_web net_portable wke_globals)
 target_include_directories(content_browser PUBLIC
     "${CMAKE_SOURCE_DIR}" "${CMAKE_SOURCE_DIR}/content" "${CMAKE_SOURCE_DIR}/wke"
+    "${CMAKE_SOURCE_DIR}/mbvip"   # features/printing/WkePrinting.h (Win printing)
     "${CMAKE_SOURCE_DIR}/third_party/npapi"
     "${CMAKE_SOURCE_DIR}/third_party/v8shim" "${CMAKE_SOURCE_DIR}/third_party/khronos"
     "${CMAKE_SOURCE_DIR}/third_party/skia/include/core"
@@ -62,7 +79,8 @@ if(MSVC)
     # web_impl_win files use: mmsystem (timeBeginPeriod), objbase/ole2 (CoInitializeEx,
     # OleInitialize).
     target_compile_options(content_browser PRIVATE
-        "/GR-" "/FIwindows.h" "/FImmsystem.h" "/FIobjbase.h" "/FIole2.h" "/FIcommdlg.h")
+        "/GR-" "/FIwindows.h" "/FImmsystem.h" "/FIobjbase.h" "/FIole2.h" "/FIcommdlg.h"
+        "/FIwinspool.h")  # WkePrinting: PRINTER_INFO_2, DocumentProperties, EnumForms
 else()
     target_compile_options(content_browser PRIVATE
         -fdeclspec -fno-exceptions -fno-rtti -w

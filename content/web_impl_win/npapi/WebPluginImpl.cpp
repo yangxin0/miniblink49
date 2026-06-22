@@ -422,7 +422,7 @@ void WebPluginImpl::stop()
 
     PluginMainThreadScheduler::scheduler().unregisterPlugin(m_instance);
 
-    // ÕâÀïµ÷ÓÃdestroy»áÓÐÎÊÌâ£¬Èç¹ûÊÇÔÚ_NPN_Evaluate×ßµ½ÕâÀïµÄ»°¡£Àý×Ó£ºhttp://music.yule.sohu.com/20170926/n514522612.shtml
+    // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½destroyï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½â£¬ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½_NPN_Evaluateï¿½ßµï¿½ï¿½ï¿½ï¿½ï¿½Ä»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ó£ï¿½http://music.yule.sohu.com/20170926/n514522612.shtml
     blink::Platform::current()->currentThread()->addTaskObserver(new DestroyNpTask(m_plugin->pluginFuncs()->destroy, m_instance));
 }
 
@@ -511,7 +511,11 @@ void WebPluginImpl::performRequest(PluginRequest* request)
 
         CString cstr;        
         if (result->IsString()) {
-#if V8_MAJOR_VERSION > 5
+#if V8_MAJOR_VERSION > 7
+            // V8 8.7: Value::ToString takes a Local<Context> and returns MaybeLocal.
+            v8::Local<v8::String> v8String = result->ToString(
+                toIsolate(m_parentFrame)->GetCurrentContext()).ToLocalChecked();
+#elif V8_MAJOR_VERSION > 5
             v8::Local<v8::String> v8String = result->ToString(toIsolate(m_parentFrame));
 #else
             v8::Local<v8::String> v8String = result->ToString();
@@ -1204,7 +1208,7 @@ NPError WebPluginImpl::getValue(NPNVariable variable, void* value)
         if (!page)
             return NPERR_GENERIC_ERROR;
         //*((NPBool*)value) = page->usesEphemeralSession();
-        *((NPBool*)value) = false; // ÊÇ·ñ´¦ÓÚË½ÈËÄ£Ê½
+        *((NPBool*)value) = false; // ï¿½Ç·ï¿½ï¿½ï¿½Ë½ï¿½ï¿½Ä£Ê½
         return NPERR_NO_ERROR;
     }
 
