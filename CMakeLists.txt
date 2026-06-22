@@ -142,6 +142,22 @@ if(MINIBLINK_BUILD_BLINK)
             -licucore -lxml2 -lxslt -lz -lcurl
             "-framework Cocoa" "-framework CoreText" "-framework CoreGraphics"
             "-framework CoreFoundation" "-framework Foundation" "-framework AppKit" "-framework Carbon")
+
+        # wkexe: macOS port of the Windows wkexe standalone runner (wkexe/) on the
+        # wke lib — opens an HTML file or URL (CLI: [file-or-url] [-t|--transparent]).
+        add_executable(wkexe "${CMAKE_SOURCE_DIR}/port/mac/wkexe_main.mm")
+        set_target_properties(wkexe PROPERTIES CXX_STANDARD 14)
+        target_include_directories(wkexe PRIVATE "${CMAKE_SOURCE_DIR}" "${CMAKE_SOURCE_DIR}/wke" "${CMAKE_SOURCE_DIR}/win_compat")
+        target_compile_options(wkexe PRIVATE -fdeclspec -fno-exceptions -Wno-deprecated-declarations)
+        target_link_libraries(wkexe PRIVATE
+            -Wl,-force_load,$<TARGET_FILE:wke> -Wl,-force_load,$<TARGET_FILE:wke_globals>
+            -Wl,-force_load,$<TARGET_FILE:blink_bindings_infra>
+            content_browser mc net_portable blink_web blink_modules blink_bindings blink_core
+            blink_generated blink_platform blink_heap_asm wtf skia_ext skia harfbuzz
+            miniblink_png miniblink_jpeg miniblink_webp miniblink_ots gin base "${_v8mono}"
+            -licucore -lxml2 -lxslt -lz -lcurl
+            "-framework Cocoa" "-framework CoreText" "-framework CoreGraphics"
+            "-framework CoreFoundation" "-framework Foundation" "-framework AppKit" "-framework Carbon")
     endif()
 
     add_subdirectory(test/blink)  # smoke test: prove geometry links + computes
