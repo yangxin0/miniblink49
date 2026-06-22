@@ -96,7 +96,11 @@ list(FILTER BLINK_SUBLAYERS EXCLUDE REGEX "Test\\.cpp$")
 # KURL_w (copyASCII skew) variants are not used on macOS.
 list(FILTER BLINK_SUBLAYERS EXCLUDE REGEX "KURL_new\\.cpp$|KURL_w\\.cpp$|KURL_a\\.cpp$")
 # clipboard: keep the Posix variant; the Win one needs shlwapi.h.
-list(FILTER BLINK_SUBLAYERS EXCLUDE REGEX "ClipboardUtilitiesWin\\.cpp$")
+# ClipboardUtilitiesWin (replaceNewlinesWithWindowsStyleNewlines, used by core
+# Pasteboard/DataTransfer + web) is kept on Windows; macOS uses the posix variant.
+if(NOT MB_OS_WINDOWS)
+    list(FILTER BLINK_SUBLAYERS EXCLUDE REGEX "ClipboardUtilitiesWin\\.cpp$")
+endif()
 # image codecs: GDIPlus is Win-only. JPEGImageDecoder kept (libjpeg enum-boolean
 # fixed by pre-defining TRUE/FALSE before jpeglib.h).
 list(FILTER BLINK_SUBLAYERS EXCLUDE REGEX "/GDIPlus")
@@ -159,6 +163,12 @@ if(APPLE AND CMAKE_SYSTEM_PROCESSOR MATCHES "arm64|aarch64")
     add_library(blink_heap_asm STATIC "${BSRC}/heap/asm/SaveRegisters_arm64_mac.S")
     set_source_files_properties("${BSRC}/heap/asm/SaveRegisters_arm64_mac.S"
         PROPERTIES LANGUAGE ASM)
+elseif(MB_OS_WINDOWS)
+    # Oilpan conservative stack scan: pushAllRegisters, the MASM x64 routine.
+    enable_language(ASM_MASM)
+    add_library(blink_heap_asm STATIC "${BSRC}/heap/asm/SaveRegisters_x64.asm")
+    set_source_files_properties("${BSRC}/heap/asm/SaveRegisters_x64.asm"
+        PROPERTIES LANGUAGE ASM_MASM)
 endif()
 
 # base::debug::Alias — a tiny no-op blink references to defeat optimization. Pull
@@ -207,9 +217,10 @@ if(APPLE)
     target_link_libraries(blink_platform PUBLIC
         icucore "-framework CoreText" "-framework CoreGraphics"
         "-framework CoreFoundation")
-    if(TARGET blink_heap_asm)
-        target_link_libraries(blink_platform PUBLIC blink_heap_asm)
-    endif()
+endif()
+# Oilpan stack-scan asm (arm64-mac / x64-win) when present, on both platforms.
+if(TARGET blink_heap_asm)
+    target_link_libraries(blink_platform PUBLIC blink_heap_asm)
 endif()
 
 # blink/WTF need the config bootstrap force-included (MSVC spells it /FI, clang

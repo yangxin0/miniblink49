@@ -98,6 +98,11 @@ if(MB_OS_WINDOWS)
     target_include_directories(wtf PRIVATE
         "${CMAKE_SOURCE_DIR}/third_party/icu/source/common"
         "${CMAKE_SOURCE_DIR}/third_party/icu/source/i18n")
+    # The minimal WTF-integrated ICU (u_charType, uscript_getScript/hasScript that
+    # blink's shaping/break iteration need). macOS gets these from system libicucore;
+    # on Windows compile it here so it inherits wtf's config.h force-include + Unicode
+    # types (it pulls wtf/text/qt4/UnicodeQt4.h).
+    target_sources(wtf PRIVATE "${CMAKE_SOURCE_DIR}/third_party/icu/source/uchar.cpp")
 endif()
 # Force-include the WTF/blink config bootstrap (MSVC spells it /FI, clang -include).
 if(MSVC)

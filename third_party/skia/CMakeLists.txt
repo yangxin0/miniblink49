@@ -47,10 +47,23 @@ set(SKIA_PORTS
     src/ports/SkDiscardableMemory_none.cpp
 )
 if(MB_OS_WINDOWS)
-    # GDI font host (DirectWrite/COM left for later) + Win32 file/TLS/time/debug.
+    # DirectWrite font host — blink's FontCacheSkiaWin calls SkFontMgr_New_DirectWrite
+    # — plus the COM/DWrite helpers, and Win32 file/TLS/time/debug.
     list(APPEND SKIA_PORTS
-        src/ports/SkFontHost_win.cpp
-        src/ports/SkFontMgr_win_gdi_factory.cpp
+        src/ports/SkFontHost_win.cpp          # SkFontMgr_New_GDI (FontCacheSkiaWin picks GDI or DW)
+        src/ports/SkFontMgr_win_dw.cpp
+        src/ports/SkFontMgr_win_dw_factory.cpp
+        src/ports/SkScalerContext_win_dw.cpp
+        src/ports/SkTypeface_win_dw.cpp
+        src/ports/SkRemotableFontMgr_win_dw.cpp
+        src/fonts/SkFontMgr_indirect.cpp      # SkFontMgr_Indirect (DW mgr base)
+        src/fonts/SkRemotableFontMgr.cpp
+        src/utils/win/SkDWrite.cpp
+        src/utils/win/SkDWriteFontFileStream.cpp
+        src/utils/win/SkDWriteGeometrySink.cpp
+        src/utils/win/SkHRESULT.cpp
+        src/utils/win/SkIStream.cpp
+        src/utils/win/SkAutoCoInitialize.cpp
         src/ports/SkOSFile_win.cpp
         src/ports/SkTime_win.cpp
         src/ports/SkTLS_win.cpp

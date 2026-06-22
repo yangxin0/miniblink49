@@ -42,4 +42,9 @@ target_compile_definitions(mb_libcurl PRIVATE
     CURL_STATICLIB BUILDING_LIBCURL _CRT_SECURE_NO_WARNINGS _CRT_NONSTDC_NO_DEPRECATE)
 target_link_libraries(mb_libcurl PUBLIC mb_zlib)
 
+# NOTE: the minimal ICU (third_party/icu/source/uchar.cpp — u_charType,
+# uscript_getScript/hasScript) is WTF-Unicode-integrated (umachine.h pulls
+# wtf/text/qt4/UnicodeQt4.h and reuses WTF's int types), so it is compiled inside
+# the wtf target (which force-includes config.h), not as a standalone lib.
+
 set(MB_THIRDPARTY_WIN_LIBS mb_libxslt mb_libxml mb_libcurl mb_zlib CACHE INTERNAL "")
