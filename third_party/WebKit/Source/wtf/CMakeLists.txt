@@ -80,14 +80,31 @@ if(APPLE)
         text/StringImplMac.mm   # WTF::StringImpl::operator NSString* (ObjC bridge)
         text/StringMac.mm       # WTF::String::String(NSString*)
     )
+elseif(MB_OS_WINDOWS)
+    # Win32 threading primitives (the posix/mac build uses ThreadingPthreads).
+    list(APPEND WTF_SOURCES
+        ThreadingWin.cpp
+        ThreadSpecificWin.cpp
+    )
 endif()
 
 list(TRANSFORM WTF_SOURCES PREPEND "${WSRC}/wtf/")
 
 add_library(wtf STATIC ${WTF_SOURCES})
 target_include_directories(wtf PUBLIC "${WSRC}" "${CMAKE_SOURCE_DIR}" "${CMAKE_SOURCE_DIR}/orig_chrome")
-# Force-include the WTF/blink config bootstrap.
-target_compile_options(wtf PRIVATE -include "${WSRC}/config.h")
+if(MB_OS_WINDOWS)
+    # Bundled ICU public headers (unicode/*.h) for TextCodecICU.cpp; macOS resolves
+    # these via the system ICU it links (-licucore).
+    target_include_directories(wtf PRIVATE
+        "${CMAKE_SOURCE_DIR}/third_party/icu/source/common"
+        "${CMAKE_SOURCE_DIR}/third_party/icu/source/i18n")
+endif()
+# Force-include the WTF/blink config bootstrap (MSVC spells it /FI, clang -include).
+if(MSVC)
+    target_compile_options(wtf PRIVATE "/FI${WSRC}/config.h")
+else()
+    target_compile_options(wtf PRIVATE -include "${WSRC}/config.h")
+endif()
 # OFFICIAL_BUILD makes WTF_HEAP_PROFILER_TYPE_NAME a no-op (the non-official path
 # needs getStringWithTypeName, which isn't available here).
 target_compile_definitions(wtf PRIVATE OFFICIAL_BUILD)
