@@ -59,15 +59,24 @@ add_library(gin STATIC ${GIN_SOURCES})
 # RTTI on, the derived typeinfo references the base typeinfo, which the V8 monolith
 # (built -fno-rtti) does not export -> undefined "typeinfo for
 # v8::ArrayBuffer::Allocator". Building this TU -fno-rtti drops the typeinfo chain.
-set_source_files_properties(array_buffer.cc PROPERTIES COMPILE_OPTIONS
-    "-include;${CMAKE_SOURCE_DIR}/third_party/WebKit/Source/config.h;-fdeclspec;-DOFFICIAL_BUILD;-fno-rtti")
+# The WTF config force-include and RTTI flags are spelled differently for MSVC
+# (/FI, /GR-) than for clang/gcc (-include, -fno-rtti). -fdeclspec is clang-only
+# (MSVC has __declspec natively).
+set(_wtf_cfg "${CMAKE_SOURCE_DIR}/third_party/WebKit/Source/config.h")
+if(MSVC)
+    set(_gin_ab_opts  "/FI${_wtf_cfg};/DOFFICIAL_BUILD;/GR-")
+    set(_gin_v8p_opts "/FI${_wtf_cfg};/DOFFICIAL_BUILD;/DINSIDE_BLINK")
+else()
+    set(_gin_ab_opts  "-include;${_wtf_cfg};-fdeclspec;-DOFFICIAL_BUILD;-fno-rtti")
+    set(_gin_v8p_opts "-include;${_wtf_cfg};-fdeclspec;-DOFFICIAL_BUILD;-DINSIDE_BLINK")
+endif()
+set_source_files_properties(array_buffer.cc PROPERTIES COMPILE_OPTIONS "${_gin_ab_opts}")
 
 # v8_platform.cc pulls blink Platform/WebThread + WTF headers; same config as
 # array_buffer.cc (WTF config force-include + flags). FROM_HERE is only defined by
 # WebTraceLocation.h under INSIDE_BLINK (a blink-impl-only macro); v8_task_runner.h
 # uses it inline, so define INSIDE_BLINK for this TU to get the blink FROM_HERE.
-set_source_files_properties(v8_platform.cc PROPERTIES COMPILE_OPTIONS
-    "-include;${CMAKE_SOURCE_DIR}/third_party/WebKit/Source/config.h;-fdeclspec;-DOFFICIAL_BUILD;-DINSIDE_BLINK")
+set_source_files_properties(v8_platform.cc PROPERTIES COMPILE_OPTIONS "${_gin_v8p_opts}")
 
 target_include_directories(gin PRIVATE
     "${CMAKE_SOURCE_DIR}"                              # gin/..., base/... (root base wins)

@@ -51,5 +51,7 @@ add_compile_definitions(
 # the ANSI (*A) variants and reject wchar_t* arguments (this matches what the
 # historical miniblink.vcxproj defined).
 if(MB_OS_WINDOWS)
-    add_compile_definitions(UNICODE _UNICODE)
+    # NOMINMAX: stop windows.h defining min()/max() macros, which otherwise hijack
+    # std::numeric_limits<T>::max() etc. in WTF (CheckedArithmetic.h) and elsewhere.
+    add_compile_definitions(UNICODE _UNICODE NOMINMAX)
 endif()
