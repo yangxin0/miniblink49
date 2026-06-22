@@ -38,7 +38,7 @@
 #include "gen/blink/platform/RuntimeEnabledFeatures.h"
 #if defined(_WIN32)
 // Windows-only printing implementation (mbvip/printing); not built on macOS.
-#include "printing/WkePrinting.h"
+#include "features/printing/WkePrinting.h"
 #endif
 #include "wtf/text/WTFString.h"
 #include "wtf/text/WTFStringUtil.h"

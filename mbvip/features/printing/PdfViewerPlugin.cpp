@@ -1,8 +1,8 @@
 
-#include "printing/PdfViewerPlugin.h"
-#include "printing/PdfiumLoad.h"
-#include "printing/PrintingUtil.h"
-#include "printing/PdfViewerHtml.h"
+#include "features/printing/PdfViewerPlugin.h"
+#include "features/printing/PdfiumLoad.h"
+#include "features/printing/PrintingUtil.h"
+#include "features/printing/PdfViewerHtml.h"
 #include "common/LiveIdDetect.h"
 #include "common/ThreadCall.h"
 #include "common/StringUtil.h"
@@ -314,7 +314,7 @@ PdfViewerPlugin::PdfViewerPlugin(wkeWebView parentWebview, const char* url)
     }));
 
     wkeLoadHtmlWithBaseUrl(m_webview, (const utf8 *)kPdfViewerHtml, "PdfViewer.html");
-    //wkeLoadURL(m_webview, "file:///G:/mycode/mb/mbvip/printing/PdfViewer_zh.htm");
+    //wkeLoadURL(m_webview, "file:///G:/mycode/mb/mbvip/features/printing/PdfViewer_zh.htm");
 }
 
 PdfViewerPlugin::~PdfViewerPlugin()

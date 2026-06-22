@@ -1,9 +1,9 @@
 
-#include "download/SimpleDownload.h"
+#include "features/download/SimpleDownload.h"
 
 #include "common/ThreadCall.h"
 #include "common/LiveIdDetect.h"
-#include "download/DownloadUtil.h"
+#include "features/download/DownloadUtil.h"
 #include "wke/wkedefine.h"
 #include "base/strings/string_util.h"
 #include <process.h>

@@ -12,7 +12,7 @@
 #include "core/PromptWnd.h"
 
 #if 1 // ENABLE_IN_MB_MAIN
-#include "printing/PdfViewerPluginFunc.h"
+#include "features/printing/PdfViewerPluginFunc.h"
 #endif
 
 #include "common/ThreadCall.h"

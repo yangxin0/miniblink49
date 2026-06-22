@@ -1,17 +1,15 @@
 ﻿
 #define _CRT_NON_CONFORMING_SWPRINTFS 1
 
-#include "content/browser/WebPage.h"
-#include "wke/wkeWebView.h"
-#include "printing/WkePrinting.h"
-#include "printing/PdfiumLoad.h"
-#include "printing/PrintingUtil.h"
-#include "printing/PdfViewerPlugin.h"
-#include "printing/PrintingSetting.h"
-// #include "core/mb.h"
-// #include "core/MbWebView.h"
+#include "features/printing/printing.h"
+#include "features/printing/PrintingPageHtml.h"
+#include "features/printing/PdfiumLoad.h"
+#include "features/printing/PrintingUtil.h"
+#include "features/printing/PdfViewerPlugin.h"
+#include "features/printing/PrintingSetting.h"
+#include "core/mb.h"
+#include "core/MbWebView.h"
 #include "wke/wkedefine.h"
-#include "wke/wkeWebView.h"
 #include "common/ThreadCall.h"
 #include "common/StringUtil.h"
 #include "common/LiveIdDetect.h"
@@ -19,56 +17,89 @@
 
 namespace printing {
 
-extern unsigned char kPrintingPageHtml[];
-
-static void responseQuery(jsExecState es, int64_t queryId, int customMsg, const utf8* response)
+void MB_CALL_TYPE Printing::onPrintingDocumentReadyCallback(mbWebView webView, void* param, mbWebFrameHandle frameId)
 {
-    jsValue args[2];
-    args[0] = jsInt(customMsg);
-    if (!response)
-        response = "";
-    args[1] = jsString(es, response);
-    jsValue kw = jsCall(es, (jsValue)queryId, jsUndefined(), args, 2);
-}
-
-void WkePrinting::onPrintingDocumentReadyCallback(wkeWebView webView, void* param)
-{
-    WkePrinting* self = (WkePrinting*)param;
+    Printing* self = (Printing*)param;
     self->onDocumentReady(webView);
 }
 
-bool WkePrinting::onPrintingLoadUrlBegin(wkeWebView webView, void* param, const char* url, wkeNetJob job)
+void MB_CALL_TYPE Printing::onPrintingJsQueryCallback(mbWebView webView, void* param, mbJsExecState es, int64_t queryId, int customMsg, const utf8* request)
 {
-    WkePrinting* self = (WkePrinting*)param;
+    Printing* self = (Printing*)param;
+    self->onJsQuery(webView, es, queryId, customMsg, request);
+}
+
+BOOL MB_CALL_TYPE Printing::onPrintingLoadUrlBegin(mbWebView webView, void* param, const char* url, mbNetJob job)
+{
+    Printing* self = (Printing*)param;
     self->onLoadUrlBegin(webView, url, job);
     return false;
 }
 
-void WkePrinting::onDidCreateScriptContext(wkeWebView webView, void* param, wkeWebFrameHandle frameId, void* context, int extensionGroup, int worldId)
+void MB_CALL_TYPE Printing::onPaintUpdatedCallback(mbWebView webView, void* param, const HDC hdc, int x, int y, int cx, int cy)
 {
-    WkePrinting* self = (WkePrinting*)param;
+    Printing* self = (Printing*)param;
+    self->onPaintUpdated(webView, hdc, x, y, cx, cy);
 }
 
-void WkePrinting::onPaintUpdatedCallback(wkeWebView webView, void* param, const HDC hdc, int x, int y, int cx, int cy)
+PdfDataVisitor::PdfDataVisitor(const PdfViewerPlugin* plugin)
 {
-    WkePrinting* self = (WkePrinting*)param;
-    self->onPaintUpdated(webView, hdc, x, y, cx, cy);
+    m_pdfData = *(plugin->getPdfData());
+    m_pageCount = plugin->getPageCount();
+    m_isPdfPluginMode = true;
+    m_pdfdatas = nullptr;
+}
+
+PdfDataVisitor::PdfDataVisitor(const wkePdfDatas* pdfdatas)
+{
+    m_pdfdatas = pdfdatas;
+    m_pageCount = m_pdfdatas->count;
+    m_isPdfPluginMode = false;
+}
+
+PdfDataVisitor::~PdfDataVisitor()
+{
+    if (m_pdfdatas)
+        wkeUtilRelasePrintPdfDatas(m_pdfdatas);
+}
+
+bool PdfDataVisitor::isValid()
+{
+    return true;
+}
+
+int PdfDataVisitor::getCount() const
+{
+    return m_pageCount;
+}
+       
+const void* PdfDataVisitor::getData(int pageNum)
+{
+    if (m_isPdfPluginMode)
+        return &(m_pdfData.at(0));
+    return m_pdfdatas->datas[pageNum];
+}
+
+int PdfDataVisitor::getDataSize(int pageNum)
+{
+    if (m_isPdfPluginMode)
+        return (int)m_pdfData.size();
+    return (int)m_pdfdatas->sizes[pageNum];
 }
 
 //////////////////////////////////////////////////////////////////////////
 
-// int g_edgeDistance[4] = { 0, 1000, 0, 1000 };
-// wkeDefaultPrinterSettings* s_defaultPrinterSettings = nullptr;
+int g_edgeDistance[4] = { 0/*, 1000, 0, 1000*/ };
+mbDefaultPrinterSettings* s_defaultPrinterSettings = nullptr;
 
-WkePrinting::WkePrinting(wkeWebView webView, wkeWebFrameHandle frameId)
+Printing::Printing(mbWebView webView, mbWebFrameHandle frameId)
 {
-//     if (!s_defaultPrinterSettings)
-//         s_defaultPrinterSettings = new wkeDefaultPrinterSettings();
+    if (!s_defaultPrinterSettings)
+        s_defaultPrinterSettings = new mbDefaultPrinterSettings();
 
     m_frameId = frameId;
     m_mbSrcView = webView;
-    m_mbSrcViewId = wkeGetWebviewId(webView);
-    m_mbPreview = nullptr;
+    m_mbPreview = NULL_WEBVIEW;
     m_pdfDataVisitor = nullptr;
     m_delayRunClosure = nullptr;
     m_landscape = false;
@@ -85,7 +116,7 @@ WkePrinting::WkePrinting(wkeWebView webView, wkeWebFrameHandle frameId)
     m_curPrinterSettings = new PrintSettings();
 }
 
-WkePrinting::~WkePrinting()
+Printing::~Printing()
 {
     if (m_isGettingPreviewData)
         DebugBreak();
@@ -273,7 +304,7 @@ static bool getFormInfoFromName2(const std::wstring& devName, std::vector<FromIn
     }
     OutputDebugStringA("getFormInfoFromName2 end\n");
 
-    unsigned int hash = WkePrinting::DevnameToDeviceMode::getHash(devName.c_str());
+    unsigned int hash = Printing::DevnameToDeviceMode::getHash(devName.c_str());
     nameToPrinterDefaultPaperType->insert(std::pair<unsigned int, int>(hash, defaultDevMode->dmPaperSize));
 
     for (size_t i = 0; i < paperInfo->size(); ++i) { // 把默认设置提到最前
@@ -301,7 +332,7 @@ static bool getFormInfoFromName2(const std::wstring& devName, std::vector<FromIn
     return true;
 }
 
-static PrintSettings* getPrinterSettingsByDevName(PrintSettings* settings, bool landscape, const std::wstring& devName, const wkeSize& userSelectPaperSize)
+static PrintSettings* getPrinterSettingsByDevName(PrintSettings* settings, bool landscape, const std::wstring& devName, const mbSize& userSelectPaperSize)
 {
     HANDLE tempHandle;
 
@@ -310,7 +341,7 @@ static PrintSettings* getPrinterSettingsByDevName(PrintSettings* settings, bool 
 
     if (!::OpenPrinterW((LPWSTR)devNameStr.c_str(), &tempHandle, NULL)) { // ::OpenPrinter may return error but assign some value into handle.
         wchar_t* output = (wchar_t*)malloc(0x600 * 2);
-        swprintf(output, L"WkePrinting::getPrinterSettingsByDevName OpenPrinterW fail: %d %ws\n", ::GetLastError(), (LPWSTR)devNameStr.c_str());
+        swprintf(output, L"Printing::getPrinterSettingsByDevName OpenPrinterW fail: %d %ws\n", ::GetLastError(), (LPWSTR)devNameStr.c_str());
         OutputDebugStringW(output);
         free(output);
 
@@ -321,7 +352,7 @@ static PrintSettings* getPrinterSettingsByDevName(PrintSettings* settings, bool 
     DEVMODE* devMode = createDevMode(tempHandle, nullptr);
     if (!devMode) {
         ::ClosePrinter(tempHandle);
-        OutputDebugStringA("WkePrinting::getPrinterSettingsByDevName createDevMode fail\n");
+        OutputDebugStringA("Printing::getPrinterSettingsByDevName createDevMode fail\n");
         delete settings;
         return nullptr;
     }
@@ -331,7 +362,7 @@ static PrintSettings* getPrinterSettingsByDevName(PrintSettings* settings, bool 
     free(devMode);
     if (!hdc) {
         ::ClosePrinter(tempHandle);
-        OutputDebugStringA("WkePrinting::getPrinterSettingsByDevName CreateDC fail\n");
+        OutputDebugStringA("Printing::getPrinterSettingsByDevName CreateDC fail\n");
         delete settings;
         return nullptr;
     }
@@ -345,7 +376,7 @@ static PrintSettings* getPrinterSettingsByDevName(PrintSettings* settings, bool 
     if (0 == settings->dpi) {
         ::DeleteDC(hdc);
         ::ClosePrinter(tempHandle);
-        OutputDebugStringA("WkePrinting::getPrinterSettingsByDevName GetDeviceCaps fail\n");
+        OutputDebugStringA("Printing::getPrinterSettingsByDevName GetDeviceCaps fail\n");
         delete settings;
         return nullptr;
     }
@@ -364,7 +395,7 @@ static PrintSettings* getPrinterSettingsByDevName(PrintSettings* settings, bool 
         settings->printableAreaDeviceUnits = { 0, 0, settings->physicalSizeDeviceUnits.w, settings->physicalSizeDeviceUnits.h };
 
     double kThousandthsOfMillimeterInInch = 25400;
-    wkeSize paperSizeA4 = { (int)(kA4WidthInch * settings->dpi), (int)(kA4HeightInch * settings->dpi) };
+    mbSize paperSizeA4 = { (int)(kA4WidthInch * settings->dpi), (int)(kA4HeightInch * settings->dpi) };
     settings->size = {
         (int)((userSelectPaperSize.w / kThousandthsOfMillimeterInInch) * settings->dpi),
         (int)((userSelectPaperSize.h / kThousandthsOfMillimeterInInch) * settings->dpi)
@@ -387,10 +418,11 @@ static PrintSettings* getPrinterSettingsByDevName(PrintSettings* settings, bool 
     return settings;
 }
 
-bool WkePrinting::getPdfDataFromPdfViewerInBlinkThread(jsExecState es, int64_t queryId)
+bool Printing::getPdfDataFromPdfViewerInBlinkThread(int64_t queryId)
 {
-    // vip版本的这个是ChildPdfViewerPlugin。因为vip版收到的参数是父webview的顶层vip mbWebView
-    PdfViewerPlugin* plugin = (PdfViewerPlugin*)wkeGetUserKeyValue(m_mbSrcView, "PdfViewerPlugin");
+    mb::MbWebView* webview = (mb::MbWebView*)common::LiveIdDetect::get()->getPtr((int64_t)m_mbSrcView);
+
+    PdfViewerPlugin* plugin = (PdfViewerPlugin*)wkeGetUserKeyValue(webview->getWkeWebView(), "ChildPdfViewerPlugin");
     if (!plugin)
         return false;
 
@@ -400,29 +432,29 @@ bool WkePrinting::getPdfDataFromPdfViewerInBlinkThread(jsExecState es, int64_t q
 
     if (plugin->getPageCount()) {
         m_pdfDataVisitor = new PdfDataVisitor(plugin);
-        responseQuery(es, queryId, plugin->getPageCount(), nullptr);
+        mbResponseQuery(m_mbPreview, queryId, plugin->getPageCount(), nullptr);
     } else {
         std::string msgIfFail = common::utf16ToUtf8(L"获取PDFViewer页数为0！");
-        responseQuery(es, queryId, 0, msgIfFail.c_str());
+        mbResponseQuery(m_mbPreview, queryId, 0, msgIfFail.c_str());
     }
 
     return true;
 }
 
-void WkePrinting::getPdfDataInBlinkThread(jsExecState es, int64_t queryId, const std::string& printerName)
+void Printing::getPdfDataInBlinkThread(int64_t queryId, const std::string& printerName)
 {
-    OutputDebugStringA("WkePrinting::getPdfDataInBlinkThread 1\n");
+    OutputDebugStringA("Printing::getPdfDataInBlinkThread 1\n");
 
     if (m_curPrinterSettings)
         delete m_curPrinterSettings;
     m_curPrinterSettings = getPrinterSettingsByDevName((new PrintSettings()), m_landscape, common::utf8ToUtf16(printerName), m_userSelectPaperSize);
     if (!m_curPrinterSettings) {
         std::string msgIfFail = common::utf16ToUtf8(L"打印参数错误！！");
-        responseQuery(es, queryId, 0, msgIfFail.c_str());
+        mbResponseQuery(m_mbPreview, queryId, 0, msgIfFail.c_str());
         return;
     }
 
-    if (getPdfDataFromPdfViewerInBlinkThread(es, queryId))
+    if (getPdfDataFromPdfViewerInBlinkThread(queryId))
         return;
 
     const int dpi = m_curPrinterSettings->dpi; // 这个dpi，在打印机上又叫device_units_per_inch
@@ -445,7 +477,7 @@ void WkePrinting::getPdfDataInBlinkThread(jsExecState es, int64_t queryId, const
     params.isLandscape = m_landscape;
 
     char* output = (char*)malloc(0x200);
-    sprintf(output, "WkePrinting::getPdfDataInBlinkThread: userSelect:(%d %d) %d, physicalSize:(%d %d) printableArea:(%d %d %d %d)\n", 
+    sprintf(output, "Printing::getPdfDataInBlinkThread: userSelect:(%d %d) %d, physicalSize:(%d %d) printableArea:(%d %d %d %d)\n", 
         params.width, params.height, dpi,
         m_curPrinterSettings->physicalSizeDeviceUnits.w, m_curPrinterSettings->physicalSizeDeviceUnits.h,
         m_curPrinterSettings->printableAreaDeviceUnits.x, m_curPrinterSettings->printableAreaDeviceUnits.y,
@@ -456,12 +488,13 @@ void WkePrinting::getPdfDataInBlinkThread(jsExecState es, int64_t queryId, const
     if (m_pdfDataVisitor)
         delete m_pdfDataVisitor;
 
-    const wkePdfDatas* pdfDatas = wkeUtilPrintToPdf(m_mbSrcView, (wkeWebFrameHandle)m_frameId, &params);
+    mb::MbWebView* webview = (mb::MbWebView*)common::LiveIdDetect::get()->getPtr((int64_t)m_mbSrcView);
+    const wkePdfDatas* pdfDatas = wkeUtilPrintToPdf(webview->getWkeWebView(), (wkeWebFrameHandle)m_frameId, &params);
     if (!pdfDatas || 0 == pdfDatas->count) {
-        OutputDebugStringA("WkePrinting::getPdfDataInBlinkThread fail 1\n");
+        OutputDebugStringA("Printing::getPdfDataInBlinkThread fail 1\n");
 
         std::string msgIfFail = common::utf16ToUtf8(L"生成打印预览数据失败！");
-        responseQuery(es, queryId, 0, msgIfFail.c_str());
+        mbResponseQuery(m_mbPreview, queryId, 0, msgIfFail.c_str());
         return;
     }
     m_pdfDataVisitor = new PdfDataVisitor(pdfDatas);
@@ -480,34 +513,39 @@ void WkePrinting::getPdfDataInBlinkThread(jsExecState es, int64_t queryId, const
 //     }
     ///----
 
-    OutputDebugStringA("WkePrinting::getPdfDataInBlinkThread over\n");
-    responseQuery(es, queryId, m_pdfDataVisitor->getCount(), nullptr);
+    OutputDebugStringA("Printing::getPdfDataInBlinkThread over\n");
+    mbResponseQuery(m_mbPreview, queryId, m_pdfDataVisitor->getCount(), nullptr);
 }
 
-static void createJsToSetDefaultParam(wkeWebView preview)
+static void createJsToSetDefaultParam(mbWebView preview)
 {
-//     std::string jscript = "window.setDefaultParam({";
-//     std::vector<char> temp(1000);
-//     sprintf(temp.data(), 
-//         "edgeDistanceLeft: %d, edgeDistanceTop: %d, edgeDistanceRight: %d, edgeDistanceBottom: %d, "
-//         "isLandscape: %s, isPrintHeadFooter: %s, isPrintBackgroud: %s,"
-//         "copies: %d, paperType: %d",
-//         s_defaultPrinterSettings->edgeDistanceLeft,
-//         s_defaultPrinterSettings->edgeDistanceTop,
-//         s_defaultPrinterSettings->edgeDistanceRight,
-//         s_defaultPrinterSettings->edgeDistanceBottom,
-//         s_defaultPrinterSettings->isLandscape ? "true" : "false",
-//         s_defaultPrinterSettings->isPrintHeadFooter ? "true" : "false",
-//         s_defaultPrinterSettings->isPrintBackgroud ? "true" : "false",
-//         s_defaultPrinterSettings->copies, 
-//         s_defaultPrinterSettings->paperType
-//         );
-//     jscript += temp.data();
-//     jscript += "});";
-//     wkeRunJS(preview, jscript.c_str());
+    std::string jscript = "window.setDefaultParam({";
+//     for (size_t i = 0; i < 4; ++i) {
+//         char temp[32] = { 0 };
+//         sprintf_s(temp, 31, "%d, ", g_edgeDistance[i] / 100);
+//         jscript += temp;
+//     }
+    std::vector<char> temp(1000);
+    sprintf(temp.data(), 
+        "edgeDistanceLeft: %d, edgeDistanceTop: %d, edgeDistanceRight: %d, edgeDistanceBottom: %d, "
+        "isLandscape: %s, isPrintHeadFooter: %s, isPrintBackgroud: %s,"
+        "copies: %d, paperType: %d",
+        s_defaultPrinterSettings->edgeDistanceLeft,
+        s_defaultPrinterSettings->edgeDistanceTop,
+        s_defaultPrinterSettings->edgeDistanceRight,
+        s_defaultPrinterSettings->edgeDistanceBottom,
+        s_defaultPrinterSettings->isLandscape ? "true" : "false",
+        s_defaultPrinterSettings->isPrintHeadFooter ? "true" : "false",
+        s_defaultPrinterSettings->isPrintBackgroud ? "true" : "false",
+        s_defaultPrinterSettings->copies, 
+        s_defaultPrinterSettings->paperType
+        );
+    jscript += temp.data();
+    jscript += "});";
+    mbRunJs(preview, mbWebFrameGetMainFrame(preview), jscript.c_str(), true, nullptr, nullptr, nullptr);
 }
 
-static void createJsToAddPrinter(wkeWebView preview, const std::vector<std::wstring>& printerNames, std::map<unsigned int, int>* nameToPrinterDefaultPaperType)
+static void createJsToAddPrinter(mbWebView preview, const std::vector<std::wstring>& printerNames, std::map<unsigned int, int>* nameToPrinterDefaultPaperType)
 {
     std::wstring jscript = L"window.addPrinter([";
     for (size_t i = 0; i < printerNames.size(); ++i) {
@@ -543,11 +581,11 @@ static void createJsToAddPrinter(wkeWebView preview, const std::vector<std::wstr
 
     jscript += L"]);";
     std::string jscriptA = common::utf16ToUtf8(jscript.c_str());
-    wkeRunJS(preview, jscriptA.c_str());
-    wkeRunJS(preview, "console.log('createJsToAddPrinter end')");
+    mbRunJs(preview, mbWebFrameGetMainFrame(preview), jscriptA.c_str(), true, nullptr, nullptr, nullptr);
+    mbRunJs(preview, mbWebFrameGetMainFrame(preview), "console.log('createJsToAddPrinter end')", true, nullptr, nullptr, nullptr);
 }
 
-bool WkePrinting::enumNetworkPrinters(std::vector<std::wstring>* printerNames)
+bool Printing::enumNetworkPrinters(std::vector<std::wstring>* printerNames)
 {
     DWORD enumFlags = PRINTER_ENUM_NETWORK | PRINTER_ENUM_LOCAL | PRINTER_ENUM_REMOTE;
     DWORD level = 2;
@@ -566,7 +604,7 @@ bool WkePrinting::enumNetworkPrinters(std::vector<std::wstring>* printerNames)
     const PRINTER_INFO_2* info = reinterpret_cast<PRINTER_INFO_2*>(printerInfoBuffer);
     const PRINTER_INFO_2* infoEnd = info + countReturned;
 
-    OutputDebugStringA("WkePrinting::enumNetworkPrinters:\n");
+    OutputDebugStringA("Printing::enumNetworkPrinters:\n");
     for (; info < infoEnd; ++info) {
         m_nameToDeviceMode.add(info);
 
@@ -578,11 +616,11 @@ bool WkePrinting::enumNetworkPrinters(std::vector<std::wstring>* printerNames)
     }
 
     delete printerInfoBuffer;
-    OutputDebugStringA("WkePrinting::enumNetworkPrinters end\n");
+    OutputDebugStringA("Printing::enumNetworkPrinters end\n");
     return true;
 }
 
-bool WkePrinting::enumLocalPrinters(std::vector<std::wstring>* printerNames)
+bool Printing::enumLocalPrinters(std::vector<std::wstring>* printerNames)
 {
     OutputDebugStringA("EnumPrintersW 1\n");
     DWORD enumFlags = enumFlags = PRINTER_ENUM_LOCAL | PRINTER_ENUM_CONNECTIONS;
@@ -605,7 +643,7 @@ bool WkePrinting::enumLocalPrinters(std::vector<std::wstring>* printerNames)
     const PRINTER_INFO_2* info = reinterpret_cast<PRINTER_INFO_2*>(printerInfoBuffer);
     const PRINTER_INFO_2* infoEnd = info + countReturned;
 
-    OutputDebugStringA("WkePrinting::enumLocalPrinters:\n");
+    OutputDebugStringA("Printing::enumLocalPrinters:\n");
     for (; info < infoEnd; ++info) {
         m_nameToDeviceMode.add(info);
 
@@ -617,11 +655,11 @@ bool WkePrinting::enumLocalPrinters(std::vector<std::wstring>* printerNames)
     }
 
     delete printerInfoBuffer;
-    OutputDebugStringA("WkePrinting::enumLocalPrinters end\n");
+    OutputDebugStringA("Printing::enumLocalPrinters end\n");
     return true;
 }
 
-bool WkePrinting::enumPrinters()
+bool Printing::enumPrinters()
 {
     m_nameToDeviceMode.clear();
     std::vector<std::wstring> printerNames;
@@ -655,10 +693,10 @@ bool WkePrinting::enumPrinters()
     return true;
 }
 
-void WkePrinting::onDocumentReady(wkeWebView webView)
+void Printing::onDocumentReady(mbWebView webView)
 {
     enumPrinters();
-    wkeRunJS(m_mbPreview, "toNativeGetPreview();");
+    mbRunJs(m_mbPreview, mbWebFrameGetMainFrame(m_mbPreview), "toNativeGetPreview();", true, nullptr, nullptr, nullptr);
 }
 
 static void simpleModifyWorldTransform(HDC context, int offsetX, int offsetY, float shrink_factor)
@@ -670,7 +708,7 @@ static void simpleModifyWorldTransform(HDC context, int offsetX, int offsetY, fl
     BOOL res = ::ModifyWorldTransform(context, &xform, MWT_LEFTMULTIPLY);
 }
 
-void WkePrinting::doPrintImpl(const std::vector<int>& needPrintedPages, DEVMODE* devMode, const std::wstring& devName)
+void Printing::doPrintImpl(const std::vector<int>& needPrintedPages, DEVMODE* devMode, const std::wstring& devName)
 {
 //     HDC hdc = TestGetPrinterDC(devMode);
 //     ::DeleteDC(hdc);
@@ -678,7 +716,7 @@ void WkePrinting::doPrintImpl(const std::vector<int>& needPrintedPages, DEVMODE*
     HDC hdcOfPrinter = ::CreateDC(L"WINSPOOL", devName.c_str(), NULL, devMode);
 
     char* output = (char*)malloc(0x100);
-    sprintf(output, "WkePrinting::doPrintImpl, devMode->dmPaperSize: %d\n", devMode->dmPaperSize);
+    sprintf(output, "Printing::doPrintImpl, devMode->dmPaperSize: %d\n", devMode->dmPaperSize);
     OutputDebugStringA(output);
     free(output);
 
@@ -700,10 +738,7 @@ void WkePrinting::doPrintImpl(const std::vector<int>& needPrintedPages, DEVMODE*
     int diffY = (m_curPrinterSettings->physicalSizeDeviceUnits.h - m_curPrinterSettings->size.h) / 2;
 
     output = (char*)malloc(0x100);
-    sprintf(output, "WkePrinting::doPrintImpl: %d %d, %d %d,(%d, %d)\n", 
-      offsetX, offsetY, 
-      diffX, diffY,
-      m_curPrinterSettings->printableAreaDeviceUnits.w, m_curPrinterSettings->printableAreaDeviceUnits.h);
+    sprintf(output, "Printing::doPrintImpl: %d %d, %d %d, %d\n", offsetX, offsetY, diffX, diffY, m_curPrinterSettings->printableAreaDeviceUnits.w);
     OutputDebugStringA(output);
     free(output);
 
@@ -726,9 +761,19 @@ void WkePrinting::doPrintImpl(const std::vector<int>& needPrintedPages, DEVMODE*
             m_pdfDataVisitor->isPdfPluginMode() ? i : 0,
             hdcOfPrinter, dpi,
             0, 0,
-            (int)(m_curPrinterSettings->size.w * scaleX), // physicalSizeDeviceUnits
-            (int)(m_curPrinterSettings->size.h * scaleY),
+            (int)(m_curPrinterSettings->physicalSizeDeviceUnits.w * scaleX),
+            (int)(m_curPrinterSettings->physicalSizeDeviceUnits.h * scaleY),
             true /*fit_to_bounds*/, true /*stretch_to_bounds*/, false, false, false);
+
+        mb::MbWebView* webview = (mb::MbWebView*)common::LiveIdDetect::get()->getPtr((int64_t)m_mbSrcView);
+        if (webview->m_printingCallback) {
+            mbPrintintSettings settings;
+            settings.dpi = dpi;
+            settings.width = m_curPrinterSettings->size.w;
+            settings.height = m_curPrinterSettings->size.h;
+            settings.scale = 1;
+            webview->m_printingCallback(m_mbSrcView, webview->m_printingCallbackParam, kPrintintStepPrinting, hdcOfPrinter, &settings, i);
+        }
 
 //         if (0) {
 //             wchar_t* text = L"打印测试文本";
@@ -758,18 +803,18 @@ void WkePrinting::doPrintImpl(const std::vector<int>& needPrintedPages, DEVMODE*
     ::DeleteDC(hdcOfPrinter);
 }
 
-void WkePrinting::doPrint(jsExecState es, const std::string& printerParams, int64_t queryId)
+void Printing::doPrint(const std::string& printerParams, int64_t queryId)
 {
     std::string msgIfFail;
     if (!m_pdfDataVisitor) {
         msgIfFail = common::utf16ToUtf8(L"请先点击预览生成打印数据");
-        responseQuery(es, queryId, 0, msgIfFail.c_str());
+        mbResponseQuery(m_mbPreview, queryId, 0, msgIfFail.c_str());
         return;
     }
 
     if (0 == m_pdfDataVisitor->getCount()) {
         msgIfFail = common::utf16ToUtf8(L"可打印页数为0");
-        responseQuery(es, queryId, 0, msgIfFail.c_str());
+        mbResponseQuery(m_mbPreview, queryId, 0, msgIfFail.c_str());
         return;
     }
    
@@ -779,7 +824,7 @@ void WkePrinting::doPrint(jsExecState es, const std::string& printerParams, int6
     bool b = parseDoPrintParams(printerParams.c_str(), &pagesCount, &printerName, &m_copies);
     if (!b) {
         msgIfFail = common::utf16ToUtf8(L"打印页码填写错误");
-        responseQuery(es, queryId, 0, msgIfFail.c_str());
+        mbResponseQuery(m_mbPreview, queryId, 0, msgIfFail.c_str());
         return;
     }
     std::vector<int> needPrintedPages = createNeedPrintedPages(m_pdfDataVisitor->getCount(), pagesCount);
@@ -789,14 +834,14 @@ void WkePrinting::doPrint(jsExecState es, const std::string& printerParams, int6
     DEVMODE* devMode = m_nameToDeviceMode.find(devName);
     if (!devMode) {
         msgIfFail = common::utf16ToUtf8(L"打开打印设备失败(2)");
-        responseQuery(es, queryId, 0, msgIfFail.c_str());
+        mbResponseQuery(m_mbPreview, queryId, 0, msgIfFail.c_str());
         return;
     }
 
     HANDLE handlePrinter;
     if (!::OpenPrinterW((LPWSTR)devName.c_str(), &handlePrinter, NULL)) { // ::OpenPrinter may return error but assign some value into handle.
         msgIfFail = common::utf16ToUtf8(L"打开打印设备失败(3)");
-        responseQuery(es, queryId, 0, msgIfFail.c_str());
+        mbResponseQuery(m_mbPreview, queryId, 0, msgIfFail.c_str());
         return;
     }
 
@@ -832,19 +877,21 @@ void WkePrinting::doPrint(jsExecState es, const std::string& printerParams, int6
         doPrintImpl(needPrintedPages, devMode, devName);
     else {
         msgIfFail = common::utf16ToUtf8(L"打开打印设备失败(4)");
-        responseQuery(es, queryId, 0, msgIfFail.c_str());
+        mbResponseQuery(m_mbPreview, queryId, 0, msgIfFail.c_str());
     }
 
     ::ClosePrinter(handlePrinter);
 
-    responseQuery(es, queryId, 1, nullptr);
+    mbResponseQuery(m_mbPreview, queryId, 1, nullptr);
+
+    mbRunJs(m_mbSrcView, mbWebFrameGetMainFrame(m_mbSrcView), "$('#bill_print').hide();", true, nullptr, nullptr, nullptr);
 }
 
-void WkePrinting::onPaintUpdated(wkeWebView webView, const HDC hdc, int x, int y, int cx, int cy)
+void Printing::onPaintUpdated(mbWebView webView, const HDC hdc, int x, int y, int cx, int cy)
 {
     if (m_delayRunClosure) {
         char* output = (char*)malloc(0x100);
-        sprintf(output, "WkePrinting::onPaintUpdated: %d %d\n", cx, cy);
+        sprintf(output, "Printing::onPaintUpdated: %d %d\n", cx, cy);
         OutputDebugStringA(output);
         free(output);
     }
@@ -859,7 +906,7 @@ const int kGetPreviewMsg = 2;
 const int kDoPrintMsg = 3;
 const int kDoCloseMsg = 4;
 
-std::string* WkePrinting::parseGetPreviewParams(const utf8* request)
+std::string* Printing::parseGetPreviewParams(const utf8* request)
 {
     std::string* printerName = nullptr;
     std::string requestStr(request);
@@ -868,6 +915,7 @@ std::string* WkePrinting::parseGetPreviewParams(const utf8* request)
     m_landscape = ('1' == requestStr[0]);
     m_isPrintPageHeadAndFooter = ('1' == requestStr[2]);
     m_isPrintBackgroud = ('1' == requestStr[4]);
+
     if ('0' == requestStr[6])
         m_duplex = 0;
     else if ('1' == requestStr[6])
@@ -908,87 +956,92 @@ std::string* WkePrinting::parseGetPreviewParams(const utf8* request)
     return devName;
 }
 
-void WkePrinting::getPreview(jsExecState es, int64_t queryId, const utf8* request)
+void Printing::getPreview(int64_t queryId, int64_t id, const utf8* request)
 {
-    OutputDebugStringA("WkePrinting::getPreview 1\n");
+    OutputDebugStringA("Printing::getPreview 1\n");
     if (m_delayRunClosure) {
-        OutputDebugStringA("WkePrinting::getPreview fail 1\n");
+        OutputDebugStringA("Printing::getPreview fail 1\n");
         return;
     }
 
     if (!PdfiumLoad::get()) {
-        OutputDebugStringA("WkePrinting::getPreview fail 2\n");
+        OutputDebugStringA("Printing::getPreview fail 2\n");
 
         std::string msgIfFail = common::utf16ToUtf8(L"缺少pdfium.dll");
-        responseQuery(es, queryId, 0, msgIfFail.c_str());
+        mbResponseQuery(m_mbPreview, queryId, 0, msgIfFail.c_str());
         return;
     }
 
     std::string* printerName = parseGetPreviewParams(request);
     if (!printerName) {
-        OutputDebugStringA("WkePrinting::getPreview fail 2\n");
+        OutputDebugStringA("Printing::getPreview fail 2\n");
 
         std::string msgIfFail = common::utf16ToUtf8(L"打印参数错误！");
-        responseQuery(es, queryId, 0, msgIfFail.c_str());
+        mbResponseQuery(m_mbPreview, queryId, 0, msgIfFail.c_str());
         return;
     }
 
-    int srcViewId = wkeGetWebviewId(m_mbSrcView);
-    int previewId = wkeGetWebviewId(m_mbPreview);
-    content::WebPage* mbPreview = m_mbPreview->webPage();
+    int64_t previewId = m_mbPreview;
+    mb::MbWebView* mbPreview = (mb::MbWebView*)common::LiveIdDetect::get()->getPtr((int64_t)m_mbPreview);
     
-    WkePrinting* self = this;
+    Printing* self = this;
     mbPreview->setIsMouseKeyMessageEnable(false);
 
-    m_delayRunClosure = new std::function<void(void)>([es, srcViewId, previewId, mbPreview, self, queryId, printerName] {
-        OutputDebugStringA("WkePrinting::getPreview lambda\n");
+    m_delayRunClosure = new std::function<void(void)>([id, previewId, self, queryId, printerName] {
+        OutputDebugStringA("Printing::getPreview lambda\n");
 
-        if (!wkeIsWebviewAlive(srcViewId) || !wkeIsWebviewAlive(previewId)) {
-            OutputDebugStringA("WkePrinting::getPreview fail 3\n");
+        mb::MbWebView* mbSrcView = (mb::MbWebView*)common::LiveIdDetect::get()->getPtrLocked(id);
+        if (!mbSrcView) {
+            OutputDebugStringA("Printing::getPreview fail 3\n");
+
             delete printerName;
             return;
         }
 
+        mb::MbWebView* mbPreview = (mb::MbWebView*)common::LiveIdDetect::get()->getPtrLocked(previewId);
+        if (!mbPreview) {
+            OutputDebugStringA("Printing::getPreview fail 4\n");
+
+            common::LiveIdDetect::get()->unlock(id, mbSrcView);
+            delete printerName;
+            return;
+        }
         self->m_isGettingPreviewData = true;
-        self->getPdfDataInBlinkThread(es, queryId, *printerName);
+        self->getPdfDataInBlinkThread(queryId, *printerName);
         mbPreview->setIsMouseKeyMessageEnable(true);
         delete printerName;
         self->m_isGettingPreviewData = false;
-    });
 
-    (*m_delayRunClosure)();
-    delete m_delayRunClosure;
-    m_delayRunClosure = nullptr;
+        common::LiveIdDetect::get()->unlock(id, mbSrcView);
+        common::LiveIdDetect::get()->unlock(previewId, mbPreview);
+    });
 }
 
-jsValue WkePrinting::jsmbQuery(jsExecState es, void* param)
+void Printing::onJsQuery(mbWebView webView, mbJsExecState es, int64_t queryId, int customMsg, const utf8* request)
 {
-    wkeWebView webview = jsGetWebView(es);
-    WkePrinting* self = (WkePrinting*)wkeGetUserKeyValue(webview, "WkePrinting");
-    HWND hWnd = wkeGetHostHWND(webview);
-    int customMsg = jsToInt(es, jsArg(es, 0));
-    const utf8* request = jsToTempString(es, jsArg(es, 1));
-    int64_t queryId = (int64_t)jsArg(es, 2);
+    int64_t id = m_mbSrcView;
+    Printing* self = this;
 
+    HWND hWnd = mbGetHostHWND(webView);
+    
     if (kGetPreviewMsg == customMsg) {
-        self->getPreview(es, queryId, request);
+        if (common::LiveIdDetect::get()->isLive(id))
+            getPreview(queryId, id, request);
     } else if (kDoPrintMsg == customMsg) {
-        self->doPrint(es, request, queryId);
+        doPrint(request, queryId);
     } else if (kDoCloseMsg == customMsg) {
         ::PostMessage(hWnd, WM_CLOSE, 0, 0);
 
-        if (wkeIsWebviewAlive(self->m_mbSrcViewId)) {
-            content::WebPage* mbPreview = self->m_mbSrcView->webPage();
-            mbPreview->setIsMouseKeyMessageEnable(true);
-        }
-
-        self->m_mbSrcView->clearPrinting();
+        int64_t srcId = m_mbSrcView;
+        mb::MbWebView* srcView = (mb::MbWebView*)common::LiveIdDetect::get()->getPtrLocked(srcId);
+        if (!srcView)
+            return;
+        srcView->setIsMouseKeyMessageEnable(true);
+        common::LiveIdDetect::get()->unlock(srcId, srcView);
     }
-
-    return jsUndefined();
 }
 
-void WkePrinting::onLoadUrlBegin(wkeWebView webView, const char* url, mbNetJob job)
+void Printing::onLoadUrlBegin(mbWebView webView, const char* url, mbNetJob job)
 {
     const char token[] = "print://img_src_";
     std::string urlStr(url);
@@ -999,13 +1052,16 @@ void WkePrinting::onLoadUrlBegin(wkeWebView webView, const char* url, mbNetJob j
             return;
         previewSrc = previewSrc.substr(0, pos);
 
-        if (!wkeIsWebviewAlive(m_mbSrcViewId))
+        int64_t srcId = m_mbSrcView;
+        mb::MbWebView* srcView = (mb::MbWebView*)common::LiveIdDetect::get()->getPtrLocked(srcId);
+        if (!srcView)
             return;
         onGetPrintPreviewSrc(previewSrc, job);
+        common::LiveIdDetect::get()->unlock(srcId, srcView);
     }
 }
 
-void WkePrinting::onGetPrintPreviewSrc(const std::string& urlStr, mbNetJob job)
+void Printing::onGetPrintPreviewSrc(const std::string& urlStr, mbNetJob job)
 {
     int count = atoi(urlStr.c_str());
     if (count > m_pdfDataVisitor->getCount() || count > kMaxPrintPageNum)
@@ -1014,84 +1070,67 @@ void WkePrinting::onGetPrintPreviewSrc(const std::string& urlStr, mbNetJob job)
     const void* pdfData = m_pdfDataVisitor->getData(count);
     size_t pdfDataSize = m_pdfDataVisitor->getDataSize(count);
 
-    HWND hWnd = wkeGetHostHWND(m_mbSrcView);
+    mb::MbWebView* webview = (mb::MbWebView*)common::LiveIdDetect::get()->getPtr((int64_t)m_mbSrcView);
+
+    HWND hWnd = webview->getHostWnd();
     HDC refDeviceContext = ::GetDC(hWnd);
     int desiredDpi = ::GetDeviceCaps(refDeviceContext, LOGPIXELSX);
     ::ReleaseDC(hWnd, refDeviceContext);
     RenderSettings renderSettings = { desiredDpi, false, false, false, false, false };
 
-    char* output = (char*)malloc(0x200);
-    sprintf(output, "WkePrinting::onGetPrintPreviewSrc: %d, (%d, %d), (%d, %d, %d, %d), (%d, %d)\n", 
-      m_curPrinterSettings->dpi, 
-      m_curPrinterSettings->physicalSizeDeviceUnits.w, m_curPrinterSettings->physicalSizeDeviceUnits.h,
-      m_curPrinterSettings->printableAreaDeviceUnits.x, m_curPrinterSettings->printableAreaDeviceUnits.y, m_curPrinterSettings->printableAreaDeviceUnits.w, m_curPrinterSettings->printableAreaDeviceUnits.h,
-      m_curPrinterSettings->size.w, m_curPrinterSettings->size.h
-      );
-    OutputDebugStringA(output);
-    free(output);
-
     int pageNum = m_pdfDataVisitor->isPdfPluginMode() ? count : 0;
 
-    std::vector<char>* bitmap = PrintingUtil::renderPdfPageToBitmap(/*m_mbSrcView*/NULL_WEBVIEW, hWnd, pageNum, *m_curPrinterSettings, renderSettings, pdfData, pdfDataSize);
-    wkeNetSetData(job, bitmap->data(), (int)bitmap->size());
+    std::vector<char>* bitmap = PrintingUtil::renderPdfPageToBitmap(m_mbSrcView, hWnd, pageNum, *m_curPrinterSettings, renderSettings, pdfData, pdfDataSize);
+    mbNetSetData(job, bitmap->data(), (int)bitmap->size());
     delete bitmap;
 }
 
-// BOOL WKE_CALL_TYPE WkePrinting::onDestroyCallback(mbWebView webView, void* param, void* unuse)
-// {
-//     DebugBreak();
-//     WkePrinting* self = (WkePrinting*)param;
-//     mb::MbWebView* webview = (mb::MbWebView*)common::LiveIdDetect::get()->getPtr((int64_t)self->m_mbSrcView);
-//     webview->m_printing = nullptr;
-//     delete self;
-//     return TRUE;
-// }
+BOOL MB_CALL_TYPE Printing::onDestroyCallback(mbWebView webView, void* param, void* unuse)
+{
+    Printing* self = (Printing*)param;
+    mb::MbWebView* webview = (mb::MbWebView*)common::LiveIdDetect::get()->getPtr((int64_t)self->m_mbSrcView);
+    webview->m_printing = nullptr;
+    delete self;
+    return TRUE;
+}
 
-void WkePrinting::createPreviewWin()
+void Printing::createPreviewWin()
 {
     HWND hWnd = nullptr;
     if (m_mbPreview) {
-        hWnd = wkeGetHostHWND(m_mbPreview);
+        hWnd = mbGetHostHWND(m_mbPreview);
         SetForegroundWindow(hWnd);
         return;
     }
      
-    HWND hSrcWnd = wkeGetHostHWND(m_mbSrcView);
+    HWND hSrcWnd = mbGetHostHWND(m_mbSrcView);
 
-    wkeWindowCreateInfo info;
-    info.parent = hSrcWnd;
-    info.style = WS_OVERLAPPEDWINDOW | WS_CLIPSIBLINGS | WS_CLIPCHILDREN;
-    info.styleEx = 0;
-    info.x = 0;
-    info.y = 0;
-    info.width = 1;
-    info.height = 1;
-    m_mbPreview = wkeCreateWebCustomWindow(&info);
-    hWnd = wkeGetHostHWND(m_mbPreview);
+    m_mbPreview = mbCreateWebCustomWindow(hSrcWnd, WS_OVERLAPPEDWINDOW | WS_CLIPSIBLINGS | WS_CLIPCHILDREN, 0, 220, 220, 1, 1);
+    hWnd = mbGetHostHWND(m_mbPreview);
 
     ::SetWindowTextW(hWnd, L"打印");
-    wkeOnDocumentReady(m_mbPreview, onPrintingDocumentReadyCallback, this);
-    //mbOnJsQuery(m_mbPreview, onPrintingJsQueryCallback, this);
-    wkeOnPaintUpdated(m_mbPreview, onPaintUpdatedCallback, this);
-    wkeOnLoadUrlBegin(m_mbPreview, onPrintingLoadUrlBegin, this);
-    //wkeOnDestroy(m_mbPreview, onDestroyCallback, this);
-    wkeJsBindFunction("mbQuery", jsmbQuery, nullptr, 2);
-    wkeSetUserKeyValue(m_mbPreview, "WkePrinting", this);
+    mbOnDocumentReady(m_mbPreview, onPrintingDocumentReadyCallback, this);
+    mbOnJsQuery(m_mbPreview, onPrintingJsQueryCallback, this);
+    mbOnPaintUpdated(m_mbPreview, onPaintUpdatedCallback, this);
+    mbOnLoadUrlBegin(m_mbPreview, onPrintingLoadUrlBegin, this);
+    mbOnDestroy(m_mbPreview, onDestroyCallback, this);
 
-    //wkeLoadURL(m_mbPreview, "file:///G:/mycode/mb/mbvip/printing/PrintingPage.htm");
-    wkeLoadHtmlWithBaseUrl(m_mbPreview, (const utf8 *)kPrintingPageHtml, "PrintingPage.html");
+    mbRunJs(m_mbSrcView, mbWebFrameGetMainFrame(m_mbSrcView), "$('#bill_print').show();", true, nullptr, nullptr, nullptr);
+
+    //mbLoadURL(m_mbPreview, "file:///G:/mycode/mb/mbvip/features/printing/PrintingPage.htm");
+    mbLoadHtmlWithBaseUrl(m_mbPreview, (const utf8 *)kPrintingPageHtml, "PrintingPage.html");
      
     DWORD dwStyle = ::GetWindowLong(hWnd, GWL_STYLE);
     dwStyle = dwStyle & (~WS_CAPTION) & (~WS_SYSMENU) & (~WS_SIZEBOX);
     ::SetWindowLong(hWnd, GWL_STYLE, dwStyle);
 
-    wkeResize(m_mbPreview, 1285, 680);
-    wkeMoveToCenter(m_mbPreview);
-    wkeShowWindow(m_mbPreview, TRUE);
+    mbResize(m_mbPreview, 1285, 680);
+    mbMoveToCenter(m_mbPreview);
+    mbShowWindow(m_mbPreview, TRUE);
     ::UpdateWindow(hWnd);
 }
 
-void WkePrinting::run(const wkePrintSettings* printParams)
+void Printing::run(const mbPrintSettings* printParams)
 {
     createPreviewWin();
 }

@@ -763,10 +763,10 @@
     <Filter Include="mbvip\core">
       <UniqueIdentifier>{d55bdcf4-8eab-4992-b05b-43f08c2c9a43}</UniqueIdentifier>
     </Filter>
-    <Filter Include="mbvip\download">
+    <Filter Include="mbvip\features\download">
       <UniqueIdentifier>{478ba9d4-9a44-4786-8850-f5ee68766f08}</UniqueIdentifier>
     </Filter>
-    <Filter Include="mbvip\printing">
+    <Filter Include="mbvip\features\printing">
       <UniqueIdentifier>{15d10b4a-d6b1-4b33-9fdb-2d54a08af7ec}</UniqueIdentifier>
     </Filter>
     <Filter Include="gen\content">
@@ -10035,20 +10035,20 @@
     <ClCompile Include="..\..\mbvip\core\MbWebView.cpp">
       <Filter>mbvip\core</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\mbvip\download\SimpleDownload.cpp">
-      <Filter>mbvip\download</Filter>
+    <ClCompile Include="..\..\mbvip\features\download\SimpleDownload.cpp">
+      <Filter>mbvip\features\download</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\mbvip\printing\PdfViewerPluginFunc.cpp">
-      <Filter>mbvip\printing</Filter>
+    <ClCompile Include="..\..\mbvip\features\printing\PdfViewerPluginFunc.cpp">
+      <Filter>mbvip\features\printing</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\mbvip\printing\Printing.cpp">
-      <Filter>mbvip\printing</Filter>
+    <ClCompile Include="..\..\mbvip\features\printing\Printing.cpp">
+      <Filter>mbvip\features\printing</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\mbvip\printing\PdfiumLoad.cpp">
-      <Filter>mbvip\printing</Filter>
+    <ClCompile Include="..\..\mbvip\features\printing\PdfiumLoad.cpp">
+      <Filter>mbvip\features\printing</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\mbvip\printing\PdfViewerPlugin.cpp">
-      <Filter>mbvip\printing</Filter>
+    <ClCompile Include="..\..\mbvip\features\printing\PdfViewerPlugin.cpp">
+      <Filter>mbvip\features\printing</Filter>
     </ClCompile>
     <ClCompile Include="..\..\third_party\icu\source\uchar.cpp">
       <Filter>third_party\icu\source</Filter>
@@ -10476,8 +10476,8 @@
     <ClCompile Include="..\..\mbvip\core\mb2.cpp">
       <Filter>mbvip\core</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\mbvip\printing\WkePrinting.cpp">
-      <Filter>mbvip\printing</Filter>
+    <ClCompile Include="..\..\mbvip\features\printing\WkePrinting.cpp">
+      <Filter>mbvip\features\printing</Filter>
     </ClCompile>
     <ClCompile Include="..\..\third_party\WebKit\Source\bindings\core\v8\ModuleRecord.cpp">
       <Filter>third_party\Webkit\Source\bindings\core\v8</Filter>
@@ -23298,38 +23298,38 @@
     <ClInclude Include="..\..\mbvip\core\mb.h">
       <Filter>mbvip\core</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\mbvip\download\SimpleDownload.h">
-      <Filter>mbvip\download</Filter>
+    <ClInclude Include="..\..\mbvip\features\download\SimpleDownload.h">
+      <Filter>mbvip\features\download</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\mbvip\download\DownloadMgr.h">
-      <Filter>mbvip\download</Filter>
+    <ClInclude Include="..\..\mbvip\features\download\DownloadMgr.h">
+      <Filter>mbvip\features\download</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\mbvip\download\DownloadUtil.h">
-      <Filter>mbvip\download</Filter>
+    <ClInclude Include="..\..\mbvip\features\download\DownloadUtil.h">
+      <Filter>mbvip\features\download</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\mbvip\printing\PdfViewerPluginFunc.h">
-      <Filter>mbvip\printing</Filter>
+    <ClInclude Include="..\..\mbvip\features\printing\PdfViewerPluginFunc.h">
+      <Filter>mbvip\features\printing</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\mbvip\printing\Printing.h">
-      <Filter>mbvip\printing</Filter>
+    <ClInclude Include="..\..\mbvip\features\printing\Printing.h">
+      <Filter>mbvip\features\printing</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\mbvip\printing\PrintingPagehtml.h">
-      <Filter>mbvip\printing</Filter>
+    <ClInclude Include="..\..\mbvip\features\printing\PrintingPagehtml.h">
+      <Filter>mbvip\features\printing</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\mbvip\printing\PrintingSetting.h">
-      <Filter>mbvip\printing</Filter>
+    <ClInclude Include="..\..\mbvip\features\printing\PrintingSetting.h">
+      <Filter>mbvip\features\printing</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\mbvip\printing\PrintingUtil.h">
-      <Filter>mbvip\printing</Filter>
+    <ClInclude Include="..\..\mbvip\features\printing\PrintingUtil.h">
+      <Filter>mbvip\features\printing</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\mbvip\printing\PdfiumLoad.h">
-      <Filter>mbvip\printing</Filter>
+    <ClInclude Include="..\..\mbvip\features\printing\PdfiumLoad.h">
+      <Filter>mbvip\features\printing</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\mbvip\printing\PdfViewerHtml.h">
-      <Filter>mbvip\printing</Filter>
+    <ClInclude Include="..\..\mbvip\features\printing\PdfViewerHtml.h">
+      <Filter>mbvip\features\printing</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\mbvip\printing\PdfViewerPlugin.h">
-      <Filter>mbvip\printing</Filter>
+    <ClInclude Include="..\..\mbvip\features\printing\PdfViewerPlugin.h">
+      <Filter>mbvip\features\printing</Filter>
     </ClInclude>
     <ClInclude Include="..\..\third_party\WebKit\Source\core\timing\GcTimeScheduler.h">
       <Filter>third_party\Webkit\Source\core\timing</Filter>
@@ -23775,8 +23775,8 @@
     <ClInclude Include="..\..\mbvip\core\MbCallback.h">
       <Filter>mbvip\core</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\mbvip\printing\WkePrinting.h">
-      <Filter>mbvip\printing</Filter>
+    <ClInclude Include="..\..\mbvip\features\printing\WkePrinting.h">
+      <Filter>mbvip\features\printing</Filter>
     </ClInclude>
     <ClInclude Include="..\..\third_party\WebKit\Source\bindings\core\v8\ModuleRecord.h">
       <Filter>third_party\Webkit\Source\bindings\core\v8</Filter>

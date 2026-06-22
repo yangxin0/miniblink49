@@ -27,7 +27,7 @@
 
 #if defined(_WIN32)
 // Windows-only PDF printing plugin (mbvip/printing); not built on macOS and unused here.
-#include "printing/PdfViewerPluginFunc.h"
+#include "features/printing/PdfViewerPluginFunc.h"
 #endif
 
 #undef  PURE

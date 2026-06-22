@@ -11,10 +11,10 @@
 #include "common/LiveIdDetect.h"
 #include "common/Util.h"
 
-#include "printing/PdfViewerPlugin.h"
-#include "printing/Printing.h"
-#include "printing/PrintingSetting.h"
-#include "download/SimpleDownload.h"
+#include "features/printing/PdfViewerPlugin.h"
+#include "features/printing/Printing.h"
+#include "features/printing/PrintingSetting.h"
+#include "features/download/SimpleDownload.h"
 
 #include "content/browser/PostTaskHelper.h"
 

@@ -1,8 +1,8 @@
 
-#include "download/DownloadMgr.h"
-#include "download/DownloadPageHtml.h"
-#include "download/DownloadUtil.h"
-#include "download/SimpleDownload.h"
+#include "features/download/DownloadMgr.h"
+#include "features/download/DownloadPageHtml.h"
+#include "features/download/DownloadUtil.h"
+#include "features/download/SimpleDownload.h"
 #include "core/MbWebView.h"
 #include "common/ThreadCall.h"
 #include "common/StringUtil.h"
