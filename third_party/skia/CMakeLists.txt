@@ -26,51 +26,84 @@ file(GLOB SKIA_UTILS    "${SK}/src/utils/*.cpp")
 list(FILTER SKIA_IMAGE EXCLUDE REGEX "SkImage_Gpu\\.cpp$|SkSurface_Gpu\\.cpp$")
 # In-tree source bugs / debug-only translation units in this skia snapshot.
 list(FILTER SKIA_PATHOPS EXCLUDE REGEX "SkConicLineIntersection\\.cpp$|SkPathOpsPostSect\\.cpp$")
-# Lua bindings (no lua), ETC1 texture compression (GPU), and the non-mac thread
-# backends (we use SkThreadUtils_pthread_mach on macOS).
-list(FILTER SKIA_UTILS EXCLUDE REGEX "SkLua.*\\.cpp$|SkTextureCompressor\\.cpp$|SkThreadUtils_pthread_linux\\.cpp$|SkThreadUtils_win\\.cpp$")
+# Lua bindings (no lua) and ETC1 texture compression (GPU) are excluded on every
+# platform. The thread backend is platform-specific: macOS keeps the pthread
+# variants, Windows keeps SkThreadUtils_win.
+list(FILTER SKIA_UTILS EXCLUDE REGEX "SkLua.*\\.cpp$|SkTextureCompressor\\.cpp$")
+if(MB_OS_WINDOWS)
+    list(FILTER SKIA_UTILS EXCLUDE REGEX "SkThreadUtils_pthread.*\\.cpp$")
+else()
+    list(FILTER SKIA_UTILS EXCLUDE REGEX "SkThreadUtils_pthread_linux\\.cpp$|SkThreadUtils_pthread_other\\.cpp$|SkThreadUtils_win\\.cpp$")
+endif()
 
-# --- Platform ports: CoreText fonts, CoreGraphics images, posix files/TLS. ----
+# --- Platform ports. Portable pieces are shared; the font host, file, TLS, time
+#     and debug backends are platform-specific. ---------------------------------
 set(SKIA_PORTS
-    src/ports/SkFontHost_mac.cpp
-    src/ports/SkOSFile_posix.cpp
     src/ports/SkOSFile_stdio.cpp
-    src/ports/SkTime_Unix.cpp
-    src/ports/SkTLS_pthread.cpp
-    src/ports/SkDebug_stdio.cpp
     src/ports/SkMemory_malloc.cpp
     src/ports/SkImageGenerator_none.cpp
     src/ports/SkGlobalInitialization_default.cpp
     src/ports/SkImageDecoder_empty.cpp
     src/ports/SkDiscardableMemory_none.cpp
-    src/utils/mac/SkCreateCGImageRef.cpp
-    src/utils/mac/SkStream_mac.cpp
 )
+if(MB_OS_WINDOWS)
+    # GDI font host (DirectWrite/COM left for later) + Win32 file/TLS/time/debug.
+    list(APPEND SKIA_PORTS
+        src/ports/SkFontHost_win.cpp
+        src/ports/SkFontMgr_win_gdi_factory.cpp
+        src/ports/SkOSFile_win.cpp
+        src/ports/SkTime_win.cpp
+        src/ports/SkTLS_win.cpp
+        src/ports/SkDebug_win.cpp
+    )
+else()
+    # CoreText fonts, CoreGraphics images, posix files/TLS.
+    list(APPEND SKIA_PORTS
+        src/ports/SkFontHost_mac.cpp
+        src/ports/SkOSFile_posix.cpp
+        src/ports/SkTime_Unix.cpp
+        src/ports/SkTLS_pthread.cpp
+        src/ports/SkDebug_stdio.cpp
+        src/utils/mac/SkCreateCGImageRef.cpp
+        src/utils/mac/SkStream_mac.cpp
+    )
+endif()
 list(TRANSFORM SKIA_PORTS PREPEND "${SK}/")
 
-# --- SIMD opts: NEON variants. arm64 always has NEON, and skia's headers enable
-#     the NEON code paths automatically, so the "_arm" dispatchers + "_neon"
-#     implementations are required (the "_none" bitmap procs would leave the
-#     *_neon symbols undefined). This ~2015 skia's NEON intrinsics compile
-#     unmodified on Apple Silicon. Texture compression stays portable (GPU-only).
-set(SKIA_OPTS
-    src/opts/SkBitmapProcState_opts_arm.cpp
-    src/opts/SkBitmapProcState_arm_neon.cpp
-    src/opts/SkBitmapProcState_matrixProcs_neon.cpp
-    src/opts/SkBlitMask_opts_arm.cpp
-    src/opts/SkBlitMask_opts_arm_neon.cpp
-    src/opts/SkBlitRow_opts_arm.cpp
-    src/opts/SkBlitRow_opts_arm_neon.cpp
-    src/opts/SkBlurImage_opts_arm.cpp
-    src/opts/SkBlurImage_opts_neon.cpp
-    src/opts/SkMorphology_opts_arm.cpp
-    src/opts/SkMorphology_opts_neon.cpp
-    src/opts/SkUtils_opts_arm.cpp
-    src/opts/SkUtils_opts_arm_neon.cpp
-    src/opts/SkXfermode_opts_arm.cpp
-    src/opts/SkXfermode_opts_arm_neon.cpp
-    src/opts/SkTextureCompression_opts_none.cpp
-)
+# --- SIMD opts. macOS/arm64 uses the NEON dispatchers + implementations (arm64
+#     always has NEON). Windows/x64 uses the portable "_none" variants for this
+#     first pass; the SSE2/SSSE3 dispatchers can replace them later.
+if(MB_OS_WINDOWS)
+    set(SKIA_OPTS
+        src/opts/SkBitmapProcState_opts_none.cpp
+        src/opts/SkBlitMask_opts_none.cpp
+        src/opts/SkBlitRow_opts_none.cpp
+        src/opts/SkBlurImage_opts_none.cpp
+        src/opts/SkMorphology_opts_none.cpp
+        src/opts/SkUtils_opts_none.cpp
+        src/opts/SkXfermode_opts_none.cpp
+        src/opts/SkTextureCompression_opts_none.cpp
+    )
+else()
+    set(SKIA_OPTS
+        src/opts/SkBitmapProcState_opts_arm.cpp
+        src/opts/SkBitmapProcState_arm_neon.cpp
+        src/opts/SkBitmapProcState_matrixProcs_neon.cpp
+        src/opts/SkBlitMask_opts_arm.cpp
+        src/opts/SkBlitMask_opts_arm_neon.cpp
+        src/opts/SkBlitRow_opts_arm.cpp
+        src/opts/SkBlitRow_opts_arm_neon.cpp
+        src/opts/SkBlurImage_opts_arm.cpp
+        src/opts/SkBlurImage_opts_neon.cpp
+        src/opts/SkMorphology_opts_arm.cpp
+        src/opts/SkMorphology_opts_neon.cpp
+        src/opts/SkUtils_opts_arm.cpp
+        src/opts/SkUtils_opts_arm_neon.cpp
+        src/opts/SkXfermode_opts_arm.cpp
+        src/opts/SkXfermode_opts_arm_neon.cpp
+        src/opts/SkTextureCompression_opts_none.cpp
+    )
+endif()
 list(TRANSFORM SKIA_OPTS PREPEND "${SK}/")
 
 add_library(skia STATIC
@@ -89,6 +122,15 @@ target_include_directories(skia PRIVATE
     "${SK}/src/core"   "${SK}/src/utils" "${SK}/src/image"  "${SK}/src/gpu"
     "${SK}/src/lazy"   "${SK}/src/sfnt"  "${SK}/src/opts"   "${SK}/src/effects"
     "${SK}/src/pathops" "${SK}/src/ports")
+
+if(MB_OS_WINDOWS)
+    # Bundled zlib headers for SkFlate.cpp; macOS uses the system zlib it links (-lz).
+    # src/utils/win: SkHRESULT.h and the Win COM/DWrite helpers the GDI font host pulls.
+    target_include_directories(skia PRIVATE
+        "${CMAKE_SOURCE_DIR}/third_party/zlib"
+        "${SK}/include/utils/win"
+        "${SK}/src/utils/win")
+endif()
 
 target_compile_definitions(skia PRIVATE SK_INTERNAL)
 # skia requires exactly one of SK_DEBUG / SK_RELEASE.
