@@ -11,16 +11,28 @@ add_library(wke STATIC ${WKE_SRC})
 target_link_libraries(wke PUBLIC content_browser mc net_portable)
 target_include_directories(wke PUBLIC
     "${CMAKE_SOURCE_DIR}" "${CMAKE_SOURCE_DIR}/wke" "${CMAKE_SOURCE_DIR}/orig_chrome"
-    "${CMAKE_SOURCE_DIR}/mc" "${CMAKE_SOURCE_DIR}/electron" "${CMAKE_SOURCE_DIR}/win_compat"
+    "${CMAKE_SOURCE_DIR}/mbvip"   # features/printing/PdfViewerPluginFunc.h (Win-only include)
+    "${CMAKE_SOURCE_DIR}/mc" "${CMAKE_SOURCE_DIR}/electron"
     "${CMAKE_SOURCE_DIR}/third_party/npapi" "${CMAKE_SOURCE_DIR}/third_party/v8shim"
     "${CMAKE_SOURCE_DIR}/third_party/khronos" "${CMAKE_SOURCE_DIR}/third_party/libcurl_7.69/include"
     "${CMAKE_SOURCE_DIR}/third_party/skia/include/core"
     "${CMAKE_SOURCE_DIR}/third_party/skia/include/config"
     "${CMAKE_SOURCE_DIR}/third_party/skia/include/utils")
+if(NOT MB_OS_WINDOWS)
+    target_include_directories(wke PUBLIC "${CMAKE_SOURCE_DIR}/win_compat")  # <windows.h> shim
+endif()
 target_compile_definitions(wke PUBLIC "V8CALL=" ENABLE_WKE=1 BLINK_IMPLEMENTATION=1
     V8_COMPRESS_POINTERS V8_31BIT_SMIS_ON_64BIT_ARCH V8_REVERSE_JSARGS)
 set_target_properties(wke PROPERTIES CXX_STANDARD 14)
-if(NOT MSVC)
+if(MSVC)
+    # Real SDK windows.h + the headers WIN32_LEAN_AND_MEAN trims that wke uses.
+    # ole2.h/objbase.h are force-included EARLY (before any `using namespace` in the
+    # wke sources) so oaidl.h's DOUBLE binds to ::DOUBLE unambiguously, not a
+    # namespace DOUBLE pulled in later (C2872); ole2.h also provides RevokeDragDrop.
+    target_compile_options(wke PRIVATE
+        "/GR-" "/FIwindows.h" "/FImmsystem.h" "/FIshellapi.h" "/FIcommdlg.h"
+        "/FIobjbase.h" "/FIole2.h" "/FIwinspool.h")  # winspool: PRINTER_INFO_2 (mbvip printing)
+else()
     target_compile_options(wke PRIVATE
         -fdeclspec -fno-exceptions -fno-rtti -w
         "SHELL:-include ${CMAKE_SOURCE_DIR}/win_compat/windows.h")
