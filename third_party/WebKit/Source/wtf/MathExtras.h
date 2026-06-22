@@ -52,8 +52,10 @@ const float piOverFourFloat = static_cast<float>(M_PI_4);
 const double twoPiDouble = piDouble * 2.0;
 const float twoPiFloat = piFloat * 2.0f;
 
-#if OS(ANDROID) || COMPILER(MSVC)
-// ANDROID and MSVC's math.h does not currently supply log2 or log2f.
+#if OS(ANDROID) || (COMPILER(MSVC) && _MSC_VER < 1800)
+// ANDROID and pre-VS2013 MSVC's math.h did not supply log2 or log2f. VS2013+
+// (incl. the VS2022 toolset used by the CMake build) provide them, and in
+// release builds they are intrinsics, so defining them here triggers C2169.
 inline double __cdecl log2(double num)
 {
     // This constant is roughly M_LN2, which is not provided by default on Windows and Android.

@@ -170,8 +170,13 @@ target_include_directories(blink_platform PUBLIC
     "${CMAKE_SOURCE_DIR}/third_party/ots/include"  # opentype-sanitiser.h (OpenTypeSanitizer)
     "${CMAKE_SOURCE_DIR}/skia/ext"
     "${CMAKE_SOURCE_DIR}/third_party/v8shim"    # v8-debug.h shim (plugins/heap pull ScriptState)
-    "${CMAKE_SOURCE_DIR}/win_compat"            # <windows.h> shim (ImageBuffer pulls wke)
     "${CMAKE_SOURCE_DIR}/orig_chrome")
+# win_compat is the <windows.h> SHIM for NON-Windows builds (ImageBuffer pulls wke
+# which uses Win32 types). On Windows the real SDK windows.h is used instead; the
+# shim deliberately #errors if included on Windows.
+if(NOT MB_OS_WINDOWS)
+    target_include_directories(blink_platform PUBLIC "${CMAKE_SOURCE_DIR}/win_compat")
+endif()
 
 target_link_libraries(blink_platform PUBLIC wtf skia harfbuzz
     miniblink_png miniblink_jpeg miniblink_webp miniblink_ots skia_ext)
@@ -185,9 +190,13 @@ if(APPLE)
     endif()
 endif()
 
-# blink/WTF need the config bootstrap force-included; skia needs SK_RELEASE and
-# blink uses __declspec annotations (-fdeclspec) and is built without exceptions.
-target_compile_options(blink_platform PUBLIC -include "${WSRC}/config.h")
+# blink/WTF need the config bootstrap force-included (MSVC spells it /FI, clang
+# -include); blink uses __declspec annotations (-fdeclspec) and no exceptions.
+if(MSVC)
+    target_compile_options(blink_platform PUBLIC "/FI${WSRC}/config.h")
+else()
+    target_compile_options(blink_platform PUBLIC -include "${WSRC}/config.h")
+endif()
 # ENABLE_OILPAN=1 makes blink's RefCountedWillBe*/RefPtrWillBeMember transitional
 # types resolve to garbage-collected (Member/GarbageCollectedFinalized). It is an
 # ABI-affecting flag, so it must be identical across platform and core; PUBLIC so

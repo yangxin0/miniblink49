@@ -33,6 +33,10 @@ target_include_directories(miniblink_ots PUBLIC
     "${CMAKE_SOURCE_DIR}/third_party/ots/include")
 target_include_directories(miniblink_ots PRIVATE
     "${CMAKE_SOURCE_DIR}/third_party/ots/src" "${CMAKE_SOURCE_DIR}/third_party")
+if(MB_OS_WINDOWS)
+    # ots.cc includes <zlib.h>; macOS resolves it via the system zlib.
+    target_include_directories(miniblink_ots PRIVATE "${CMAKE_SOURCE_DIR}/third_party/zlib")
+endif()
 if(NOT MSVC)
     target_compile_options(miniblink_ots PRIVATE -w -fno-exceptions)
 endif()
