@@ -19,5 +19,6 @@ CMakeCache.txt
 *.o
 *.a
 
-# macOS CMake out-of-source build directory (all generated)
-build-mac/
+# macOS CMake out-of-source build directories (all generated): build-mac (release),
+# build-mac-debug, and any other build-mac* variant.
+build-mac*/
