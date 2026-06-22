@@ -240,6 +240,56 @@ static const char* kPolyfillJS = R"JS(
   if (!window.queueMicrotask) {
     window.queueMicrotask = function(cb){ Promise.resolve().then(cb); };
   }
+  // navigator.permissions.query -- fingerprint/feature-detect code (e.g. X's
+  // bot-check) reads navigator.permissions.query and crashes if it's undefined.
+  try {
+    if (navigator && !navigator.permissions) {
+      Object.defineProperty(navigator, 'permissions', { configurable:true, value: {
+        query: function(d){ return Promise.resolve({
+          state:'prompt', status:'prompt', onchange:null,
+          addEventListener:function(){}, removeEventListener:function(){},
+          dispatchEvent:function(){return false;} }); }
+      }});
+    }
+  } catch(e){}
+  // --- Make web-platform collections iterable -------------------------------
+  // blink-53 predates Symbol.iterator on several DOM/fetch types; modern bundles
+  // (X, YouTube) do `[...x]` / `for..of x` / `const [a]=x` on them and throw
+  // "object is not iterable". Install a missing-only Symbol.iterator on each.
+  try {
+  if (typeof Symbol !== 'undefined' && Symbol.iterator) {
+    var IT = Symbol.iterator;
+    var def = function(proto, fn){
+      // NB: never probe accessor props (e.g. .length) on a prototype -- that
+      // invokes the getter with this===prototype and throws "Illegal invocation".
+      if (proto && !proto[IT]) {
+        try { Object.defineProperty(proto, IT, {value: fn, configurable:true, writable:true}); } catch(e){}
+      }
+    };
+    // length-indexed collections -> yield items 0..length-1 (read length lazily,
+    // at iteration time, on a real instance -- never on the prototype).
+    var idxIter = function(){
+      var i = 0, self = this, it = { next: function(){
+        return i < self.length ? {value: self[i++], done:false}
+                               : {value: undefined, done:true}; } };
+      it[IT] = function(){ return this; };
+      return it;
+    };
+    ['NodeList','HTMLCollection','DOMTokenList','CSSRuleList','NamedNodeMap',
+     'FileList','DataTransferItemList','TouchList','StyleSheetList','DOMStringList',
+     'MediaList','SVGLengthList','SVGNumberList','SVGStringList','SVGTransformList',
+     'SVGPointList','MimeTypeArray','PluginArray'].forEach(function(n){
+      var C = window[n];
+      if (C && C.prototype) def(C.prototype, idxIter);
+    });
+    // entries()-based pair collections (Headers, URLSearchParams, FormData)
+    ['Headers','URLSearchParams','FormData'].forEach(function(n){
+      var C = window[n];
+      if (C && C.prototype && typeof C.prototype.entries === 'function')
+        def(C.prototype, function(){ return this.entries(); });
+    });
+  }
+  } catch(e){}
 })();
 )JS";
 
