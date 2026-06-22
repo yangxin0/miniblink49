@@ -28,6 +28,25 @@ enum {
 
 static wkeWebView g_webView = nullptr;
 static NSView* g_contentView = nil;
+static NSTextField* g_addressBar = nil;   // URL entry
+static NSButton* g_backButton = nil;      // ◀
+static NSButton* g_forwardButton = nil;   // ▶
+static const CGFloat kToolbarHeight = 40.0;
+
+// Reflect the engine's current URL + history availability into the chrome.
+static void mbUpdateChrome() {
+    if (!g_webView) return;
+    const utf8* u = wkeGetURL(g_webView);
+    if (u && g_addressBar) {
+        // Don't stomp the field while the user is editing it (an active NSTextField
+        // edit makes the window's firstResponder the shared field editor, an NSTextView).
+        id fr = [g_addressBar.window firstResponder];
+        if (![fr isKindOfClass:[NSTextView class]])
+            [g_addressBar setStringValue:[NSString stringWithUTF8String:u]];
+    }
+    [g_backButton setEnabled:wkeCanGoBack(g_webView)];
+    [g_forwardButton setEnabled:wkeCanGoForward(g_webView)];
+}
 
 // ---- The content view: blits the wke webview's RGBA buffer ------------------
 @interface MbBrowserView : NSView
@@ -237,6 +256,71 @@ static void onConsole(wkeWebView, void*, wkeConsoleLevel level, const wkeString 
     NSLog(@"[console:%d] %s  (%s:%u)", (int)level, msg ? msg : "", src ? src : "", sourceLine);
 }
 
+// URL changed in the engine -> refresh address bar + back/forward state.
+static void onURLChanged(wkeWebView, void*, const wkeString url) {
+    dispatch_async(dispatch_get_main_queue(), ^{ mbUpdateChrome(); });
+}
+// Page finished loading -> refresh chrome (final URL after redirects, history).
+static void onLoadingFinish(wkeWebView, void*, const wkeString, wkeLoadingResult, const wkeString) {
+    dispatch_async(dispatch_get_main_queue(), ^{ mbUpdateChrome(); });
+}
+// Title changed -> window title.
+static void onTitleChanged(wkeWebView, void*, const wkeString title) {
+    const utf8* t = title ? wkeGetString(title) : "";
+    if (!t) return;
+    NSString* s = [NSString stringWithUTF8String:t];
+    dispatch_async(dispatch_get_main_queue(), ^{
+        [[g_contentView window] setTitle:s.length ? s : @"miniblink (macOS)"];
+    });
+}
+
+// ---- Browser chrome: back/forward/reload buttons + address bar --------------
+@interface MbChrome : NSObject <NSWindowDelegate>
+@end
+@implementation MbChrome
+- (void)goBack:(id)sender    { if (g_webView && wkeCanGoBack(g_webView))    wkeGoBack(g_webView); }
+- (void)goForward:(id)sender { if (g_webView && wkeCanGoForward(g_webView)) wkeGoForward(g_webView); }
+- (void)reload:(id)sender    { if (g_webView) wkeReload(g_webView); }
+
+// Enter in the address bar -> normalize + load.
+- (void)navigate:(id)sender {
+    if (!g_webView) return;
+    NSString* text = [[g_addressBar stringValue]
+        stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+    if (text.length == 0) return;
+    // Add a scheme if the user typed a bare host/path; treat a no-dot, no-space
+    // token as a search query routed through a search engine.
+    BOOL hasScheme = ([text rangeOfString:@"://"].location != NSNotFound) ||
+                     [text hasPrefix:@"about:"] || [text hasPrefix:@"data:"];
+    NSString* urlStr;
+    if (hasScheme) {
+        urlStr = text;
+    } else if ([text rangeOfString:@" "].location != NSNotFound ||
+               [text rangeOfString:@"."].location == NSNotFound) {
+        NSString* q = [text stringByAddingPercentEncodingWithAllowedCharacters:
+            [NSCharacterSet URLQueryAllowedCharacterSet]];
+        urlStr = [@"https://www.bing.com/search?q=" stringByAppendingString:q ?: @""];
+    } else {
+        urlStr = [@"https://" stringByAppendingString:text];
+    }
+    wkeLoadURL(g_webView, [urlStr UTF8String]);
+    // hand keyboard focus back to the page
+    [[g_addressBar window] makeFirstResponder:g_contentView];
+}
+
+// Keep the web view sized to the area below the toolbar as the window resizes.
+- (void)windowDidResize:(NSNotification*)note {
+    NSWindow* win = [note object];
+    NSRect cr = [[win contentView] bounds];
+    int w = (int)cr.size.width;
+    int h = (int)(cr.size.height - kToolbarHeight);
+    if (w <= 0 || h <= 0 || !g_webView) return;
+    wkeResize(g_webView, w, h);
+    wkeRepaintIfNeeded(g_webView);
+    [g_contentView setNeedsDisplay:YES];
+}
+@end
+
 @interface MbAppDelegate : NSObject <NSApplicationDelegate>
 @end
 @implementation MbAppDelegate
@@ -246,22 +330,60 @@ static void onConsole(wkeWebView, void*, wkeConsoleLevel level, const wkeString 
 int main(int argc, const char** argv) {
     @autoreleasepool {
         const char* url = (argc > 1) ? argv[1] : "https://example.com";
-        const int W = 1024, H = 768;
+        const int W = 1024, H = 768;                 // web content area
+        const int winH = H + (int)kToolbarHeight;    // window adds a toolbar strip
 
         [NSApplication sharedApplication];
         [NSApp setActivationPolicy:NSApplicationActivationPolicyRegular];
         MbAppDelegate* del = [[MbAppDelegate alloc] init];
         [NSApp setDelegate:del];
 
-        NSRect frame = NSMakeRect(0, 0, W, H);
+        NSRect winFrame = NSMakeRect(0, 0, W, winH);
         NSWindow* win = [[NSWindow alloc]
-            initWithContentRect:frame
+            initWithContentRect:winFrame
             styleMask:(NSWindowStyleMaskTitled | NSWindowStyleMaskClosable |
                        NSWindowStyleMaskMiniaturizable | NSWindowStyleMaskResizable)
             backing:NSBackingStoreBuffered defer:NO];
         [win setTitle:@"miniblink (macOS)"];
-        g_contentView = [[MbBrowserView alloc] initWithFrame:frame];
-        [win setContentView:g_contentView];
+
+        NSView* root = [[NSView alloc] initWithFrame:winFrame];
+        [win setContentView:root];
+
+        // --- Toolbar (pinned to the top, full width) ---
+        NSView* toolbar = [[NSView alloc] initWithFrame:
+            NSMakeRect(0, winH - kToolbarHeight, W, kToolbarHeight)];
+        [toolbar setAutoresizingMask:(NSViewWidthSizable | NSViewMinYMargin)];
+        [root addSubview:toolbar];
+
+        MbChrome* chrome = [[MbChrome alloc] init];
+        [win setDelegate:chrome];
+
+        NSButton* (^mkBtn)(NSString*, SEL, CGFloat) = ^NSButton*(NSString* label, SEL act, CGFloat x) {
+            NSButton* b = [[NSButton alloc] initWithFrame:NSMakeRect(x, 6, 34, 28)];
+            [b setTitle:label]; [b setBezelStyle:NSBezelStyleRounded];
+            [b setTarget:chrome]; [b setAction:act];
+            [b setAutoresizingMask:NSViewMaxXMargin];
+            [toolbar addSubview:b];
+            return b;
+        };
+        g_backButton    = mkBtn(@"◀", @selector(goBack:), 8);      // back
+        g_forwardButton = mkBtn(@"▶", @selector(goForward:), 46);  // forward
+        (void)            mkBtn(@"↻", @selector(reload:), 84);     // reload
+
+        g_addressBar = [[NSTextField alloc] initWithFrame:
+            NSMakeRect(124, 8, W - 124 - 10, 24)];
+        [g_addressBar setAutoresizingMask:NSViewWidthSizable];
+        [[g_addressBar cell] setPlaceholderString:@"Enter URL or search"];
+        [g_addressBar setStringValue:[NSString stringWithUTF8String:url]];
+        [g_addressBar setTarget:chrome];
+        [g_addressBar setAction:@selector(navigate:)];   // fires on Enter
+        [toolbar addSubview:g_addressBar];
+
+        // --- Web content view (fills the area below the toolbar) ---
+        g_contentView = [[MbBrowserView alloc] initWithFrame:NSMakeRect(0, 0, W, H)];
+        [g_contentView setAutoresizingMask:(NSViewWidthSizable | NSViewHeightSizable)];
+        [root addSubview:g_contentView];
+
         [win setAcceptsMouseMovedEvents:YES];   // deliver mouseMoved for hover
         [win center];
         [win makeKeyAndOrderFront:nil];
@@ -278,6 +400,10 @@ int main(int argc, const char** argv) {
         wkeSetUserAgent(g_webView, kModernUA);
         wkeOnDidCreateScriptContext(g_webView, onDidCreateScriptContext, nullptr);
         wkeOnConsole(g_webView, onConsole, nullptr);
+        // Chrome wiring: keep the address bar + back/forward state in sync.
+        wkeOnURLChanged(g_webView, onURLChanged, nullptr);
+        wkeOnLoadingFinish(g_webView, onLoadingFinish, nullptr);
+        wkeOnTitleChanged(g_webView, onTitleChanged, nullptr);
         wkeLoadURL(g_webView, url);
 
         NSLog(@"[minibrowser] loading %s", url);
@@ -292,6 +418,7 @@ int main(int argc, const char** argv) {
             wkeRepaintIfNeeded(g_webView);
             if (ticks <= 3) NSLog(@"[minibrowser] tick %d: after wkeRepaintIfNeeded", ticks);
             [g_contentView setNeedsDisplay:YES];
+            if (ticks % 15 == 0) mbUpdateChrome();   // keep nav buttons/URL fresh
             if (ticks % 60 == 0)
                 NSLog(@"[minibrowser] tick=%d loading=%d complete=%d", ticks,
                       wkeIsLoading(g_webView), wkeIsLoadingCompleted(g_webView));
