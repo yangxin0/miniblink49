@@ -874,12 +874,9 @@ void WebFrameClientImpl::clearContextMenu()
 
 void WebFrameClientImpl::didCreateScriptContext(WebLocalFrame* frame, v8::Local<v8::Context> context, int extensionGroup, int worldId)
 {
-#if defined(_WIN32)
-    v8::V8::SetCaptureStackTraceForUncaughtExceptions(true, 50, v8::StackTrace::kDetailed);
-#else
-    // V8 8.7: this moved from the static v8::V8 API onto Isolate.
+    // V8 8.7: this moved from the static v8::V8 API onto Isolate (both platforms;
+    // the old static v8::V8::SetCaptureStackTraceForUncaughtExceptions was removed).
     v8::Isolate::GetCurrent()->SetCaptureStackTraceForUncaughtExceptions(true, 50, v8::StackTrace::kDetailed);
-#endif
 
 #if (defined ENABLE_WKE) && (ENABLE_WKE == 1)
     if (frame->top() == frame)
