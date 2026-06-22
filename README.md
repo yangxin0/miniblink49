@@ -1,127 +1,110 @@
-# 声明
+# miniblink49 — cross-platform fork (macOS arm64 + Windows)
 
-miniblink 108内核版本和华为达成战略合作，已经在华为欧拉系统里开源https://gitee.com/openeuler/liteview 。
+A fork of [weolar/miniblink49](https://github.com/weolar/miniblink49) — the small,
+single-file browser widget based on Chromium/Blink — ported to build and **run on
+macOS (Apple Silicon)** alongside the original Windows build, on **one shared,
+pinned V8 8.7**.
 
-而本仓库收藏的是较老的49内核版本。如果需要更新的，可以参考上述108内核版本。
+On macOS the engine now executes page JavaScript and renders real sites (e.g.
+baidu fully; YouTube/X app shells) through a Cocoa mini-browser that drives the
+`wke` C API. The Windows `mb`/`wke` API is preserved; all macOS changes are
+version-guarded so the Windows path is unchanged.
 
-miniblink132内核也即将开源，大家敬请期待。
+> New here? `wke/wke.h` is the public C API. The macOS host lives in
+> `port/mac/minibrowser_main.mm`. Build details below.
 
-可执行文件及头文件下载地址（含最新的132版本）：https://github.com/weolar/miniblink49/releases
+---
 
-希望大家尊重开源，尊重作者全职几年持续更新付出的劳动。
+## Build on macOS (Apple Silicon / arm64)
 
-如需获得后续技术支持，请使用以下联系方式：
+### Prerequisites
 
-开发者论坛：https://bbs.miniblink.com/ （注册后，需要加我QQ告诉我，我才能验证通过）
+- macOS on Apple Silicon (arm64). x64 is supported via `TARGET_CPU=x64`.
+- **Xcode Command Line Tools** (`xcode-select --install`) — full Xcode is *not* required.
+- **CMake ≥ 3.16** (`brew install cmake`).
+- ~30 GB free disk and a network connection (the V8 build fetches depot_tools + V8 source).
 
-加微信群：![wx_group](https://miniblink.net/images/wx_group.png)
+### Step 1 — Build the pinned V8 8.7 monolith
 
-Telegram群：https://t.me/miniblink
+The JS engine is a single pinned **V8 8.7.220.3**, built from source once. The
+script bootstraps depot_tools, applies the macOS/Clang patches (`v8_8_7_*.patch`),
+and builds a static monolith:
 
-Q群：738349226（可加）、94093808（已满勿加）
-
-QQ（weolar）：93527630
-
-email：weolar@miniblink.net
-
-微信：可发邮箱咨询我微信号。暂时不放到github了
-
-
-# 简介 Abstract
-
-miniblink is a open source, one file, small browser widget base on chromium.
-
-By using C interface, you can create a browser just some line code.
-
-more information at http://miniblink.net
-
-----
-
-miniblink是一个开源的、单文件、且目前已知的最小的基于chromium的，浏览器控件。
-
-通过其导出的纯C接口，几行代码即可创建一个浏览器控件。
-
-您可以通过官网http://miniblink.net 来获取更多的关于miniblink的信息。
-
-
-----
-
-# 特性 Features
-
-- 极致小巧的体积 (small size)
-- C++，C#，Delphi等语言调用 (support C++，C#，Delphi language to call)
-- 内嵌Nodejs，支持electron (with Nodejs, can run electron)
-- 随心所欲的定制功能、模拟环境 (simulate other browser environment)
-- 支持Windows xp、npapi (support windows xp and npapi)
-- 完善的HTML5支持，对各种前端库友好 (support HTML5, and friendly to front framework)
-- 关闭跨域开关后，可以使用各种跨域功能 (support cross domain)
-- 网络资源拦截，替换任意网站任意js为本地文件 (network intercept, you can replace any resource to local file)
-- headless模式，极大节省资源，适用于爬虫 (headless mode, be suitable for Web Crawler)
-
-----
-
-# 文档 Document
-
-关于miniblink的介绍见这篇文章：https://zhuanlan.zhihu.com/p/22611497?group_id=764036386641707008
-
-API文档见：https://miniblink.net/views/doc/index.html 
-
-----
-
-# 使用 Usage
-请前往https://github.com/weolar/miniblink49/releases 下载最新编译后的SDK，里面的demo_src是个完整的用例。
-
-或者前往 https://github.com/weolar/mb-demo 下载
-
-最简单的创建一个窗口：
-
-**Usage**
-
-```cpp
-// 无边框窗体 borderless window
-wkeWebView window = wkeCreateWebWindow(WKE_WINDOW_TYPE_TRANSPARENT, NULL, 0, 0, 640, 480);  
-wkeLoadURLW(window, L"miniblink.net");
+```sh
+tools/build-v8-8.7-macos.sh                  # native arm64 (default)
+# TARGET_CPU=x64 tools/build-v8-8.7-macos.sh   # x64 instead
 ```
-![demo-1](https://weolar.github.io/miniblink/assets/images/demo-0.gif)
 
-# 编译 Build
+Output: `~/build/v8-8.7/v8/out/arm64.release/obj/libv8_monolith.a` (+ headers under
+`~/build/v8-8.7/v8/include`). Re-running is idempotent.
 
-不推荐自己编译。请前往https://github.com/weolar/miniblink49/releases 下载编译好的文件使用。
+### Step 2 — Configure & build the engine + mini-browser
 
-因为每天有大量更新，我无法确保每次更新都能保证编译通过。如果有编译错误，请不要来提问，耐心等待我的下次提交。
+```sh
+cmake -S . -B build-mac
+cmake --build build-mac --target minibrowser -j8
+```
 
-----
+`CMakeLists.txt` finds V8 via `MINIBLINK_V8_ROOT` (default `~/build/v8-8.7/v8`)
+and `MINIBLINK_V8_OUT` (default `out/<arch>.release`). Override if you built V8
+elsewhere:
 
-# mini-electron
+```sh
+cmake -S . -B build-mac -DMINIBLINK_V8_ROOT=/path/to/v8-8.7/v8
+```
 
-mini-electron项目是一个基于miniblink的独立项目，旨在创建一个更小的electron运行环境。目前已经实现了这一目标。
+### Step 3 — Run
 
-通过替换mini-electron，打包完后的文件仅仅6m左右。
+```sh
+build-mac/bin/minibrowser https://www.baidu.com
+```
 
-----
+A Cocoa window opens with a toolbar (back / forward / reload + address bar) and
+the rendered page. The address bar accepts a URL (bare hosts get `https://`
+prepended) or a search query.
 
-# 联系方式
+### Outputs
 
-大家有问题可以选择：
+| Artifact | Path |
+|----------|------|
+| Mini-browser executable | `build-mac/bin/minibrowser` |
+| Static `wke` C-API library | `build-mac/lib/libwke.a` |
 
-- 加微信群：![wx_group](https://miniblink.net/images/wx_group.png)
+> Tip: the V8 monolith is linked via `force_load`, a dependency CMake does not
+> track. After rebuilding V8, run `rm -f build-mac/bin/minibrowser` before
+> `cmake --build` to force a relink.
 
-- 邮箱weolar@miniblink.net
+---
 
-- github里留言issue讨论
+## Build on Windows
 
-- 加Q群94093808
+The original Visual Studio build is unchanged:
 
-- 关注知乎专栏：https://zhuanlan.zhihu.com/chrome
+1. Open `build/miniblink.sln` in Visual Studio.
+2. Build the desired configuration.
 
-----
+A cross-platform CMake path (sharing the same pinned V8 8.7) is also being wired
+up — see [`BUILD_CROSSPLATFORM.md`](BUILD_CROSSPLATFORM.md). Build the matching
+V8 8.7 with V8's standard GN + Ninja (the `v8_8_7_*.patch` files are
+macOS/Clang-specific and not needed on Windows).
 
-# 致谢 Thanks
+---
 
-特别感谢网友zero，他是miniblink的代码的重要贡献者。
+## Notes
 
-感谢网友core，感谢网友“大清知府”。
+- **One JS engine.** The six in-tree vendored V8 copies were removed; both OSes
+  use the single pinned V8 8.7.220.3 — the first V8 with native Apple Silicon
+  support, while staying close to the engine's existing V8 ~7.5 API. See
+  [`V8_API_MIGRATION.md`](V8_API_MIGRATION.md).
+- **macOS porting approach.** Changes are guarded with `#if defined(_WIN32)` /
+  `#if V8_MAJOR_VERSION < 8`; a Win32 compatibility shim (`win_compat/`) and a
+  Cocoa embedding host (`content/web_impl_mac/`, `port/mac/`) back the port. The
+  `mc` compositor runs single-threaded on macOS.
+- **Free & open source.** The VIP license-verification subsystem has been
+  removed; all features are enabled by default.
 
-感谢网友boxue（ https://www.zhihu.com/people/coltor/ ），他致力于对miniblink架构的研究及推广。
+## Credits
 
-
+Engine and original Windows implementation by **weolar** —
+<https://github.com/weolar/miniblink49> · <http://miniblink.net>. Please respect
+the upstream author's years of work.
