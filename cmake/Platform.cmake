@@ -36,13 +36,3 @@ add_compile_definitions(
     $<$<BOOL:${MB_OS_MACOSX}>:MB_OS_MACOSX=1>
     $<$<BOOL:${MB_OS_LINUX}>:MB_OS_LINUX=1>
 )
-
-# Note on QuickJS + MSVC: upstream QuickJS relies on computed-goto / C99
-# features that classic MSVC (cl.exe) does not accept. On Windows the portable
-# build therefore expects clang-cl or mingw for the quickjs target. This is
-# documented in BUILD_CROSSPLATFORM.md and surfaced here for visibility.
-if(MB_OS_WINDOWS AND MSVC AND NOT CMAKE_C_COMPILER_ID MATCHES "Clang")
-    message(WARNING
-        "QuickJS may not compile with classic MSVC (cl.exe). "
-        "Use clang-cl (-T ClangCL) or mingw for the quickjs target on Windows.")
-endif()
