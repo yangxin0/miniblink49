@@ -84,7 +84,7 @@ The original Visual Studio build is unchanged:
 2. Build the desired configuration.
 
 A cross-platform CMake path (sharing the same pinned V8 8.7) is also being wired
-up — see [`BUILD_CROSSPLATFORM.md`](BUILD_CROSSPLATFORM.md). Build the matching
+up — see [`BUILD_CROSSPLATFORM.md`](docs/BUILD_CROSSPLATFORM.md). Build the matching
 V8 8.7 with V8's standard GN + Ninja (the `v8_8_7_*.patch` files are
 macOS/Clang-specific and not needed on Windows).
 
@@ -95,7 +95,7 @@ macOS/Clang-specific and not needed on Windows).
 - **One JS engine.** The six in-tree vendored V8 copies were removed; both OSes
   use the single pinned V8 8.7.220.3 — the first V8 with native Apple Silicon
   support, while staying close to the engine's existing V8 ~7.5 API. See
-  [`V8_API_MIGRATION.md`](V8_API_MIGRATION.md).
+  [`V8_API_MIGRATION.md`](docs/V8_API_MIGRATION.md).
 - **macOS porting approach.** Changes are guarded with `#if defined(_WIN32)` /
   `#if V8_MAJOR_VERSION < 8`; a Win32 compatibility shim (`win_compat/`) and a
   Cocoa embedding host (`content/web_impl_mac/`, `port/mac/`) back the port. The

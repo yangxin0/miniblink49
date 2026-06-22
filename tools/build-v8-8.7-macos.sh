@@ -10,7 +10,7 @@
 #
 # Prereqs handled by this script: depot_tools, a `python`->python3 shim, the
 # pinned gn binary, the pinned clang, and a set of small patches (see the
-# v8_8_7_*.patch files next to this repo) needed to build a 2020 V8 on a 2026
+# patches in the patches/ directory) needed to build a 2020 V8 on a 2026
 # toolchain. Re-running is idempotent.
 set -euo pipefail
 
@@ -65,17 +65,17 @@ for pkg in jinja2 markupsafe; do
 done
 
 # ---- Apply source/tooling patches (idempotent) -----------------------------
-git apply --check "$REPO_DIR/v8_8_7_macos.patch" 2>/dev/null && git apply "$REPO_DIR/v8_8_7_macos.patch" || true
-( cd build && git apply --check "$REPO_DIR/v8_8_7_build_dir.patch" 2>/dev/null && git apply "$REPO_DIR/v8_8_7_build_dir.patch" || true )
-git apply --check "$REPO_DIR/v8_8_7_dcheck_kmax.patch" 2>/dev/null && git apply "$REPO_DIR/v8_8_7_dcheck_kmax.patch" || true
+git apply --check "$REPO_DIR/patches/v8_8_7_macos.patch" 2>/dev/null && git apply "$REPO_DIR/patches/v8_8_7_macos.patch" || true
+( cd build && git apply --check "$REPO_DIR/patches/v8_8_7_build_dir.patch" 2>/dev/null && git apply "$REPO_DIR/patches/v8_8_7_build_dir.patch" || true )
+git apply --check "$REPO_DIR/patches/v8_8_7_dcheck_kmax.patch" 2>/dev/null && git apply "$REPO_DIR/patches/v8_8_7_dcheck_kmax.patch" || true
 # Restore old-V8 full-prototype-chain holder lookup for the global proxy so
 # blink-53's split-window window.* methods don't throw "Illegal invocation".
-git apply --check "$REPO_DIR/v8_8_7_global_proxy_signature.patch" 2>/dev/null && git apply "$REPO_DIR/v8_8_7_global_proxy_signature.patch" || true
+git apply --check "$REPO_DIR/patches/v8_8_7_global_proxy_signature.patch" 2>/dev/null && git apply "$REPO_DIR/patches/v8_8_7_global_proxy_signature.patch" || true
 # Make dcheck_always_on DCHECKs non-fatal: we build with dcheck on only to dodge
 # the release wrapper-construction miscompile, but blink-53 trips a few too-strict
 # DCHECKs that shouldn't take down the whole browser.
-git apply --check "$REPO_DIR/v8_8_7_nonfatal_dcheck.patch" 2>/dev/null && git apply "$REPO_DIR/v8_8_7_nonfatal_dcheck.patch" || true
-( cd third_party/zlib && git apply --check "$REPO_DIR/v8_8_7_zlib.patch" 2>/dev/null && git apply "$REPO_DIR/v8_8_7_zlib.patch" || true )
+git apply --check "$REPO_DIR/patches/v8_8_7_nonfatal_dcheck.patch" 2>/dev/null && git apply "$REPO_DIR/patches/v8_8_7_nonfatal_dcheck.patch" || true
+( cd third_party/zlib && git apply --check "$REPO_DIR/patches/v8_8_7_zlib.patch" 2>/dev/null && git apply "$REPO_DIR/patches/v8_8_7_zlib.patch" || true )
 
 # ---- Configure + build -----------------------------------------------------
 OUT="out/${TARGET_CPU}.release"

@@ -32,7 +32,7 @@ Output: `~/build/v8-8.7/v8/out/<cpu>.release/obj/libv8_monolith.a` + `include/`.
 
 ### What it took (a 2020 V8 on a 2026 toolchain)
 
-The build script and these patches (kept next to this file) capture the bring-up:
+The build script and these patches (in patches/) capture the bring-up:
 
 - `v8_8_7_macos.patch` — V8 source fixes for Clang 21: `bit-field.h` `kMax`
   (out-of-enum-range `constexpr` cast), and scoped-enum comparison casts in
