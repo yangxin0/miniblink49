@@ -14,3 +14,7 @@ build-cmake/
 cmake-build-*/
 /build/CMakeFiles/
 CMakeCache.txt
+
+# Compiled build artifacts (object files + static archives)
+*.o
+*.a
