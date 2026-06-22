@@ -44,3 +44,12 @@ add_compile_definitions(
     $<$<BOOL:${MB_OS_MACOSX}>:MB_OS_MACOSX=1>
     $<$<BOOL:${MB_OS_LINUX}>:MB_OS_LINUX=1>
 )
+
+# miniblink is a Unicode Win32 application: define UNICODE/_UNICODE so the Win32
+# API macros resolve to the wide (*W) entry points that the engine's wchar_t code
+# paths expect. Without this, CreateFile/VerQueryValue/GetFileVersionInfo/... pick
+# the ANSI (*A) variants and reject wchar_t* arguments (this matches what the
+# historical miniblink.vcxproj defined).
+if(MB_OS_WINDOWS)
+    add_compile_definitions(UNICODE _UNICODE)
+endif()
