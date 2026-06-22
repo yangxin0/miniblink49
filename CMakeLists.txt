@@ -1,8 +1,9 @@
 # miniblink49 — cross-platform (CMake) build entry point
 #
-# Historically miniblink49 builds ONLY with Visual Studio (build/miniblink.sln,
-# 182 .vcxproj files). This CMake tree is the cross-platform build method,
-# introduced to let the engine build on both Windows and macOS.
+# Historically miniblink49 built ONLY with Visual Studio (build/miniblink.sln +
+# ~150 .vcxproj files, mixed v120/v140_xp/v141_xp toolsets). That legacy MSBuild
+# project tree has been removed: this CMake tree is now the SOLE build method,
+# building the engine on both Windows and macOS from one source of truth.
 #
 # JavaScript engine: a SINGLE pinned V8 (8.7.220.3) is shared by both platforms,
 # replacing the old in-tree vendored V8 copies (v8_4_5 .. v8_7_5, now removed).

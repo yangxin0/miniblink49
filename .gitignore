@@ -12,8 +12,18 @@ bin/cookies.dat
 # CMake (cross-platform build) out-of-source build dirs
 build-cmake/
 cmake-build-*/
+build-win*/
 /build/CMakeFiles/
 CMakeCache.txt
+
+# Legacy Visual Studio project/solution files — removed in favour of the
+# cross-platform CMake build. Ignored so they cannot be re-introduced.
+*.sln
+*.vcxproj
+*.vcxproj.filters
+*.vcxproj.user
+*.vcproj
+*.suo
 
 # Compiled build artifacts (object files + static archives)
 *.o
