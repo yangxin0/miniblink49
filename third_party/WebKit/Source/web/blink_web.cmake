@@ -13,6 +13,10 @@ set(WEBSRC "${CMAKE_SOURCE_DIR}/third_party/WebKit/Source/web")
 
 file(GLOB BLINK_WEB_SRC "${WEBSRC}/*.cpp" "${WEBSRC}/painting/*.cpp")  # +painting/ContinuousPainter
 list(FILTER BLINK_WEB_SRC EXCLUDE REGEX "Test\\.cpp$")
+# ImageDecodeBench.cpp is a standalone benchmark tool (it has its own int main()),
+# not part of the embedding layer. Compiled into the archive its main() collides
+# with any host that defines one (e.g. WordLens), so drop it.
+list(REMOVE_ITEM BLINK_WEB_SRC "${WEBSRC}/ImageDecodeBench.cpp")
 # Deferred: devtools/inspector glue (legacy v8::Debug API), find-in-page
 # (TextFinder, guard quirk), NPAPI WebBindings, the worker glue that pulls the
 # inspector debugger (v8::NativeWeakMap, removed in 8.7), and WebMutationEvent
