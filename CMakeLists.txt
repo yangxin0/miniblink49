@@ -124,6 +124,24 @@ if(MINIBLINK_BUILD_BLINK)
             -licucore -lxml2 -lxslt -lz -lcurl
             "-framework Cocoa" "-framework CoreText" "-framework CoreGraphics"
             "-framework CoreFoundation" "-framework Foundation" "-framework AppKit" "-framework Carbon")
+
+        # mb_demo: macOS port of weolar/mb-demo's "Estart" launcher demo, driving
+        # the same wke C API + engine archive set as minibrowser. Loads the demo's
+        # web resources by path at runtime (default baked into the source; override
+        # with argv[1]) so no demo assets are vendored into this repo.
+        add_executable(mb_demo "${CMAKE_SOURCE_DIR}/port/mac/mb_demo_main.mm")
+        set_target_properties(mb_demo PROPERTIES CXX_STANDARD 14)
+        target_include_directories(mb_demo PRIVATE "${CMAKE_SOURCE_DIR}" "${CMAKE_SOURCE_DIR}/wke" "${CMAKE_SOURCE_DIR}/win_compat")
+        target_compile_options(mb_demo PRIVATE -fdeclspec -fno-exceptions -Wno-deprecated-declarations)
+        target_link_libraries(mb_demo PRIVATE
+            -Wl,-force_load,$<TARGET_FILE:wke> -Wl,-force_load,$<TARGET_FILE:wke_globals>
+            -Wl,-force_load,$<TARGET_FILE:blink_bindings_infra>
+            content_browser mc net_portable blink_web blink_modules blink_bindings blink_core
+            blink_generated blink_platform blink_heap_asm wtf skia_ext skia harfbuzz
+            miniblink_png miniblink_jpeg miniblink_webp miniblink_ots gin base "${_v8mono}"
+            -licucore -lxml2 -lxslt -lz -lcurl
+            "-framework Cocoa" "-framework CoreText" "-framework CoreGraphics"
+            "-framework CoreFoundation" "-framework Foundation" "-framework AppKit" "-framework Carbon")
     endif()
 
     add_subdirectory(test/blink)  # smoke test: prove geometry links + computes
