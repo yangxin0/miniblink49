@@ -173,6 +173,42 @@ if(MINIBLINK_BUILD_BLINK)
             "-framework CoreFoundation" "-framework Foundation" "-framework AppKit" "-framework Carbon")
     endif()
 
+    if(MB_OS_WINDOWS)
+        # ---- Windows deliverables -------------------------------------------
+        # Full engine archive set (transitively pulls the blink_* graph).
+        # wke/wke_globals/blink_bindings_infra are whole-archived so the wke C-API
+        # entry points + blink's ENABLE_WKE hooks aren't dropped — the /WHOLEARCHIVE
+        # analog of the macOS -force_load.
+        set(_v8mono "${MINIBLINK_V8_ROOT}/out/x64.release/obj/v8_monolith.lib")
+        set(_mb_archives
+            content_browser mc net_portable blink_web blink_modules blink_bindings
+            blink_core blink_generated blink_platform wtf skia_ext skia harfbuzz
+            miniblink_png miniblink_jpeg miniblink_webp miniblink_ots gin base "${_v8mono}")
+        set(_mb_syslibs
+            winmm dbghelp shlwapi advapi32 ws2_32 userenv psapi version
+            gdi32 user32 ole32 oleaut32 comdlg32 winspool shell32 comctl32 imm32
+            usp10 crypt32 wininet)
+
+        function(mb_windows_link tgt)
+            target_include_directories(${tgt} PRIVATE "${CMAKE_SOURCE_DIR}" "${CMAKE_SOURCE_DIR}/wke")
+            set_target_properties(${tgt} PROPERTIES CXX_STANDARD 14)
+            target_link_libraries(${tgt} PRIVATE
+                wke wke_globals blink_bindings_infra ${_mb_archives} ${_mb_syslibs})
+            target_link_options(${tgt} PRIVATE
+                "/WHOLEARCHIVE:$<TARGET_FILE:wke>"
+                "/WHOLEARCHIVE:$<TARGET_FILE:wke_globals>"
+                "/WHOLEARCHIVE:$<TARGET_FILE:blink_bindings_infra>")
+        endfunction()
+
+        # wkexe: the historical Win32 standalone runner (wkexe/).
+        file(GLOB WKEXE_SRC "${CMAKE_SOURCE_DIR}/wkexe/*.cpp" "${CMAKE_SOURCE_DIR}/wkexe/*.c")
+        # getopt.c is C, but the target inherits blink_platform's /FIconfig.h
+        # (a C++ header) — compile it as C++ so the force-include parses.
+        set_source_files_properties("${CMAKE_SOURCE_DIR}/wkexe/getopt.c" PROPERTIES LANGUAGE CXX)
+        add_executable(wkexe WIN32 ${WKEXE_SRC})
+        mb_windows_link(wkexe)
+    endif()
+
     add_subdirectory(test/blink)  # smoke test: prove geometry links + computes
 
     if(APPLE)

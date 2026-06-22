@@ -4,6 +4,9 @@
 
 #include "base/process/memory.h"
 
+#include <stdlib.h>   // malloc/free (was previously pulled in transitively by the
+                      // full windows.h; WIN32_LEAN_AND_MEAN trims that path)
+
 #ifndef USING_VC6RT
 #include <psapi.h>
 #endif

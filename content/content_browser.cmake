@@ -47,6 +47,10 @@ target_compile_definitions(content_browser PUBLIC "V8CALL=" ENABLE_WKE=1 BLINK_I
 # WebThreadImpl.cpp has its own event/thread shim; opt out of win_compat's worker-
 # thread primitives (WaitForSingleObject/CloseHandle/_beginthreadex) to avoid a clash.
 target_compile_definitions(content_browser PRIVATE WIN_COMPAT_NO_THREAD_PRIMS)
+# We use the lightweight mc compositor, not the heavyweight OrigChrome mode, so
+# disable WebPageImpl.cpp's `#pragma comment(lib, "orig_chrome.lib")` (that lib is
+# not built; the OrigChrome paths are stubbed).
+target_compile_definitions(content_browser PRIVATE NO_USE_ORIG_CHROME)
 set_target_properties(content_browser PROPERTIES CXX_STANDARD 14)
 # win_compat is the <windows.h> shim for NON-Windows; on Windows the real SDK
 # windows.h is used (force-included to match the macOS shim force-include).

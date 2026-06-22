@@ -24,7 +24,7 @@ list(REMOVE_ITEM BLINK_WEB_SRC "${WEBSRC}/ImageDecodeBench.cpp")
 # now compile and are included.
 # Use the real DevToolsEmulator + WebDevToolsAgentImpl; exclude their *None stub
 # variants (would duplicate symbols) and WebDevToolsFrontendImpl (V8 8.7 Delete skew).
-list(FILTER BLINK_WEB_SRC EXCLUDE REGEX "DevToolsEmulatorNone|WebDevToolsAgentImplNone|InspectorOverlayImplNone|TextFinder\\.cpp$|WebBindings\\.cpp$|WebEmbeddedWorkerImpl\\.cpp$|WebSharedWorkerImpl\\.cpp$|WebMutationEvent\\.cpp$|WebTestingSupport\\.cpp$")
+list(FILTER BLINK_WEB_SRC EXCLUDE REGEX "DevToolsEmulatorNone|WebDevToolsAgentImplNone|InspectorOverlayImplNone|StorageClientImplNone|TextFinder\\.cpp$|WebBindings\\.cpp$|WebEmbeddedWorkerImpl\\.cpp$|WebSharedWorkerImpl\\.cpp$|WebMutationEvent\\.cpp$|WebTestingSupport\\.cpp$")
 
 add_library(blink_web STATIC ${BLINK_WEB_SRC})
 
