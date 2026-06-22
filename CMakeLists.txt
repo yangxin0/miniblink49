@@ -175,6 +175,10 @@ if(MINIBLINK_BUILD_BLINK)
 
     if(MB_OS_WINDOWS)
         # ---- Windows deliverables -------------------------------------------
+        # Bundled third-party deps (zlib/libxml2/libxslt/libcurl) — macOS links the
+        # system versions; Windows builds them from the in-tree sources.
+        include(ThirdPartyWin)
+
         # Full engine archive set (transitively pulls the blink_* graph).
         # wke/wke_globals/blink_bindings_infra are whole-archived so the wke C-API
         # entry points + blink's ENABLE_WKE hooks aren't dropped — the /WHOLEARCHIVE
@@ -183,7 +187,8 @@ if(MINIBLINK_BUILD_BLINK)
         set(_mb_archives
             content_browser mc net_portable blink_web blink_modules blink_bindings
             blink_core blink_generated blink_platform wtf skia_ext skia harfbuzz
-            miniblink_png miniblink_jpeg miniblink_webp miniblink_ots gin base "${_v8mono}")
+            miniblink_png miniblink_jpeg miniblink_webp miniblink_ots gin base
+            ${MB_THIRDPARTY_WIN_LIBS} "${_v8mono}")
         set(_mb_syslibs
             winmm dbghelp shlwapi advapi32 ws2_32 userenv psapi version
             gdi32 user32 ole32 oleaut32 comdlg32 winspool shell32 comctl32 imm32

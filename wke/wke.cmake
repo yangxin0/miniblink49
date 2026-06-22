@@ -7,6 +7,11 @@ set(WKED "${CMAKE_SOURCE_DIR}/wke")
 file(GLOB WKE_SRC "${WKED}/*.cpp")
 list(FILTER WKE_SRC EXCLUDE REGEX "/(wkeGlobalVar|wkeString|CurlVsetoptForwardMac)\\.cpp$")  # in wke_globals
 
+if(MB_OS_WINDOWS)
+    # Link-only stubs for the PDF print path (skia src/pdf + mbvip printing plugin
+    # aren't built); printing is non-core. (macOS has sk_document_pdf_stub_mac.)
+    list(APPEND WKE_SRC "${CMAKE_SOURCE_DIR}/skia/ext/sk_pdf_printing_stub_win.cpp")
+endif()
 add_library(wke STATIC ${WKE_SRC})
 target_link_libraries(wke PUBLIC content_browser mc net_portable)
 target_include_directories(wke PUBLIC
