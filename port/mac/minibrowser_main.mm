@@ -28,6 +28,7 @@ enum {
 
 static wkeWebView g_webView = nullptr;
 static NSView* g_contentView = nil;
+static CGFloat g_scale = 1.0;             // Retina backing scale: render at this factor for crisp output
 static NSTextField* g_addressBar = nil;   // URL entry
 static NSButton* g_backButton = nil;      // ◀
 static NSButton* g_forwardButton = nil;   // ▶
@@ -58,22 +59,19 @@ static void mbUpdateChrome() {
 - (void)drawRect:(NSRect)dirtyRect {
     if (!g_webView)
         return;
-    int w = (int)self.bounds.size.width;
-    int h = (int)self.bounds.size.height;
+    CGFloat sc = g_scale > 0 ? g_scale : 1.0;
+    int lw = (int)self.bounds.size.width;        // logical points
+    int lh = (int)self.bounds.size.height;
+    int w = (int)(lw * sc);                       // physical pixels (matches the webview)
+    int h = (int)(lh * sc);
     if (w <= 0 || h <= 0)
         return;
 
-    // Pull the rendered page pixels (RGBA, w*4 pitch) from wke.
+    // Pull the rendered page pixels (RGBA, w*4 pitch) from wke, at physical resolution.
     int pitch = w * 4;
     static std::vector<unsigned char> buf;
     buf.assign((size_t)pitch * h, 0);
-    static int dr = 0; ++dr;
-    if (dr <= 3) NSLog(@"[minibrowser] drawRect %d: before wkePaint (w=%d h=%d)", dr, w, h);
     wkePaint(g_webView, buf.data(), pitch);
-    if (dr <= 3) {
-        size_t nz = 0; for (size_t i = 0; i < buf.size(); ++i) if (buf[i]) ++nz;
-        NSLog(@"[minibrowser] drawRect %d: after wkePaint, nonzero bytes=%zu", dr, nz);
-    }
 
     CGColorSpaceRef cs = CGColorSpaceCreateDeviceRGB();
     CGContextRef ctx = (CGContextRef)[[NSGraphicsContext currentContext] CGContext];
@@ -81,11 +79,13 @@ static void mbUpdateChrome() {
         kCGImageAlphaPremultipliedLast | kCGBitmapByteOrder32Big);
     CGImageRef img = CGBitmapContextCreateImage(bmp);
     // wke's buffer is top-down (row 0 = top). In this flipped NSView, draw the
-    // image with a vertical flip so it appears upright instead of mirrored.
+    // image with a vertical flip so it appears upright. The physical-resolution
+    // image is blitted into the logical bounds; on a Retina context that maps 1:1
+    // to device pixels -> crisp (no upscaling blur).
     CGContextSaveGState(ctx);
-    CGContextTranslateCTM(ctx, 0, h);
+    CGContextTranslateCTM(ctx, 0, lh);
     CGContextScaleCTM(ctx, 1, -1);
-    CGContextDrawImage(ctx, CGRectMake(0, 0, w, h), img);
+    CGContextDrawImage(ctx, CGRectMake(0, 0, lw, lh), img);
     CGContextRestoreGState(ctx);
     CGImageRelease(img);
     CGContextRelease(bmp);
@@ -111,7 +111,8 @@ static void mbUpdateChrome() {
 // converted point is already top-left origin (matching wke/blink).
 - (void)wkePoint:(NSEvent*)e x:(int*)x y:(int*)y flags:(unsigned int*)flags {
     NSPoint p = [self convertPoint:[e locationInWindow] fromView:nil];
-    *x = (int)p.x; *y = (int)p.y;
+    // The webview viewport is in physical pixels; scale logical points to match.
+    *x = (int)(p.x * g_scale); *y = (int)(p.y * g_scale);
     unsigned int f = 0;
     NSUInteger m = [e modifierFlags];
     if (m & NSEventModifierFlagShift)   f |= kMK_SHIFT;
@@ -312,8 +313,8 @@ static void onTitleChanged(wkeWebView, void*, const wkeString title) {
 - (void)windowDidResize:(NSNotification*)note {
     NSWindow* win = [note object];
     NSRect cr = [[win contentView] bounds];
-    int w = (int)cr.size.width;
-    int h = (int)(cr.size.height - kToolbarHeight);
+    int w = (int)(cr.size.width * g_scale);
+    int h = (int)((cr.size.height - kToolbarHeight) * g_scale);
     if (w <= 0 || h <= 0 || !g_webView) return;
     wkeResize(g_webView, w, h);
     wkeRepaintIfNeeded(g_webView);
@@ -390,10 +391,15 @@ int main(int argc, const char** argv) {
         [win makeFirstResponder:g_contentView]; // keyboard goes to the page
         [NSApp activateIgnoringOtherApps:YES];
 
-        // Bring up the engine and load the page.
+        // Bring up the engine and load the page. Render at the display's backing
+        // scale (Retina) so the page isn't upscaled/blurry: size the viewport in
+        // physical pixels and set the zoom to the scale (wke's devicePixelRatio).
+        g_scale = [win backingScaleFactor];
+        if (g_scale <= 0) g_scale = 1.0;
         wkeInitialize();
         g_webView = wkeCreateWebView();
-        wkeResize(g_webView, W, H);
+        wkeResize(g_webView, (int)(W * g_scale), (int)(H * g_scale));
+        wkeSetZoomFactor(g_webView, g_scale);
         wkeOnPaintUpdated(g_webView, onPaintUpdated, nullptr);
         // Low-disk modernization: spoof a modern Chrome UA + inject web-platform
         // polyfills into every frame before its scripts run.

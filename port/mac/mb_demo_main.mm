@@ -30,6 +30,7 @@ enum {
 static wkeWebView g_webView = nullptr;
 static NSView* g_contentView = nil;
 static NSWindow* g_window = nil;
+static CGFloat g_scale = 1.0;   // Retina backing scale: render at this factor for crisp output
 
 // ---- The content view: blits the wke webview's RGBA buffer ------------------
 @interface MbDemoView : NSView
@@ -40,8 +41,11 @@ static NSWindow* g_window = nil;
 
 - (void)drawRect:(NSRect)dirtyRect {
     if (!g_webView) return;
-    int w = (int)self.bounds.size.width;
-    int h = (int)self.bounds.size.height;
+    CGFloat sc = g_scale > 0 ? g_scale : 1.0;
+    int lw = (int)self.bounds.size.width;       // logical points
+    int lh = (int)self.bounds.size.height;
+    int w = (int)(lw * sc);                      // physical pixels (matches the webview)
+    int h = (int)(lh * sc);
     if (w <= 0 || h <= 0) return;
 
     int pitch = w * 4;
@@ -54,10 +58,12 @@ static NSWindow* g_window = nil;
     CGContextRef bmp = CGBitmapContextCreate(buf.data(), w, h, 8, pitch, cs,
         kCGImageAlphaPremultipliedLast | kCGBitmapByteOrder32Big);
     CGImageRef img = CGBitmapContextCreateImage(bmp);
+    // Blit the physical-resolution image into the logical bounds; on a Retina
+    // context this maps 1:1 to device pixels -> crisp (no upscaling blur).
     CGContextSaveGState(ctx);
-    CGContextTranslateCTM(ctx, 0, h);
+    CGContextTranslateCTM(ctx, 0, lh);
     CGContextScaleCTM(ctx, 1, -1);
-    CGContextDrawImage(ctx, CGRectMake(0, 0, w, h), img);
+    CGContextDrawImage(ctx, CGRectMake(0, 0, lw, lh), img);
     CGContextRestoreGState(ctx);
     CGImageRelease(img);
     CGContextRelease(bmp);
@@ -81,7 +87,8 @@ static NSWindow* g_window = nil;
 
 - (void)wkePoint:(NSEvent*)e x:(int*)x y:(int*)y flags:(unsigned int*)flags {
     NSPoint p = [self convertPoint:[e locationInWindow] fromView:nil];
-    *x = (int)p.x; *y = (int)p.y;
+    // The webview viewport is in physical pixels; scale logical points to match.
+    *x = (int)(p.x * g_scale); *y = (int)(p.y * g_scale);
     unsigned int f = 0;
     NSUInteger m = [e modifierFlags];
     if (m & NSEventModifierFlagShift)   f |= kMK_SHIFT;
@@ -349,10 +356,15 @@ int main(int argc, const char** argv) {
         [g_window makeFirstResponder:g_contentView];
         [NSApp activateIgnoringOtherApps:YES];
 
-        // Bring up the engine.
+        // Bring up the engine. Render at the display's backing scale (Retina) so
+        // the page isn't upscaled/blurry: size the viewport in physical pixels and
+        // set the zoom factor to the scale (this is how wke models devicePixelRatio).
+        g_scale = [g_window backingScaleFactor];
+        if (g_scale <= 0) g_scale = 1.0;
         wkeInitialize();
         g_webView = wkeCreateWebView();
-        wkeResize(g_webView, W, H);
+        wkeResize(g_webView, (int)(W * g_scale), (int)(H * g_scale));
+        wkeSetZoomFactor(g_webView, g_scale);
         wkeOnPaintUpdated(g_webView, onPaintUpdated, nullptr);
         wkeOnTitleChanged(g_webView, onTitleChanged, nullptr);
         wkeOnConsole(g_webView, onConsole, nullptr);
