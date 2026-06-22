@@ -19,7 +19,13 @@ set(NETSRC "${CMAKE_SOURCE_DIR}/net")
 file(GLOB_RECURSE NET_PORTABLE_SRC "${NETSRC}/*.cpp")
 list(FILTER NET_PORTABLE_SRC EXCLUDE REGEX "Test\\.cpp$")
 # Windows-only: WinINet HTTP loader + Win32 file enumeration / Shlwapi path helpers.
-list(FILTER NET_PORTABLE_SRC EXCLUDE REGEX "/(WebURLLoaderWinINet|FileSystemWin)\\.cpp$")
+# WebURLLoaderWinINet is dropped on every platform (curl is used). The FileSystem
+# backend is platform-specific: Windows keeps FileSystemWin, macOS FileSystemPosix.
+if(MB_OS_WINDOWS)
+    list(FILTER NET_PORTABLE_SRC EXCLUDE REGEX "/(WebURLLoaderWinINet|FileSystemPosix)\\.cpp$")
+else()
+    list(FILTER NET_PORTABLE_SRC EXCLUDE REGEX "/(WebURLLoaderWinINet|FileSystemWin)\\.cpp$")
+endif()
 # Missing upstream dependencies (not Win32-specific): SSLHandle needs the legacy
 # WebKit ResourceHandle/ResourceHandleInternal classes (absent from miniblink,
 # which uses WebURLLoaderInternal), and SharedMemoryReceivedDataFactory needs
@@ -39,6 +45,12 @@ if(NOT MB_OS_WINDOWS)
 endif()
 target_compile_definitions(net_portable PUBLIC "V8CALL=" ENABLE_WKE=1 BLINK_IMPLEMENTATION=1
     V8_COMPRESS_POINTERS V8_31BIT_SMIS_ON_64BIT_ARCH V8_REVERSE_JSARGS)
+if(MB_OS_WINDOWS)
+    # The bundled libcurl is a static lib; consumers must define CURL_STATICLIB so
+    # curl.h declares the functions normally (not __declspec(dllimport)/__imp_).
+    # PUBLIC so wke (which also includes curl.h) inherits it.
+    target_compile_definitions(net_portable PUBLIC CURL_STATICLIB)
+endif()
 # net uses Win32 types but relies on Windows PCH inclusion; force-include the shim.
 # SHELL: keeps the "-include <path>" pair together — CMake otherwise de-duplicates
 # the bare "-include" token against the inherited "-include config.h", orphaning
