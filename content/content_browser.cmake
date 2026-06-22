@@ -28,6 +28,10 @@ if(MB_OS_WINDOWS)
     # WebPluginImpl, s_wkeBrowserFuncs) from web_impl_win/npapi/ — macOS stubs it.
     # The mutil_thread_np/ variant is the alternate multi-thread NP impl; skip it
     # to avoid duplicate symbols.
+    # Windows UI: popup menus, drag-drop (content/ui/, not under content/browser/).
+    file(GLOB CB_UI "${C}/ui/*.cpp")
+    list(APPEND CB_IMPL_WIN ${CB_UI})
+
     file(GLOB CB_NPAPI "${C}/web_impl_win/npapi/*.cpp")
     list(FILTER CB_NPAPI EXCLUDE REGEX "/mutil_thread_np/")
     # NetscapePlugInStreamLoader / PluginStream couple to blink-53 internals
@@ -39,7 +43,9 @@ if(MB_OS_WINDOWS)
         # that we don't build (OrigChromeMgr/LayerTreeWrap heavyweight mode; the
         # mbvip printing/pdfium stack; DPI init). The real WkePrinting.cpp /
         # OrigChromeStubs.cpp pull in pdfium + duplicate g_uiThreadHeartbeatCallback.
-        "${CMAKE_SOURCE_DIR}/content/web_impl_win/MbWinOptionalStubs.cpp")
+        "${CMAKE_SOURCE_DIR}/content/web_impl_win/MbWinOptionalStubs.cpp"
+        # common::LiveIdDetect (self-contained mbvip helper referenced by content).
+        "${CMAKE_SOURCE_DIR}/mbvip/common/LiveIdDetect.cpp")
 else()
     list(FILTER CB_IMPL_WIN EXCLUDE REGEX "/(WebURLLoaderImpl|WebCookieJarINetImpl|WebClipboardImpl|w3client)\\.cpp$")
 endif()
@@ -80,7 +86,8 @@ if(MSVC)
     # OleInitialize).
     target_compile_options(content_browser PRIVATE
         "/GR-" "/FIwindows.h" "/FImmsystem.h" "/FIobjbase.h" "/FIole2.h" "/FIcommdlg.h"
-        "/FIwinspool.h")  # WkePrinting: PRINTER_INFO_2, DocumentProperties, EnumForms
+        "/FIwinspool.h"   # WkePrinting: PRINTER_INFO_2, DocumentProperties, EnumForms
+        "/FIshellapi.h")  # DragHandle: HDROP, DragQueryFile, ShellExecute
 else()
     target_compile_options(content_browser PRIVATE
         -fdeclspec -fno-exceptions -fno-rtti -w

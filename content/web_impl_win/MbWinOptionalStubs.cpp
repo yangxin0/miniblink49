@@ -53,4 +53,14 @@ namespace gfx { namespace win {
 void InitDeviceScaleFactor() {}
 } }  // namespace gfx::win
 
+// WkePrinting — the wke print path (wke.cpp wkeUtilPrint). The real class drives
+// the mbvip pdfium printing stack (PdfiumLoad/PdfDataVisitor); printing is
+// non-core, so stub the three referenced members to a no-op.
+#include "features/printing/WkePrinting.h"
+namespace printing {
+WkePrinting::WkePrinting(wkeWebView, wkeWebFrameHandle) {}
+void WkePrinting::run(const wkePrintSettings*) {}
+WkePrinting::~WkePrinting() {}
+}  // namespace printing
+
 #endif  // defined(_WIN32)

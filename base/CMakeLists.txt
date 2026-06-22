@@ -33,6 +33,7 @@ set(BASE_SOURCES
 
 if(MB_OS_WINDOWS)
     list(APPEND BASE_SOURCES
+        WindowsVersion.cpp            # base::getWindowsVersion (miniblink helper)
         debug/gdi_debug_util_win.cc
         file_version_info_win.cc
         files/file_win.cc
