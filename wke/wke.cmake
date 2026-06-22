@@ -28,6 +28,12 @@ if(NOT MB_OS_WINDOWS)
 endif()
 target_compile_definitions(wke PUBLIC "V8CALL=" ENABLE_WKE=1 BLINK_IMPLEMENTATION=1
     V8_COMPRESS_POINTERS V8_31BIT_SMIS_ON_64BIT_ARCH V8_REVERSE_JSARGS)
+# Mark the wke C-API definitions __declspec(dllexport) so the miniblink DLL exports
+# them (WKE_API in wke.h keys off BUILDING_wke). PRIVATE: only wke's own TUs; static
+# consumers (wkexe) include wke.h without it and link the definitions directly.
+if(MB_OS_WINDOWS)
+    target_compile_definitions(wke PRIVATE BUILDING_wke)
+endif()
 set_target_properties(wke PROPERTIES CXX_STANDARD 14)
 if(MSVC)
     # Real SDK windows.h + the headers WIN32_LEAN_AND_MEAN trims that wke uses.

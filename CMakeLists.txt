@@ -212,6 +212,32 @@ if(MINIBLINK_BUILD_BLINK)
         set_source_files_properties("${CMAKE_SOURCE_DIR}/wkexe/getopt.c" PROPERTIES LANGUAGE CXX)
         add_executable(wkexe WIN32 ${WKEXE_SRC})
         mb_windows_link(wkexe)
+
+        # minibrowser: a Win32 browser host driving the wke C API (built from the
+        # same standalone-runner sources — Windows has no separate browser source).
+        add_executable(minibrowser WIN32 ${WKEXE_SRC})
+        mb_windows_link(minibrowser)
+
+        # miniblink dynamic library: exports the wke C API (compiled dllexport via
+        # BUILDING_wke, pulled in whole-archive by mb_windows_link).
+        add_library(miniblink SHARED "${CMAKE_SOURCE_DIR}/content/web_impl_win/mb_dll_main.cpp")
+        mb_windows_link(miniblink)
+
+        # miniblink static library: merge the whole engine archive set into one .lib
+        # so a consumer can link a single static library for the full wke surface.
+        add_library(miniblink_static STATIC "${CMAKE_SOURCE_DIR}/content/web_impl_win/mb_dll_main.cpp")
+        set(_mb_all_archives wke wke_globals blink_bindings_infra ${_mb_archives})
+        list(FILTER _mb_all_archives EXCLUDE REGEX "\\.lib$")   # drop the v8 monolith path (added below)
+        add_dependencies(miniblink_static ${_mb_all_archives})
+        set(_mb_lib_files "")
+        foreach(_a ${_mb_all_archives})
+            list(APPEND _mb_lib_files "$<TARGET_FILE:${_a}>")
+        endforeach()
+        add_custom_command(TARGET miniblink_static POST_BUILD
+            COMMAND lib.exe /NOLOGO "/OUT:$<TARGET_FILE:miniblink_static>"
+                "$<TARGET_FILE:miniblink_static>" ${_mb_lib_files} "${_v8mono}"
+            COMMENT "Merging engine archives into miniblink_static.lib"
+            VERBATIM)
     endif()
 
     add_subdirectory(test/blink)  # smoke test: prove geometry links + computes
