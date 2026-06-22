@@ -77,8 +77,9 @@ if(NOT MB_OS_WINDOWS)
 else()
     # Bundled libxml2/libxslt headers (XMLDocumentParser, TransformSource); macOS
     # uses the system libxml2/libxslt. win32/include carries the pre-generated
-    # xmlversion.h config (must precede src/include).
-    target_include_directories(blink_core PRIVATE
+    # xmlversion.h config (must precede src/include). PUBLIC so the blink consumers
+    # that include core xml headers (bindings' V8XSLTProcessor, ...) inherit them.
+    target_include_directories(blink_core PUBLIC
         "${CMAKE_SOURCE_DIR}/third_party/libxml/win32/include"
         "${CMAKE_SOURCE_DIR}/third_party/libxml/src/include"
         "${CMAKE_SOURCE_DIR}/third_party/libxslt")

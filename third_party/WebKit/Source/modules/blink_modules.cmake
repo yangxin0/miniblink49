@@ -15,7 +15,14 @@ list(FILTER BLINK_MODULES_SRC EXCLUDE REGEX "/bindings/modules/v8/custom/")
 # Per-feature stragglers (mostly promise/generated-binding-heavy or Win/API-skew):
 # web MIDI, IndexedDB txn/db/request, WebRTC peer/req, MediaKeys/EME, fetch Body,
 # crypto result, file-system, websocket channel, etc. Deferred per-file.
-list(FILTER BLINK_MODULES_SRC EXCLUDE REGEX "BatteryManager\\.cpp$|DatabaseContext\\.cpp$|MIDI[A-Za-z]*\\.cpp$|NavigatorWebMIDI\\.cpp$|Notification\\.cpp$|PresentationAvailability\\.cpp$|ServiceWorkerRegistration\\.cpp$|SQLiteFileSystemWin\\.cpp$")
+list(FILTER BLINK_MODULES_SRC EXCLUDE REGEX "BatteryManager\\.cpp$|DatabaseContext\\.cpp$|MIDI[A-Za-z]*\\.cpp$|NavigatorWebMIDI\\.cpp$|Notification\\.cpp$|PresentationAvailability\\.cpp$|ServiceWorkerRegistration\\.cpp$")
+if(MB_OS_WINDOWS)
+    # WebSQL needs a bundled sqlite3 (the trimmed tree has no sqlite3.h); macOS uses
+    # the system sqlite. Disable the webdatabase module on Windows for now.
+    list(FILTER BLINK_MODULES_SRC EXCLUDE REGEX "/webdatabase/")
+else()
+    list(FILTER BLINK_MODULES_SRC EXCLUDE REGEX "SQLiteFileSystemWin\\.cpp$")  # macOS uses the Posix variant
+endif()
 list(FILTER BLINK_MODULES_SRC EXCLUDE REGEX "CryptoResultImpl\\.cpp$|IDBTransaction\\.cpp$|IDBDatabase\\.cpp$|IDBOpenDBRequest\\.cpp$|IDBRequest\\.cpp$|PushMessageData\\.cpp$|MediaKeySession\\.cpp$|MediaKeys\\.cpp$|DOMFileSystemBase\\.cpp$|FileWriter\\.cpp$|DOMFileSystem\\.cpp$|PermissionStatus\\.cpp$|SpeechRecognition\\.cpp$|DataConsumerHandleTestUtil\\.cpp$|CompositorWorkerManager\\.cpp$")
 list(FILTER BLINK_MODULES_SRC EXCLUDE REGEX "RTCDTMFSender\\.cpp$|RTCSessionDescriptionRequestImpl\\.cpp$|RTCVoidRequestImpl\\.cpp$|RTCStatsRequestImpl\\.cpp$|MediaDevicesRequest\\.cpp$|RTCPeerConnection\\.cpp$")
 

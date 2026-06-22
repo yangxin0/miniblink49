@@ -28,14 +28,23 @@ add_library(blink_bindings_infra STATIC ${BLINK_BINDINGS_INFRA}
 # ScriptCompiler::ExternalSourceStream in ScriptStreamer); with RTTI on, the subclass
 # typeinfo references the base typeinfo, which the -fno-rtti V8 monolith doesn't export.
 # The subclasses are never dynamic_cast, so build them -fno-rtti to drop the reference.
-set_source_files_properties(
-    "${BIV8}/V8Initializer.cpp" "${BIV8}/ScriptStreamer.cpp"
-    PROPERTIES COMPILE_OPTIONS "-fno-rtti")
+if(MSVC)
+    set_source_files_properties(
+        "${BIV8}/V8Initializer.cpp" "${BIV8}/ScriptStreamer.cpp"
+        PROPERTIES COMPILE_OPTIONS "/GR-")
+else()
+    set_source_files_properties(
+        "${BIV8}/V8Initializer.cpp" "${BIV8}/ScriptStreamer.cpp"
+        PROPERTIES COMPILE_OPTIONS "-fno-rtti")
+endif()
 target_link_libraries(blink_bindings_infra PUBLIC blink_core)
 target_include_directories(blink_bindings_infra PUBLIC
     "${CMAKE_SOURCE_DIR}/third_party/v8shim" "${CMAKE_SOURCE_DIR}/third_party/khronos"
-    "${CMAKE_SOURCE_DIR}/third_party/npapi"   # bindings/npruntime.h (NP* plugin glue)
-    "${CMAKE_SOURCE_DIR}/win_compat")         # <windows.h> shim (WinINet/NP cookie decls)
+    "${CMAKE_SOURCE_DIR}/third_party/npapi")   # bindings/npruntime.h (NP* plugin glue)
+# win_compat is the <windows.h> shim for NON-Windows; on Windows real windows.h is used.
+if(NOT MB_OS_WINDOWS)
+    target_include_directories(blink_bindings_infra PUBLIC "${CMAKE_SOURCE_DIR}/win_compat")
+endif()
 target_compile_definitions(blink_bindings_infra PUBLIC "V8CALL=" ENABLE_WKE=1 BLINK_IMPLEMENTATION=1
     V8_COMPRESS_POINTERS V8_31BIT_SMIS_ON_64BIT_ARCH V8_REVERSE_JSARGS)
 set_target_properties(blink_bindings_infra PROPERTIES CXX_STANDARD 14)
