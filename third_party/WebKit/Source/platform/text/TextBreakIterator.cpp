@@ -167,6 +167,18 @@ static inline int nextBreakablePosition(LazyLineBreakIterator& lazyBreakIterator
     for (int i = pos; i < len; i++) {
         CharacterType ch = str[i];
 
+        // Never break inside a surrogate pair: a trail surrogate preceded by a
+        // lead surrogate is mid-codepoint (e.g. an emoji), not a break
+        // opportunity. Without this, a run beginning with an emoji can be split
+        // into two lone surrogates, each measuring as zero advance width — which
+        // collapses the inline element to zero width. (For 8-bit strings these
+        // masks never match, so this is a no-op there.)
+        if ((ch & 0xFC00) == 0xDC00 && (lastCh & 0xFC00) == 0xD800) {
+            lastLastCh = lastCh;
+            lastCh = ch;
+            continue;
+        }
+
         if (isBreakableSpace(ch) || shouldBreakAfter(lastLastCh, lastCh, ch))
             return i;
 
