@@ -1,11 +1,38 @@
-# macOS port — release log
+# Cross-platform port — release log
 
-Version history of the macOS (Apple Silicon / arm64) port of miniblink49. Each
-version is an annotated git tag (`macos-port-v*`). The port shares one pinned
-V8 8.7 with the Windows build; all macOS changes are version-guarded so the
-Windows path is unchanged.
+Version history of the cross-platform (macOS Apple Silicon / arm64 + Windows x64)
+CMake port of miniblink49. Each version is an annotated git tag (`macos-port-v*`).
+Both platforms share one pinned V8 8.7; every platform change is build-guarded so
+the other platform is unchanged.
 
 ---
+
+## v1.2 — 2026-06-23 (`macos-port-v1.2`)
+
+**The Windows x64 build comes up via CMake.** The entire engine now builds on
+Windows (Release) and the standalone runner launches the full engine — bringing
+the Windows path to parity with the macOS port through one shared codebase.
+
+- **Whole engine builds on Windows** via CMake + clang-cl/MSVC: the pinned V8 8.7
+  monolith (clang-cl 22, since the DEPS-pinned clang 12 can't compile against the
+  VS2022 STL), base/gin/wtf/skia, the full blink stack (platform/core/web/
+  generated/bindings/bindings_infra/modules), and net/mc/wke_globals/
+  content_browser/wke — all in Release to match the monolith ABI.
+- Bundled third-party deps built from in-tree sources (zlib/libxml2/libxslt/
+  libcurl) + a minimal ICU + skia DirectWrite fonts + the Oilpan x64 heap-asm.
+- **All four deliverables build**: `miniblink_static.lib` (merged engine),
+  `miniblink.dll` (exports 312 `wke*` C-API functions), `minibrowser.exe`, and
+  `wkexe.exe`. Both executables launch and initialize V8 + blink + the compositor
+  (~20 threads) without crashing.
+- Reproducible V8 monolith build: `tools/build-v8-8.7-windows.ps1` (counterpart of
+  the macOS `build-v8-8.7-macos.sh`).
+- Recurring Windows-port mechanics: `/FI config.h`, platform-aware source
+  selection (mac→win), `/utf-8`, `WIN32_LEAN_AND_MEAN` + targeted `/FI` of trimmed
+  Win32 headers, `OS_WIN` native types, `/WHOLEARCHIVE` (the `-force_load` analog),
+  a few V8-8.7 API migrations on Windows-only code paths, and stubbing optional
+  subsystems (OrigChrome, printing/pdfium, NPAPI stream loader).
+
+All Windows changes are `WIN32`-guarded; the macOS path is unchanged.
 
 ## v1.1 — 2026-06-22 (`macos-port-v1.1`)
 
