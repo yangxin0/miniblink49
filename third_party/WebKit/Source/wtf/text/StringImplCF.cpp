@@ -126,28 +126,17 @@ static CFAllocatorRef allocator()
 
 RetainPtr<CFStringRef> StringImpl::createCFString()
 {
-    // Since garbage collection isn't compatible with custom allocators, we
-    // can't use the NoCopy variants of CFStringCreate*() when GC is enabled.
-    if (!m_length || !isMainThread()) {
-        if (is8Bit())
-            return adoptCF(CFStringCreateWithBytes(0, reinterpret_cast<const UInt8*>(characters8()), m_length, kCFStringEncodingISOLatin1, false));
-        return adoptCF(CFStringCreateWithCharacters(0, reinterpret_cast<const UniChar*>(characters16()), m_length));
-    }
-    CFAllocatorRef allocator = StringWrapperCFAllocator::allocator();
-
-    // Put pointer to the StringImpl in a global so the allocator can store it with the CFString.
-    ASSERT(!StringWrapperCFAllocator::currentString);
-    StringWrapperCFAllocator::currentString = this;
-
-    CFStringRef string;
+    // Always make CoreFoundation copy the characters. WebKit's original
+    // optimization wrapped the StringImpl's own buffer with a custom allocator
+    // and CFStringCreate*WithBytesNoCopy, stashing `this` in a global so the
+    // allocator could ref/deref it. That path crashes on modern CoreFoundation
+    // (macOS 26): __CFStringCreateImmutableFunnel3 mis-handles the no-copy buffer
+    // + custom allocator, faulting on a pointer made of the string's own bytes
+    // (e.g. the last-resort font name "Times"). The copy is cheap relative to a
+    // segfault, and was already the behavior off the main thread.
     if (is8Bit())
-        string = CFStringCreateWithBytesNoCopy(allocator, reinterpret_cast<const UInt8*>(characters8()), m_length, kCFStringEncodingISOLatin1, false, kCFAllocatorNull);
-    else
-        string = CFStringCreateWithCharactersNoCopy(allocator, reinterpret_cast<const UniChar*>(characters16()), m_length, kCFAllocatorNull);
-    // CoreFoundation might not have to allocate anything, we clear currentString in case we did not execute allocate().
-    StringWrapperCFAllocator::currentString = 0;
-
-    return adoptCF(string);
+        return adoptCF(CFStringCreateWithBytes(0, reinterpret_cast<const UInt8*>(characters8()), m_length, kCFStringEncodingISOLatin1, false));
+    return adoptCF(CFStringCreateWithCharacters(0, reinterpret_cast<const UniChar*>(characters16()), m_length));
 }
 
 // On StringImpl creation we could check if the allocator is the StringWrapperCFAllocator.
