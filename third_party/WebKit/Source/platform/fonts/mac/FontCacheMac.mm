@@ -31,6 +31,7 @@
 #import "platform/fonts/FontCache.h"
 
 #import <AppKit/AppKit.h>
+#import <CoreText/CoreText.h>
 #include "platform/LayoutTestSupport.h"
 #include "platform/RuntimeEnabledFeatures.h"
 #include "platform/fonts/FontDescription.h"
@@ -43,13 +44,6 @@
 #include <wtf/Functional.h>
 #include <wtf/MainThread.h>
 #include <wtf/StdLibExtras.h>
-
-// Forward declare Mac SPIs.
-// Request for public API: rdar://13803570
-@interface NSFont (WebKitSPI)
-+ (NSFont*)findFontLike:(NSFont*)font forString:(NSString*)string withRange:(NSRange)range inLanguage:(id)useNil;
-+ (NSFont*)findFontLike:(NSFont*)font forCharacter:(UniChar)uc inLanguage:(id)useNil;
-@end
 
 namespace blink {
 
@@ -119,65 +113,39 @@ PassRefPtr<SimpleFontData> FontCache::fallbackFontForCharacter(const FontDescrip
     }
 
     const FontPlatformData& platformData = fontDataToSubstitute->platformData();
-    NSFont* nsFont = toNSFont(platformData.ctFont());
 
-    NSString *string = [[NSString alloc] initWithCharactersNoCopy:codeUnits length:codeUnitsLength freeWhenDone:NO];
-    NSFont *substituteFont = [NSFont findFontLike:nsFont forString:string withRange:NSMakeRange(0, codeUnitsLength) inLanguage:nil];
-    [string release];
-
-    // FIXME: Remove this SPI usage: http://crbug.com/255122
-    if (!substituteFont && codeUnitsLength == 1)
-        substituteFont = [NSFont findFontLike:nsFont forCharacter:codeUnits[0] inLanguage:nil];
-    if (!substituteFont)
+    // Find a font that covers `character`. WebKit historically used the private
+    // AppKit SPI -[NSFont findFontLike:forString:/forCharacter:], but that was
+    // removed on modern macOS and returns nil there — so emoji (e.g. U+1F511) and
+    // CJK got no substitute and fell through to the last-resort font, rendering
+    // the wrong glyph at the wrong advance width. CTFontCreateForString is
+    // Apple's supported replacement: it returns a font from the system cascade
+    // that covers the range (Apple Color Emoji for emoji, a CJK face, etc.) at
+    // the reference font's size.
+    CFStringRef cfString = CFStringCreateWithCharacters(kCFAllocatorDefault, reinterpret_cast<const UniChar*>(codeUnits), codeUnitsLength);
+    CTFontRef ctSubstitute = CTFontCreateForString(platformData.ctFont(), cfString, CFRangeMake(0, codeUnitsLength));
+    CFRelease(cfString);
+    if (!ctSubstitute)
         return nullptr;
-
-    // Use the family name from the AppKit-supplied substitute font, requesting the
-    // traits, weight, and size we want. One way this does better than the original
-    // AppKit request is that it takes synthetic bold and oblique into account.
-    // But it does create the possibility that we could end up with a font that
-    // doesn't actually cover the characters we need.
-
-    NSFontManager *fontManager = [NSFontManager sharedFontManager];
-
-    NSFontTraitMask traits;
-    NSInteger weight;
-    CGFloat size;
-
-    if (nsFont) {
-        traits = [fontManager traitsOfFont:nsFont];
-        if (platformData.m_syntheticBold)
-            traits |= NSBoldFontMask;
-        if (platformData.m_syntheticItalic)
-            traits |= NSFontItalicTrait;
-        weight = [fontManager weightOfFont:nsFont];
-        size = [nsFont pointSize];
-    } else {
-        // For custom fonts nsFont is nil.
-        traits = fontDescription.style() ? NSFontItalicTrait : 0;
-        weight = toAppKitFontWeight(fontDescription.weight());
-        size = fontDescription.computedPixelSize();
+    // If CoreText just echoed the reference font, nothing in the cascade covers
+    // the character — give up so the caller falls back to its last-resort font.
+    if (CFEqual(ctSubstitute, platformData.ctFont())) {
+        CFRelease(ctSubstitute);
+        return nullptr;
     }
 
-    NSFontTraitMask substituteFontTraits = [fontManager traitsOfFont:substituteFont];
-    NSInteger substituteFontWeight = [fontManager weightOfFont:substituteFont];
-
-    if (traits != substituteFontTraits || weight != substituteFontWeight || !nsFont) {
-        if (NSFont *bestVariation = [fontManager fontWithFamily:[substituteFont familyName] traits:traits weight:weight size:size]) {
-            if ((!nsFont || [fontManager traitsOfFont:bestVariation] != substituteFontTraits || [fontManager weightOfFont:bestVariation] != substituteFontWeight)
-                && [[bestVariation coveredCharacterSet] longCharacterIsMember:character])
-                substituteFont = bestVariation;
-        }
-    }
-
-    substituteFont = useHinting() ? [substituteFont screenFont] : [substituteFont printerFont];
-
-    substituteFontTraits = [fontManager traitsOfFont:substituteFont];
-    substituteFontWeight = [fontManager weightOfFont:substituteFont];
-
+    // Build the substitute straight from the CoreText font. The old code then ran
+    // it through NSFontManager + -screenFont/-printerFont to match traits, but
+    // those AppKit paths are deprecated and corrupt the resolved font on modern
+    // macOS (turning the emoji/icon glyphs into tofu). Carry over the original's
+    // synthetic-bold/italic flags and orientation instead. (CTFontRef is toll-free
+    // bridged to NSFont*; the FontPlatformData ctor retains it, so we can release
+    // our reference afterwards — this file is compiled without ARC.)
+    NSFont *substituteFont = toNSFont(ctSubstitute);
     FontPlatformData alternateFont(substituteFont, platformData.size(),
-        isAppKitFontWeightBold(weight) && !isAppKitFontWeightBold(substituteFontWeight),
-        (traits & NSFontItalicTrait) && !(substituteFontTraits & NSFontItalicTrait),
+        platformData.m_syntheticBold, platformData.m_syntheticItalic,
         platformData.orientation());
+    CFRelease(ctSubstitute);
 
     return fontDataFromFontPlatformData(&alternateFont, DoNotRetain);
 }
