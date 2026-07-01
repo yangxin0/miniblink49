@@ -62,6 +62,14 @@ clang++ -dynamiclib -o "$STAGE/lib/libwke.dylib" \
   -framework CoreFoundation -framework Foundation -framework AppKit -framework Carbon \
   -Wl,-install_name,@rpath/libwke.dylib
 
+# Strip the local symbol table. The engine archives carry ~210k local symbols
+# (static functions, etc.) that bloat __LINKEDIT to ~48MB. `strip -x` removes
+# only local symbols, keeping every external/exported symbol — so all wke* C-API
+# exports (the reason to ship a dylib) survive and the library stays linkable.
+# Cuts libwke.dylib roughly in half (~89MB -> ~57MB).
+echo "==> [$LABEL] stripping local symbols from libwke.dylib"
+strip -x "$STAGE/lib/libwke.dylib"
+
 echo "==> [$LABEL] staging headers + README"
 cp "$REPO"/wke/wke.h "$REPO"/wke/wkedefine.h "$REPO"/wke/wkeString.h "$STAGE/include/wke/" 2>/dev/null || true
 cp "$REPO"/win_compat/*.h "$STAGE/include/win_compat/" 2>/dev/null || true
