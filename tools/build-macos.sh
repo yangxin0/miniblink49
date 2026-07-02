@@ -17,7 +17,8 @@
 #   tools/build-macos.sh release wke wke_globals   # just the wke libs
 #
 # Prereq: the pinned V8 8.7 monolith (tools/build-v8-8.7-macos.sh). Override its
-# location with MINIBLINK_V8_ROOT (default ~/build/v8-8.7/v8).
+# location with MINIBLINK_V8_ROOT (default: the v8-8.7/v8 checkout sitting
+# alongside this repo, i.e. ../v8-8.7/v8).
 set -euo pipefail
 
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -31,7 +32,7 @@ case "$CONFIG" in
     *) echo "usage: tools/build-macos.sh [release|debug] [target ...]" >&2; exit 1 ;;
 esac
 
-V8ROOT="${MINIBLINK_V8_ROOT:-$HOME/build/v8-8.7/v8}"
+V8ROOT="${MINIBLINK_V8_ROOT:-$REPO/../v8-8.7/v8}"
 JOBS="$(sysctl -n hw.ncpu 2>/dev/null || echo 8)"
 BDIR="$REPO/$BUILD"
 
