@@ -54,6 +54,16 @@ if [ "$WANT_STATIC" = true ]; then
   echo "==> [$LABEL] building miniblink_static target (libminiblink.a)"
   cmake --build "$BUILD" --target miniblink_static -j"$JOBS"
   cp "$LIB/libminiblink.a" "$STAGE/lib/libminiblink.a"
+
+  # Strip local symbols from the archive too (same rationale as the dylib below).
+  # The -O3 engine + V8 objects carry ~140MB of local symbols (static functions,
+  # etc.). `strip -x` removes only locals, keeping every external symbol — Apple's
+  # strip preserves any local still referenced by a relocation, so the archive
+  # stays statically linkable (verified: a consumer linking the wke* exports
+  # resolves its whole dependency chain with zero relocation errors). Cuts
+  # libminiblink.a ~276MB -> ~134MB.
+  echo "==> [$LABEL] stripping local symbols from libminiblink.a"
+  strip -x "$STAGE/lib/libminiblink.a"
 fi
 
 if [ "$WANT_DYNAMIC" = true ]; then
