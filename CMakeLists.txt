@@ -171,6 +171,62 @@ if(MINIBLINK_BUILD_BLINK)
             -licucore -lxml2 -lxslt -lz -lcurl
             "-framework Cocoa" "-framework CoreText" "-framework CoreGraphics"
             "-framework CoreFoundation" "-framework Foundation" "-framework AppKit" "-framework Carbon")
+
+        # miniblink: the dynamic library (libminiblink.dylib) — the macOS analog of
+        # the Windows miniblink.dll. Exports the wke C API (wke/wke.h); the surface
+        # is pulled in whole via -force_load of libwke.a, exactly like the execs.
+        # mb_dll_main.cpp is an empty TU on non-Windows, so it just gives the SHARED
+        # target a source. __declspec(dllexport) is a no-op on macOS — the symbols
+        # are exported by the linker's default (non-hidden) visibility.
+        add_library(miniblink SHARED "${CMAKE_SOURCE_DIR}/content/web_impl_win/mb_dll_main.cpp")
+        set_target_properties(miniblink PROPERTIES CXX_STANDARD 14)
+        target_include_directories(miniblink PRIVATE "${CMAKE_SOURCE_DIR}" "${CMAKE_SOURCE_DIR}/wke" "${CMAKE_SOURCE_DIR}/win_compat")
+        target_compile_options(miniblink PRIVATE -fdeclspec -fno-exceptions -Wno-deprecated-declarations)
+        target_link_libraries(miniblink PRIVATE
+            -Wl,-force_load,$<TARGET_FILE:wke> -Wl,-force_load,$<TARGET_FILE:wke_globals>
+            -Wl,-force_load,$<TARGET_FILE:blink_bindings_infra>
+            content_browser mc net_portable blink_web blink_modules blink_bindings blink_core
+            blink_generated blink_platform blink_heap_asm wtf skia_ext skia harfbuzz
+            miniblink_png miniblink_jpeg miniblink_webp miniblink_ots gin base "${_v8mono}"
+            -licucore -lxml2 -lxslt -lz -lcurl
+            "-framework Cocoa" "-framework CoreText" "-framework CoreGraphics"
+            "-framework CoreFoundation" "-framework Foundation" "-framework AppKit" "-framework Carbon")
+
+        # miniblink_static (libminiblink.a): merge the whole engine archive set + V8
+        # into one archive, so a consumer can link a single static library for the
+        # full wke surface. macOS analog of the Windows miniblink_static.lib. CMake
+        # builds an (empty on non-Windows) archive from mb_dll_main.cpp, then the
+        # POST_BUILD libtool step overwrites it with the merge — the same libtool
+        # invocation packaging used to do by hand.
+        add_library(miniblink_static STATIC "${CMAKE_SOURCE_DIR}/content/web_impl_win/mb_dll_main.cpp")
+        set_target_properties(miniblink_static PROPERTIES CXX_STANDARD 14 OUTPUT_NAME miniblink)
+        target_include_directories(miniblink_static PRIVATE "${CMAKE_SOURCE_DIR}" "${CMAKE_SOURCE_DIR}/wke" "${CMAKE_SOURCE_DIR}/win_compat")
+        target_compile_options(miniblink_static PRIVATE -fdeclspec -fno-exceptions -Wno-deprecated-declarations)
+        set(_mb_static_archives
+            wke wke_globals blink_bindings_infra content_browser mc net_portable
+            blink_web blink_modules blink_bindings blink_core blink_generated
+            blink_platform blink_heap_asm wtf skia_ext skia harfbuzz miniblink_png
+            miniblink_jpeg miniblink_webp miniblink_ots gin base)
+        add_dependencies(miniblink_static ${_mb_static_archives})
+        set(_mb_static_files "")
+        foreach(_a ${_mb_static_archives})
+            list(APPEND _mb_static_files "$<TARGET_FILE:${_a}>")
+        endforeach()
+        add_custom_command(TARGET miniblink_static POST_BUILD
+            COMMAND libtool -static -o "$<TARGET_FILE:miniblink_static>"
+                ${_mb_static_files} "${_v8mono}"
+            COMMENT "Merging engine archives + V8 into libminiblink.a"
+            VERBATIM)
+
+        # wke / wke_globals / blink_bindings_infra are pulled in only via the
+        # -force_load raw link flags above. A $<TARGET_FILE:> genex inside a raw
+        # flag string does not register a build-order dependency on the Makefiles
+        # generator, so without naming them explicitly they may not be built before
+        # the link (libwke.a / libblink_bindings_infra.a "not found"). The Windows
+        # path lists them as bare link items, so it already has this edge.
+        foreach(_mb_exe minibrowser mb_demo wkexe miniblink)
+            add_dependencies(${_mb_exe} wke wke_globals blink_bindings_infra)
+        endforeach()
     endif()
 
     if(MB_OS_WINDOWS)
